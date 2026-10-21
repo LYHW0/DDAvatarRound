@@ -16,12 +16,14 @@
 NSString *const WCRCornerSettingsChangedNotification = @"WCRCornerSettingsChangedNotification";
 
 static NSString *WCRConfigPath(void) {
-    // rootless 与 rootful 都兼容
-    NSString *base = @"/var/mobile/Library/Preferences";
-    if (![[NSFileManager defaultManager] fileExistsAtPath:base]) {
-        base = NSTemporaryDirectory();
-    }
-    return [base stringByAppendingPathComponent:@"com.wcr.corner.reverse.plist"];
+    // Sideloaded apps are sandboxed; store configuration inside this app's container.
+    NSString *library = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Preferences"];
+    NSError *error = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:library
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:&error];
+    return [library stringByAppendingPathComponent:@"com.wcr.corner.reverse.plist"];
 }
 
 #pragma mark - C++ 小工具(纯逻辑,不依赖 ObjC)
@@ -78,7 +80,14 @@ static inline void unpack(unsigned int hex, double &r, double &g, double &b) {
 #pragma mark 底层读写
 
 - (void)persist {
-    [_store writeToFile:WCRConfigPath() atomically:YES];
+    NSURL *url = [NSURL fileURLWithPath:WCRConfigPath()];
+    NSError *error = nil;
+    BOOL written = [_store writeToURL:url
+                              options:NSPropertyListBinaryFormat_v1_0
+                                error:&error];
+    if (!written) {
+        NSLog(@"[WCCornerReverse] config write failed at %@: %@", url.path, error);
+    }
 }
 
 // KVC expects setters such as setSearchCornerEnabled:, while the X-macro
