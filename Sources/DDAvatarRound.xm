@@ -226,4 +226,21 @@
             globalSectionSpacing = 0.0f;
         }
     }
+    
+    // 延迟注册到插件收纳器（等待 wcplugins.dylib 初始化）
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            Class wcpluginsMgr = NSClassFromString(@"WCPluginsMgr");
+            if (wcpluginsMgr) {
+                id mgr = [wcpluginsMgr performSelector:@selector(sharedInstance)];
+                SEL registerSel = @selector(registerControllerWithTitle:version:controller:);
+                if ([mgr respondsToSelector:registerSel]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                    [mgr performSelector:registerSel withObject:@"DD圆角美化" withObject:@"v1.0.9" withObject:@"DDAvatarCornerSettingsViewController"];
+#pragma clang diagnostic pop
+                }
+            }
+        }
+    });
 }

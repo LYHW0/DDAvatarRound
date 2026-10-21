@@ -41,3 +41,7 @@ static BOOL isListCornerEnabled = YES;
 static float customListCornerRadius = 16.0f;
 static CGFloat globalSectionMargin = 15.0f;
 static CGFloat globalSectionSpacing = 12.0f;
+
+// ========== 设置界面声明 ==========
+@interface DDAvatarCornerSettingsViewController : UIViewController
+@end
