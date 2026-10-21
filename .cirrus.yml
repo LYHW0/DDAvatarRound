@@ -1,0 +1,17 @@
+macos_instance:
+  image: ghcr.io/cirruslabs/macos-runner:sonoma
+
+task:
+  name: Build WCCornerReverse
+  install_script:
+    - brew install ldid
+    - |
+      if [ ! -d "$HOME/theos" ]; then
+        git clone --recursive https://github.com/theos/theos.git ~/theos
+      fi
+  build_script:
+    - export THEOS=~/theos
+    - make clean || true
+    - make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+  artifacts:
+    path: "packages/*.deb"
