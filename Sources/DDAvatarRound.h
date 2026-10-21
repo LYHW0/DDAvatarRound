@@ -1,6 +1,23 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
+// ========== 微信类接口声明 ==========
+@interface MMHeadImageView : UIView
+@property (nonatomic, strong) UIView *headImageView;
+@end
+
+@interface FakeHeadImageView : UIView
+@end
+
+@interface WCTableViewSectionManager : NSObject
+@end
+
+@interface UITableViewCell (WeChat)
+@end
+
+@interface UITableView (WeChat)
+@end
+
 // ========== NSUserDefaults 配置键 ==========
 static NSString * const kUserDefaultsSuiteName = @"com.cyansmoke.wechattweak";
 
