@@ -7,6 +7,9 @@
 		<key>Bundles</key>
 		<array>
 			<string>com.tencent.xin</string>
+			<string>com.tencent.mm</string>
+			<string>com.tencent.mm.xin</string>
+			<string>com.tencent.qy.xin</string>
 		</array>
 	</dict>
 </dict>
