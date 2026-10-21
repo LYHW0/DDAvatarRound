@@ -8,7 +8,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = WCRefineRebuild
 
 WCRefineRebuild_FILES = Tweak.x $(wildcard Sources/*.x) $(wildcard Sources/*.m)
-WCRefineRebuild_CFLAGS = -fobjc-arc -ISources -Wno-deprecated-declarations -Wno-unused-function
+WCRefineRebuild_CFLAGS = -fobjc-arc -ISources -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-property-ivar
 WCRefineRebuild_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics CoreFoundation
 WCRefineRebuild_LIBRARIES =
 
