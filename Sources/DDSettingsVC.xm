@@ -54,14 +54,12 @@
         radiusCell.userInfo = @"ListRadiusCell";
         [listSection addCell:radiusCell];
         
-        // 置顶高度
         CGFloat pinnedHeight = [defaults doubleForKey:kPinnedSectionHeightKey];
         NSString *pinnedStr = pinnedHeight > 0 ? [NSString stringWithFormat:@"%.0fpt", pinnedHeight] : @"默认";
         WCTableViewCellManager *pinnedCell = [objc_getClass("WCTableViewCellManager") normalCellForSel:@selector(onPinnedHeightCellTapped) target:self title:@"置顶会话距顶部间距" rightValue:pinnedStr];
         pinnedCell.userInfo = @"PinnedHeightCell";
         [listSection addCell:pinnedCell];
         
-        // 普通会话间距
         CGFloat gap = [defaults doubleForKey:kBelowPinnedGapKey];
         NSString *gapStr = gap > 0 ? [NSString stringWithFormat:@"%.0fpt", gap] : @"默认";
         WCTableViewCellManager *gapCell = [objc_getClass("WCTableViewCellManager") normalCellForSel:@selector(onGapCellTapped) target:self title:@"普通会话距置顶间距" rightValue:gapStr];
@@ -120,6 +118,12 @@
     [defaults synchronize];
     
     isListCornerEnabled = sender.isOn;
+    if (!sender.isOn) {
+        customListCornerRadius = 0.0f;
+    } else {
+        float r = [defaults floatForKey:kListCornerRadiusKey];
+        customListCornerRadius = (r > 0) ? r : 8.0f;
+    }
     
     [self buildTable];
     [self showRestartAlert];
