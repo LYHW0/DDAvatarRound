@@ -120,7 +120,7 @@
     }
 }
 
-@end
+%end
 
 // ========== 置顶间距 Hook ==========
 %hook MMConversationListViewController
