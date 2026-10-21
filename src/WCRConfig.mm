@@ -82,9 +82,11 @@ static inline void unpack(unsigned int hex, double &r, double &g, double &b) {
 - (void)persist {
     NSURL *url = [NSURL fileURLWithPath:WCRConfigPath()];
     NSError *error = nil;
-    BOOL written = [_store writeToURL:url
-                              options:NSPropertyListBinaryFormat_v1_0
-                                error:&error];
+    NSData *data = [NSPropertyListSerialization dataWithPropertyList:_store
+                                                            format:NSPropertyListBinaryFormat_v1_0
+                                                           options:0
+                                                             error:&error];
+    BOOL written = data && [data writeToURL:url options:NSDataWritingAtomic error:&error];
     if (!written) {
         NSLog(@"[WCCornerReverse] config write failed at %@: %@", url.path, error);
     }
