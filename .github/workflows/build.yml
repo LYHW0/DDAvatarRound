@@ -1,0 +1,42 @@
+name: build-arm64
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      SIGN_MODE: adhoc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select iOS SDK and install dpkg
+        run: |
+          brew install dpkg
+          SDK_PATH="$(xcrun --sdk iphoneos --show-sdk-path)"
+          test -d "$SDK_PATH/System/Library/Frameworks"
+          echo "SDK=$SDK_PATH" >> "$GITHUB_ENV"
+      - name: Build signed arm64 dylib
+        run: ./build-dylib.sh
+      - name: Verify arm64 and signature
+        run: |
+          file dist/WCCornerReverse.dylib
+          lipo -info dist/WCCornerReverse.dylib
+          codesign --verify --strict --verbose=2 dist/WCCornerReverse.dylib
+      - name: Package deb
+        run: ./build-deb.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WCCornerReverse-arm64
+          path: |
+            packages/*.deb
+            dist/WCCornerReverse.dylib
+          if-no-files-found: error
+          retention-days: 14
