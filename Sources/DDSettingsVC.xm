@@ -1,6 +1,6 @@
 #import "DDAvatarRound.h"
 
-@interface DDAvatarCornerSettingsViewController : UITableViewController
+@interface DDAvatarCornerSettingsViewController ()
 @end
 
 @implementation DDAvatarCornerSettingsViewController {
