@@ -237,7 +237,7 @@
                     // 使用 objc_msgSend 调用三参数方法
                     typedef id (*func_t)(id, SEL, id, id, id);
                     func_t method = (func_t)(void *)objc_msgSend;
-                    method(mgr, sel_registerName("registerControllerWithTitle:version:controller:"), @"DD圆角美化", @"v1.0.10", @"DDAvatarCornerSettingsViewController");
+                    method(mgr, sel_registerName("registerControllerWithTitle:version:controller:"), @"DD圆角美化", @"v1.0.14", NSStringFromClass([DDAvatarCornerSettingsViewController class]));
                 }
             }
         }
