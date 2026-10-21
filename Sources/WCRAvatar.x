@@ -96,22 +96,22 @@ static void WCRApplyAvatarStyle(UIView *view, BOOL chatPage) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRApplyAvatarStyle(self, NO);
+    WCRApplyAvatarStyle((UIView *)self, NO);
 }
 
 - (void)setFrame:(CGRect)frame {
     %orig;
-    WCRApplyAvatarStyle(self, NO);
+    WCRApplyAvatarStyle((UIView *)self, NO);
 }
 
 - (void)setBounds:(CGRect)bounds {
     %orig;
-    WCRApplyAvatarStyle(self, NO);
+    WCRApplyAvatarStyle((UIView *)self, NO);
 }
 
 - (void)setHeadImageViewCornerRadius:(double)radius {
     %orig;
-    WCRApplyAvatarStyle(self, NO);
+    WCRApplyAvatarStyle((UIView *)self, NO);
 }
 
 %end
@@ -121,7 +121,7 @@ static void WCRApplyAvatarStyle(UIView *view, BOOL chatPage) {
 - (void)setImage:(UIImage *)image {
     %orig;
     if (!WCRACfg().avatarCornerEnabled) return;
-    WCRApplyAvatarStyle(self, NO);
+    WCRApplyAvatarStyle((UIView *)self, NO);
 }
 
 %end
@@ -130,7 +130,7 @@ static void WCRApplyAvatarStyle(UIView *view, BOOL chatPage) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRApplyAvatarStyle(self, NO);
+    WCRApplyAvatarStyle((UIView *)self, NO);
 }
 
 %end
@@ -139,7 +139,7 @@ static void WCRApplyAvatarStyle(UIView *view, BOOL chatPage) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRApplyAvatarStyle(self, NO);
+    WCRApplyAvatarStyle((UIView *)self, NO);
 }
 
 %end
