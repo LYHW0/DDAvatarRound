@@ -26,7 +26,10 @@ jobs:
           ls -l "$THEOS/sdks"
 
       - name: Build package (arm64 / rootless)
-        run: make clean && make package FINALPACKAGE=1
+        run: |
+          make clean || true
+          make package FINALPACKAGE=1 ARCHS=arm64
+          test -n "$(find packages -maxdepth 1 -name '*.deb' -print -quit)"
 
       - name: Show output
         run: ls -lh packages/
