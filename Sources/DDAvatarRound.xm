@@ -225,12 +225,5 @@
             globalSectionMargin = 0.0f;
             globalSectionSpacing = 0.0f;
         }
-        
-        if (NSClassFromString(@"WCPluginsMgr")) {
-            [[objc_getClass("WCPluginsMgr") sharedInstance] 
-                registerControllerWithTitle:@"DD头像圆角" 
-                                   version:@"1.0.5" 
-                                controller:@"DDAvatarCornerSettingsViewController"];
-        }
     }
 }
