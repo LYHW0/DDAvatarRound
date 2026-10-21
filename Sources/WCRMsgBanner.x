@@ -124,6 +124,7 @@ static void WCRStyleBannerView(UIView *banner) {
     UIColor *contentColor = WCRColorForAppearance(cfg.msgBannerContentColorLight, cfg.msgBannerContentColorDark);
 
     __block void (^walk)(UIView *);
+    __weak __typeof__(walk) weakWalk = nil;
     walk = ^(UIView *v) {
         if ([v isKindOfClass:[UILabel class]]) {
             UILabel *label = (UILabel *)v;
@@ -134,10 +135,12 @@ static void WCRStyleBannerView(UIView *banner) {
                 label.textColor = contentColor;
             }
         }
+        void (^recurse)(UIView *) = weakWalk;
         for (UIView *sub in v.subviews) {
-            walk(sub);
+            if (recurse) recurse(sub);
         }
     };
+    weakWalk = walk;
     walk(banner);
 }
 
