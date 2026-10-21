@@ -81,6 +81,35 @@ static inline void unpack(unsigned int hex, double &r, double &g, double &b) {
     [_store writeToFile:WCRConfigPath() atomically:YES];
 }
 
+// KVC expects setters such as setSearchCornerEnabled:, while the X-macro
+// accessors intentionally preserve the upstream lowercase selector names.
+// Route UI edits through those accessors so clamping and persistence still run.
+- (void)setValue:(id)value forKey:(NSString *)key {
+    if (!key.length) return;
+#define WCR_KVC_SET_BOOL(name, def) \
+    if ([key isEqualToString:@#name]) { [self set##name:[value boolValue]]; return; }
+    WCR_BOOL_ITEMS(WCR_KVC_SET_BOOL)
+#undef WCR_KVC_SET_BOOL
+#define WCR_KVC_SET_INT(name, def, lo, hi) \
+    if ([key isEqualToString:@#name]) { [self set##name:[value integerValue]]; return; }
+    WCR_INT_ITEMS(WCR_KVC_SET_INT)
+#undef WCR_KVC_SET_INT
+#define WCR_KVC_SET_FLOAT(name, def, lo, hi) \
+    if ([key isEqualToString:@#name]) { [self set##name:[value doubleValue]]; return; }
+    WCR_FLOAT_ITEMS(WCR_KVC_SET_FLOAT)
+#undef WCR_KVC_SET_FLOAT
+#define WCR_KVC_SET_STRING(name, def) \
+    if ([key isEqualToString:@#name]) { [self set##name:value]; return; }
+    WCR_STRING_ITEMS(WCR_KVC_SET_STRING)
+#undef WCR_KVC_SET_STRING
+#define WCR_KVC_SET_COLOR(base, light, dark) \
+    if ([key isEqualToString:@#base "Light"]) { [self set##base##Light:value]; return; } \
+    if ([key isEqualToString:@#base "Dark"]) { [self set##base##Dark:value]; return; }
+    WCR_COLOR_ITEMS(WCR_KVC_SET_COLOR)
+#undef WCR_KVC_SET_COLOR
+    [super setValue:value forKey:key];
+}
+
 - (void)notifyChanged {
     [[NSNotificationCenter defaultCenter] postNotificationName:WCRCornerSettingsChangedNotification
                                                         object:nil];
