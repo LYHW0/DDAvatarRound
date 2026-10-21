@@ -43,5 +43,5 @@ static CGFloat globalSectionMargin = 15.0f;
 static CGFloat globalSectionSpacing = 12.0f;
 
 // ========== 设置界面声明 ==========
-@interface DDAvatarCornerSettingsViewController : UIViewController
+@interface DDAvatarCornerSettingsViewController : UITableViewController
 @end
