@@ -75,7 +75,7 @@ static void WCRApplyProfileCardCorner(UIViewController *vc) {
 
             for (UIView *cell in table.subviews) {
                 if ([NSStringFromClass([cell class]) containsString:@"Cell"]) {
-                    WCRApplyCorner(cell.contentView, radius, 0, nil, YES);
+                    WCRApplyCorner(((UITableViewCell *)cell).contentView, radius, 0, nil, YES);
                 }
             }
         } else if ([NSStringFromClass([sub class]) containsString:@"Header"]) {
@@ -94,6 +94,7 @@ static void WCRApplyProfileColors(UIViewController *vc) {
     UIColor *signColor = WCRColorForAppearance(cfg.profileCardSignatureLightColor, cfg.profileCardSignatureDarkColor);
 
     __block void (^walk)(UIView *);
+    __weak __typeof__(walk) weakWalk = nil;
     walk = ^(UIView *view) {
         if ([view isKindOfClass:[UILabel class]]) {
             UILabel *label = (UILabel *)view;
@@ -109,10 +110,12 @@ static void WCRApplyProfileColors(UIViewController *vc) {
                 label.hidden = YES;
             }
         }
+        void (^recurse)(UIView *) = weakWalk;
         for (UIView *sub in view.subviews) {
-            walk(sub);
+            if (recurse) recurse(sub);
         }
     };
+    weakWalk = walk;
     walk(vc.view);
 }
 
@@ -120,20 +123,21 @@ static void WCRApplyProfileColors(UIViewController *vc) {
 
 - (void)viewDidLoad {
     %orig;
-    WCRApplyProfileBackground(self);
-    WCRApplyProfileCardCorner(self);
-    WCRApplyProfileColors(self);
+    UIViewController *controller = (UIViewController *)self;
+    WCRApplyProfileBackground(controller);
+    WCRApplyProfileCardCorner(controller);
+    WCRApplyProfileColors(controller);
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    WCRApplyProfileBackground(self);
+    WCRApplyProfileBackground((UIViewController *)self);
 }
 
 - (void)viewDidLayoutSubviews {
     %orig;
-    WCRApplyProfileBackground(self);
-    WCRApplyProfileCardCorner(self);
+    WCRApplyProfileBackground((UIViewController *)self);
+    WCRApplyProfileCardCorner((UIViewController *)self);
 }
 
 %end
