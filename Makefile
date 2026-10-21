@@ -1,4 +1,4 @@
-ARCHS = arm64 arm64e
+ARCHS = arm64
 TARGET = iphone:clang:latest:14.0
 THEOS_PACKAGE_SCHEME = rootless
 INSTALL_TARGET_PROCESSES = WeChat
