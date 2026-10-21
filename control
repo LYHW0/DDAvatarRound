@@ -1,7 +1,7 @@
 Section: Tweaks
 Architecture: iphoneos-arm64
 Name: DD头像圆角
-Version: 1.0.5
+Version: 1.0.8
 Package: com.cyansmoke.ddavatarrond
 Depends: mobilesubstrate
 Maintainer: cyansmoke
