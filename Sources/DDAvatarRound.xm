@@ -88,19 +88,96 @@
 
 %end
 
+// ========== 列表圆角 Hook ==========
+%hook MMTableViewCell
+
+- (void)layoutSubviews {
+    %orig;
+    if (isListCornerEnabled) {
+        CGFloat radius = customListCornerRadius;
+        BOOL clipToBounds = (radius > 0);
+        
+        // 给外层 contentView 设置圆角
+        self.layer.cornerRadius = radius;
+        self.layer.masksToBounds = clipToBounds;
+        
+        // 处理内层背景 view（如果有）
+        if (self.bgView) {
+            self.bgView.cornerRadius = radius;
+            self.bgView.masksToBounds = clipToBounds;
+        }
+        
+        // 递归处理子视图
+        for (UIView *subview in self.subviews) {
+            if ([subview isKindOfClass:[UIImageView class]]) {
+                UIImageView *imgView = (UIImageView *)subview;
+                if (imgView.layer.cornerRadius != radius) {
+                    imgView.layer.cornerRadius = radius;
+                    imgView.layer.masksToBounds = clipToBounds;
+                }
+            }
+        }
+    }
+}
+
+@end
+
+// ========== 置顶间距 Hook ==========
+%hook MMConversationListViewController
+
+- (void)setPinnedSectionHeight:(CGFloat)height {
+    // 如果用户设置了自定义高度，使用用户的值
+    if (pinnedSectionHeight > 0) {
+        %orig(pinnedSectionHeight);
+    } else {
+        %orig(height);
+    }
+}
+
+- (void)setBelowPinnedSectionHeight:(CGFloat)height {
+    // 如果用户设置了自定义高度，使用用户的值
+    if (belowPinnedContentGap > 0) {
+        %orig(belowPinnedContentGap);
+    } else {
+        %orig(height);
+    }
+}
+
+- (void)setBelowPinnedContentGap:(CGFloat)gap {
+    // 如果用户设置了自定义间距，使用用户的值
+    if (belowPinnedContentGap > 0) {
+        %orig(belowPinnedContentGap);
+    } else {
+        %orig(gap);
+    }
+}
+
+%end
+
 // ========== 插件初始化 ==========
 %ctor {
     @autoreleasepool {
         NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
+        
+        // 头像圆角设置
         isRoundAvatarEnabled = [defaults boolForKey:kRoundAvatarKey];
         customCornerRadius = [defaults floatForKey:kAvatarCornerRadiusKey];
         if (customCornerRadius == 0) customCornerRadius = 1.0f;
+        
+        // 列表圆角设置
+        isListCornerEnabled = [defaults boolForKey:kListCornerRadiusKey];
+        customListCornerRadius = [defaults floatForKey:kListCornerRadiusKey];
+        if (customListCornerRadius == 0) customListCornerRadius = 8.0f;
+        
+        // 间距设置
+        pinnedSectionHeight = [defaults doubleForKey:kPinnedSectionHeightKey];
+        belowPinnedContentGap = [defaults doubleForKey:kBelowPinnedGapKey];
         
         // 注册到微信插件管理器
         if (NSClassFromString(@"WCPluginsMgr")) {
             [[objc_getClass("WCPluginsMgr") sharedInstance] 
                 registerControllerWithTitle:@"DD头像圆角" 
-                                   version:@"1.0.0" 
+                                   version:@"1.0.1" 
                                 controller:@"DDAvatarCornerSettingsViewController"];
         }
     }

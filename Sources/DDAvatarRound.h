@@ -38,13 +38,32 @@
 - (id)initWithRoundCorner:(BOOL)arg1;
 @end
 
+// ========== 列表圆角类声明 ==========
+@interface MMTableViewCell : UIView
+@property(retain, nonatomic) CALayer *bgView;
+@end
+
+@interface MMConversationListViewController : NSObject
+@property(nonatomic, assign) CGFloat pinnedSectionHeight;
+@property(nonatomic, assign) CGFloat belowPinnedSectionHeight;
+@property(nonatomic, assign) CGFloat belowPinnedContentGap;
+@end
+
 // ========== 配置常量 ==========
 static NSString * const kUserDefaultsSuiteName = @"com.cyansmoke.wechattweak";
 static NSString * const kRoundAvatarKey = @"roundAvatar";
 static NSString * const kAvatarCornerRadiusKey = @"avatarCornerRadius";
+static NSString * const kListCornerEnabledKey = @"listCornerEnabled";
+static NSString * const kListCornerRadiusKey = @"listCornerRadius";
+static NSString * const kPinnedSectionHeightKey = @"pinnedSectionHeight";
+static NSString * const kBelowPinnedGapKey = @"belowPinnedGap";
 
 static BOOL isRoundAvatarEnabled = NO;
 static float customCornerRadius = 1.0f;
+static BOOL isListCornerEnabled = YES;
+static float customListCornerRadius = 8.0f;
+static CGFloat pinnedSectionHeight = 0;
+static CGFloat belowPinnedContentGap = 8;
 
 // ========== 设置界面声明 ==========
 @interface DDAvatarCornerSettingsViewController : UIViewController
