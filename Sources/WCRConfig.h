@@ -124,8 +124,8 @@ extern NSString * const WCRSettingsChangedNotification;
 @property (nonatomic, assign) BOOL menuTextCenterEnabled;
 
 // ---------------- 通用 ----------------
-- (id)objectForKey:(NSString *)key def:(id)def;
-- (void)setObject:(id)value forKey:(NSString *)key;
+- (id _Nullable)objectForKey:(NSString *)key def:(id _Nullable)def;
+- (void)setObject:(id _Nullable)value forKey:(NSString *)key;
 
 @end
 

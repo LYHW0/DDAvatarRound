@@ -46,13 +46,13 @@ static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
     [self.defaults synchronize];
 }
 
-- (id)objectForKey:(NSString *)key def:(id _Nullable)def {
+- (id _Nullable)objectForKey:(NSString *)key def:(id _Nullable)def {
     id v = [self.defaults objectForKey:key];
     if (v == nil || v == [NSNull null]) return def;
     return v;
 }
 
-- (void)setObject:(id)value forKey:(NSString *)key {
+- (void)setObject:(id _Nullable)value forKey:(NSString *)key {
     if (value == nil) {
         [self.defaults removeObjectForKey:key];
     } else {
