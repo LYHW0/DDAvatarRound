@@ -1,10 +1,10 @@
 Section: Tweaks
 Architecture: iphoneos-arm64
 Name: DD头像圆角
-Version: 1.0.1
+Version: 1.0.5
 Package: com.cyansmoke.ddavatarrond
 Depends: mobilesubstrate
 Maintainer: cyansmoke
 Author: cyansmoke
-Description: 微信头像圆角美化插件，支持自定义圆角程度，纯设置界面控制。
+Description: 微信头像圆角美化插件，支持头像圆角自定义及全局列表卡片化圆角（微信/通讯录/发现/我的）
 Config: *

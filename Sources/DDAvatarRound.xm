@@ -83,51 +83,119 @@
 
 %end
 
-// ========== 列表圆角 Hook ==========
-%hook MMTableViewCell
+// ========== 列表分组圆角 Hook ==========
+%hook WCTableViewSectionManager
 
-- (void)layoutSubviews {
+- (void)addCell:(id)cell {
     %orig;
-    if (isListCornerEnabled && customListCornerRadius > 0) {
-        self.layer.cornerRadius = customListCornerRadius;
-        self.layer.masksToBounds = YES;
-        
-        for (UIView *subview in self.subviews) {
-            if ([subview isKindOfClass:[UIImageView class]]) {
-                UIImageView *imgView = (UIImageView *)subview;
-                imgView.layer.cornerRadius = customListCornerRadius;
-                imgView.layer.masksToBounds = YES;
+    if (!isListCornerEnabled || customListCornerRadius <= 0) return;
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if ([cell respondsToSelector:@selector(superview)]) {
+            UIView *cellView = (UIView *)cell;
+            UIView *parent = cellView.superview;
+            
+            while (parent && ![parent isKindOfClass:[UITableViewCell class]]) {
+                parent = parent.superview;
+            }
+            
+            if (parent) {
+                parent.layer.cornerRadius = customListCornerRadius;
+                parent.layer.masksToBounds = YES;
+                
+                if (globalSectionMargin > 0) {
+                    CGRect frame = parent.frame;
+                    frame.origin.x = globalSectionMargin;
+                    frame.size.width = [UIScreen mainScreen].bounds.size.width - globalSectionMargin * 2;
+                    parent.frame = frame;
+                }
             }
         }
-    }
+    });
 }
 
 %end
 
-// ========== 置顶间距 Hook ==========
-%hook MMConversationListViewController
+// ========== UITableView 分组样式全局 Hook ==========
+%hook UITableView
 
-- (void)setPinnedSectionHeight:(CGFloat)height {
-    if (pinnedSectionHeight > 0) {
-        %orig(pinnedSectionHeight);
-    } else {
-        %orig(height);
+- (id)initWithFrame:(CGRect)frame style:(NSInteger)style {
+    if (isListCornerEnabled && globalSectionMargin > 0 && style == 1) {
+        UITableView *tv = %orig(frame, style);
+        tv.separatorStyle = UITableViewCellSeparatorStyleNone;
+        tv.backgroundColor = [UIColor colorWithRed:0.949 green:0.949 blue:0.949 alpha:1.0];
+        if (@available(iOS 15.0, *)) {
+            tv.sectionHeaderTopPadding = globalSectionSpacing / 2.0;
+        }
+        return tv;
     }
+    return %orig;
 }
 
-- (void)setBelowPinnedSectionHeight:(CGFloat)height {
-    if (belowPinnedContentGap > 0) {
-        %orig(belowPinnedContentGap);
-    } else {
-        %orig(height);
-    }
-}
+%end
 
-- (void)setBelowPinnedContentGap:(CGFloat)gap {
-    if (belowPinnedContentGap > 0) {
-        %orig(belowPinnedContentGap);
+// ========== UITableViewCell 统一圆角 Hook ==========
+%hook UITableViewCell
+
+- (void)layoutSubviews {
+    %orig;
+    if (!isListCornerEnabled || customListCornerRadius <= 0) return;
+    
+    UITableView *tableView = (UITableView *)self.superview;
+    while (tableView && ![tableView isKindOfClass:[UITableView class]]) {
+        tableView = (UITableView *)tableView.superview;
+    }
+    
+    if (!tableView || tableView.style != UITableViewStyleGrouped) return;
+    
+    NSIndexPath *indexPath = [tableView indexPathForCell:self];
+    if (!indexPath) return;
+    
+    NSInteger rowCount = [tableView numberOfRowsInSection:indexPath.section];
+    if (rowCount <= 0) return;
+    
+    self.layer.cornerRadius = customListCornerRadius;
+    self.layer.masksToBounds = YES;
+    
+    UIRectCorner corners = 0;
+    if (indexPath.row == 0) {
+        corners |= UIRectCornerTopLeft | UIRectCornerTopRight;
+    }
+    if (indexPath.row == rowCount - 1) {
+        corners |= UIRectCornerBottomLeft | UIRectCornerBottomRight;
+    }
+    
+    if (corners != 0) {
+        UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.bounds
+                                                   byRoundingCorners:corners
+                                                         cornerRadii:CGSizeMake(customListCornerRadius, customListCornerRadius)];
+        CAShapeLayer *mask = [CAShapeLayer layer];
+        mask.path = path.CGPath;
+        self.layer.mask = mask;
     } else {
-        %orig(gap);
+        self.layer.mask = nil;
+    }
+    
+    if (globalSectionMargin > 0) {
+        CGRect frame = self.frame;
+        CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
+        frame.origin.x = globalSectionMargin;
+        frame.size.width = screenWidth - globalSectionMargin * 2;
+        self.frame = frame;
+    }
+    
+    for (UIView *sub in self.subviews) {
+        if ([NSStringFromClass([sub class]) containsString:@"SeparatorView"]) {
+            if (indexPath.row == rowCount - 1) {
+                sub.hidden = YES;
+            }
+            if (globalSectionMargin > 0) {
+                CGRect sepFrame = sub.frame;
+                sepFrame.origin.x = globalSectionMargin;
+                sepFrame.size.width -= globalSectionMargin;
+                sub.frame = sepFrame;
+            }
+        }
     }
 }
 
@@ -145,18 +213,23 @@
         isListCornerEnabled = [defaults boolForKey:kListCornerEnabledKey];
         if (isListCornerEnabled) {
             customListCornerRadius = [defaults floatForKey:kListCornerRadiusKey];
-            if (customListCornerRadius == 0) customListCornerRadius = 8.0f;
+            if (customListCornerRadius == 0) customListCornerRadius = 16.0f;
+            
+            globalSectionMargin = [defaults floatForKey:kSectionMarginKey];
+            if (globalSectionMargin == 0) globalSectionMargin = 15.0f;
+            
+            globalSectionSpacing = [defaults floatForKey:kSectionSpacingKey];
+            if (globalSectionSpacing == 0) globalSectionSpacing = 12.0f;
         } else {
             customListCornerRadius = 0.0f;
+            globalSectionMargin = 0.0f;
+            globalSectionSpacing = 0.0f;
         }
-        
-        pinnedSectionHeight = [defaults doubleForKey:kPinnedSectionHeightKey];
-        belowPinnedContentGap = [defaults doubleForKey:kBelowPinnedGapKey];
         
         if (NSClassFromString(@"WCPluginsMgr")) {
             [[objc_getClass("WCPluginsMgr") sharedInstance] 
                 registerControllerWithTitle:@"DD头像圆角" 
-                                   version:@"1.0.4" 
+                                   version:@"1.0.5" 
                                 controller:@"DDAvatarCornerSettingsViewController"];
         }
     }

@@ -1,249 +1,247 @@
 #import "DDAvatarRound.h"
 
+@interface DDAvatarCornerSettingsViewController : UITableViewController
+@end
+
 @implementation DDAvatarCornerSettingsViewController {
-    id _originalDelegate;
+    NSUserDefaults *defaults;
 }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"DD头像圆角";
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
-    
-    _tableViewManager = [[objc_getClass("WCTableViewManager") alloc] initWithFrame:self.view.bounds style:UITableViewStyleInsetGrouped];
-    _tableViewManager.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _tableViewManager.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
-    [self.view addSubview:_tableViewManager.tableView];
-    
-    _originalDelegate = _tableViewManager.delegate;
-    _tableViewManager.delegate = self;
-    
-    [self buildTable];
-}
-
-- (void)buildTable {
-    [_tableViewManager clearAllSection];
-    
-    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
-    
-    // ========== 头像圆角区块 ==========
-    WCTableViewSectionManager *avatarSection = [[objc_getClass("WCTableViewSectionManager") alloc] init];
-    BOOL isOn = [defaults boolForKey:kRoundAvatarKey];
-    [avatarSection addCell:[objc_getClass("WCTableViewCellManager") switchCellForSel:@selector(onMainSwitchChanged:) target:self title:@"启用圆角头像" on:isOn]];
-    
-    if (isOn) {
-        float radius = [defaults floatForKey:kAvatarCornerRadiusKey];
-        if (radius == 0) radius = 1.0f;
-        NSString *rightValue = [NSString stringWithFormat:@"%.1f", radius];
-        WCTableViewCellManager *radiusCell = [objc_getClass("WCTableViewCellManager") normalCellForSel:@selector(onAvatarRadiusCellTapped) target:self title:@"↳设置圆角程度" rightValue:rightValue];
-        radiusCell.userInfo = @"AvatarRadiusCell";
-        [avatarSection addCell:radiusCell];
+    self.tableView.backgroundColor = [UIColor colorWithRed:0.949 green:0.949 blue:0.949 alpha:1.0];
+    if (@available(iOS 15.0, *)) {
+        self.tableView.sectionHeaderTopPadding = 8;
     }
     
-    [_tableViewManager addSection:avatarSection];
-    
-    // ========== 列表圆角区块 ==========
-    WCTableViewSectionManager *listSection = [[objc_getClass("WCTableViewSectionManager") alloc] init];
-    BOOL isListOn = [defaults boolForKey:kListCornerEnabledKey];
-    [listSection addCell:[objc_getClass("WCTableViewCellManager") switchCellForSel:@selector(onListCornerSwitchChanged:) target:self title:@"启用列表圆角" on:isListOn]];
-    
-    if (isListOn) {
-        float listRadius = [defaults floatForKey:kListCornerRadiusKey];
-        if (listRadius == 0) listRadius = 8.0f;
-        NSString *rightValue = [NSString stringWithFormat:@"%.0fpt", listRadius];
-        WCTableViewCellManager *radiusCell = [objc_getClass("WCTableViewCellManager") normalCellForSel:@selector(onListRadiusCellTapped) target:self title:@"↳列表圆角半径" rightValue:rightValue];
-        radiusCell.userInfo = @"ListRadiusCell";
-        [listSection addCell:radiusCell];
-        
-        CGFloat pinnedHeight = [defaults doubleForKey:kPinnedSectionHeightKey];
-        NSString *pinnedStr = pinnedHeight > 0 ? [NSString stringWithFormat:@"%.0fpt", pinnedHeight] : @"默认";
-        WCTableViewCellManager *pinnedCell = [objc_getClass("WCTableViewCellManager") normalCellForSel:@selector(onPinnedHeightCellTapped) target:self title:@"置顶会话距顶部间距" rightValue:pinnedStr];
-        pinnedCell.userInfo = @"PinnedHeightCell";
-        [listSection addCell:pinnedCell];
-        
-        CGFloat gap = [defaults doubleForKey:kBelowPinnedGapKey];
-        NSString *gapStr = gap > 0 ? [NSString stringWithFormat:@"%.0fpt", gap] : @"默认";
-        WCTableViewCellManager *gapCell = [objc_getClass("WCTableViewCellManager") normalCellForSel:@selector(onGapCellTapped) target:self title:@"普通会话距置顶间距" rightValue:gapStr];
-        gapCell.userInfo = @"GapCell";
-        [listSection addCell:gapCell];
-    }
-    
-    [_tableViewManager addSection:listSection];
-    [_tableViewManager reloadTableView];
+    defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
 }
 
-- (void)onMainSwitchChanged:(UISwitch *)sender {
-    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 2;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    if (section == 0) {
+        BOOL isOn = [defaults boolForKey:kRoundAvatarKey];
+        return isOn ? 2 : 1;
+    } else {
+        BOOL isOn = [defaults boolForKey:kListCornerEnabledKey];
+        return isOn ? 4 : 1;
+    }
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    return section == 0 ? @"头像圆角" : @"列表圆角";
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    if (section == 0) {
+        return @"调整头像的圆角程度，1.0为完全圆形";
+    } else {
+        return @"为微信、通讯录、发现、我的页面列表添加卡片式圆角";
+    }
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
+    
+    if (indexPath.section == 0) {
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"启用头像圆角";
+            UISwitch *switchView = [[UISwitch alloc] init];
+            switchView.on = [defaults boolForKey:kRoundAvatarKey];
+            [switchView addTarget:self action:@selector(onAvatarSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = switchView;
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        } else {
+            cell.textLabel.text = @"圆角程度";
+            float radius = [defaults floatForKey:kAvatarCornerRadiusKey];
+            if (radius == 0) radius = 1.0f;
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%.2f", radius];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        }
+    } else {
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"启用列表圆角";
+            UISwitch *switchView = [[UISwitch alloc] init];
+            switchView.on = [defaults boolForKey:kListCornerEnabledKey];
+            [switchView addTarget:self action:@selector(onListCornerSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = switchView;
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        } else if (indexPath.row == 1) {
+            cell.textLabel.text = @"圆角半径";
+            float radius = [defaults floatForKey:kListCornerRadiusKey];
+            if (radius == 0) radius = 16.0f;
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%.0fpt", radius];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if (indexPath.row == 2) {
+            cell.textLabel.text = @"左右边距";
+            float margin = [defaults floatForKey:kSectionMarginKey];
+            if (margin == 0) margin = 15.0f;
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%.0fpt", margin];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else {
+            cell.textLabel.text = @"分组间距";
+            float spacing = [defaults floatForKey:kSectionSpacingKey];
+            if (spacing == 0) spacing = 12.0f;
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%.0fpt", spacing];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        }
+    }
+    
+    return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    
+    if (indexPath.section == 0 && indexPath.row == 1) {
+        [self showAvatarRadiusAlert];
+    } else if (indexPath.section == 1 && indexPath.row == 1) {
+        [self showListCornerRadiusAlert];
+    } else if (indexPath.section == 1 && indexPath.row == 2) {
+        [self showSectionMarginAlert];
+    } else if (indexPath.section == 1 && indexPath.row == 3) {
+        [self showSectionSpacingAlert];
+    }
+}
+
+- (void)onAvatarSwitchChanged:(UISwitch *)sender {
     [defaults setBool:sender.isOn forKey:kRoundAvatarKey];
     [defaults synchronize];
-    
     isRoundAvatarEnabled = sender.isOn;
-    
-    [self buildTable];
-    [self showRestartAlert];
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0] withRowAnimation:UITableViewRowAnimationFade];
 }
 
-- (void)onAvatarRadiusCellTapped {
-    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
+- (void)onListCornerSwitchChanged:(UISwitch *)sender {
+    [defaults setBool:sender.isOn forKey:kListCornerEnabledKey];
+    [defaults synchronize];
+    isListCornerEnabled = sender.isOn;
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:1] withRowAnimation:UITableViewRowAnimationFade];
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示"
+                                                                   message:@"需要重启微信以应用列表圆角效果"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)showAvatarRadiusAlert {
     float currentRadius = [defaults floatForKey:kAvatarCornerRadiusKey];
     if (currentRadius == 0) currentRadius = 1.0f;
     
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"设置圆角程度" 
-                                                                   message:@"输入 0.1 ~ 1.0 之间的数值\n0.1 = 轻微圆角\n1.0 = 完全圆形" 
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"调整圆角程度"
+                                                                   message:@"输入 0.0 到 1.0 之间的值"
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"圆角程度";
+        textField.text = [NSString stringWithFormat:@"%.2f", currentRadius];
         textField.keyboardType = UIKeyboardTypeDecimalPad;
-        textField.text = [NSString stringWithFormat:@"%.1f", currentRadius];
     }];
+    
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         NSString *text = alert.textFields.firstObject.text;
         float val = [text floatValue];
-        if (val < 0.1f) val = 0.1f;
+        if (val < 0) val = 0;
         if (val > 1.0f) val = 1.0f;
+        
         [defaults setFloat:val forKey:kAvatarCornerRadiusKey];
         [defaults synchronize];
-        
         customCornerRadius = val;
-        
-        [self buildTable];
-        [self showRestartAlert];
+        [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:1 inSection:0]]
+                              withRowAnimation:UITableViewRowAnimationNone];
     }]];
+    
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)onListCornerSwitchChanged:(UISwitch *)sender {
-    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
-    [defaults setBool:sender.isOn forKey:kListCornerEnabledKey];
-    [defaults synchronize];
-    
-    isListCornerEnabled = sender.isOn;
-    if (!sender.isOn) {
-        customListCornerRadius = 0.0f;
-    } else {
-        float r = [defaults floatForKey:kListCornerRadiusKey];
-        customListCornerRadius = (r > 0) ? r : 8.0f;
-    }
-    
-    [self buildTable];
-    [self showRestartAlert];
-}
-
-- (void)onListRadiusCellTapped {
-    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
+- (void)showListCornerRadiusAlert {
     float currentRadius = [defaults floatForKey:kListCornerRadiusKey];
-    if (currentRadius == 0) currentRadius = 8.0f;
+    if (currentRadius == 0) currentRadius = 16.0f;
     
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"设置列表圆角半径" 
-                                                                   message:@"输入 0 ~ 30 之间的数值（pt）\n0 = 无圆角\n30 = 完全圆角" 
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"调整圆角半径"
+                                                                   message:@"输入 0 到 40 之间的值（推荐 12-20）"
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"圆角半径";
-        textField.keyboardType = UIKeyboardTypeNumberPad;
         textField.text = [NSString stringWithFormat:@"%.0f", currentRadius];
+        textField.keyboardType = UIKeyboardTypeNumberPad;
     }];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *text = alert.textFields.firstObject.text;
+        float val = [text floatValue];
+        if (val < 0) val = 0;
+        if (val > 40) val = 40;
+        
+        [defaults setFloat:val forKey:kListCornerRadiusKey];
+        [defaults synchronize];
+        customListCornerRadius = val;
+        [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:1 inSection:1]]
+                              withRowAnimation:UITableViewRowAnimationNone];
+    }]];
+    
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)showSectionMarginAlert {
+    float currentMargin = [defaults floatForKey:kSectionMarginKey];
+    if (currentMargin == 0) currentMargin = 15.0f;
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"调整左右边距"
+                                                                   message:@"输入 0 到 30 之间的值（推荐 10-20）"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.text = [NSString stringWithFormat:@"%.0f", currentMargin];
+        textField.keyboardType = UIKeyboardTypeNumberPad;
+    }];
+    
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         NSString *text = alert.textFields.firstObject.text;
         float val = [text floatValue];
         if (val < 0) val = 0;
         if (val > 30) val = 30;
-        [defaults setFloat:val forKey:kListCornerRadiusKey];
+        
+        [defaults setFloat:val forKey:kSectionMarginKey];
         [defaults synchronize];
-        
-        customListCornerRadius = val;
-        
-        [self buildTable];
-        [self showRestartAlert];
+        globalSectionMargin = val;
+        [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:2 inSection:1]]
+                              withRowAnimation:UITableViewRowAnimationNone];
     }]];
+    
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)onPinnedHeightCellTapped {
-    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
-    CGFloat currentHeight = [defaults doubleForKey:kPinnedSectionHeightKey];
+- (void)showSectionSpacingAlert {
+    float currentSpacing = [defaults floatForKey:kSectionSpacingKey];
+    if (currentSpacing == 0) currentSpacing = 12.0f;
     
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"设置置顶间距" 
-                                                                   message:@"输入置顶会话距离顶部的间距（pt）\n留空或输入 0 表示使用默认值" 
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"调整分组间距"
+                                                                   message:@"输入 0 到 30 之间的值（推荐 8-15）"
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"间距（pt）";
+        textField.text = [NSString stringWithFormat:@"%.0f", currentSpacing];
         textField.keyboardType = UIKeyboardTypeNumberPad;
-        textField.text = currentHeight > 0 ? [NSString stringWithFormat:@"%.0f", currentHeight] : @"";
     }];
+    
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         NSString *text = alert.textFields.firstObject.text;
-        if (text.length > 0) {
-            CGFloat val = [text floatValue];
-            if (val < 0) val = 0;
-            [defaults setDouble:val forKey:kPinnedSectionHeightKey];
-            pinnedSectionHeight = val;
-        } else {
-            [defaults removeObjectForKey:kPinnedSectionHeightKey];
-            pinnedSectionHeight = 0;
-        }
-        [defaults synchronize];
+        float val = [text floatValue];
+        if (val < 0) val = 0;
+        if (val > 30) val = 30;
         
-        [self buildTable];
-        [self showRestartAlert];
+        [defaults setFloat:val forKey:kSectionSpacingKey];
+        [defaults synchronize];
+        globalSectionSpacing = val;
+        [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:3 inSection:1]]
+                              withRowAnimation:UITableViewRowAnimationNone];
     }]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)onGapCellTapped {
-    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:kUserDefaultsSuiteName];
-    CGFloat currentGap = [defaults doubleForKey:kBelowPinnedGapKey];
     
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"设置普通间距" 
-                                                                   message:@"输入普通会话距离置顶会话的间距（pt）\n留空或输入 0 表示使用默认值" 
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"间距（pt）";
-        textField.keyboardType = UIKeyboardTypeNumberPad;
-        textField.text = currentGap > 0 ? [NSString stringWithFormat:@"%.0f", currentGap] : @"";
-    }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        NSString *text = alert.textFields.firstObject.text;
-        if (text.length > 0) {
-            CGFloat val = [text floatValue];
-            if (val < 0) val = 0;
-            [defaults setDouble:val forKey:kBelowPinnedGapKey];
-            belowPinnedContentGap = val;
-        } else {
-            [defaults removeObjectForKey:kBelowPinnedGapKey];
-            belowPinnedContentGap = 0;
-        }
-        [defaults synchronize];
-        
-        [self buildTable];
-        [self showRestartAlert];
-    }]];
     [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)showRestartAlert {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示"
-                                                                   message:@"设置已保存，需要重启微信才能生效。"
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    UIAlertAction *later = [UIAlertAction actionWithTitle:@"稍后重启" style:UIAlertActionStyleDefault handler:nil];
-    UIAlertAction *restart = [UIAlertAction actionWithTitle:@"立即重启" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-        exit(0);
-    }];
-    [alert addAction:later];
-    [alert addAction:restart];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-// WCTableViewManager delegate forwarding
-- (BOOL)respondsToSelector:(SEL)aSelector {
-    return [super respondsToSelector:aSelector] || [_originalDelegate respondsToSelector:aSelector];
-}
-
-- (id)forwardingTargetForSelector:(SEL)aSelector {
-    if ([_originalDelegate respondsToSelector:aSelector]) return _originalDelegate;
-    return [super forwardingTargetForSelector:aSelector];
 }
 
 @end
