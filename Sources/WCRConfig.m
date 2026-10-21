@@ -46,7 +46,7 @@ static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
     [self.defaults synchronize];
 }
 
-- (id)objectForKey:(NSString *)key def:(id)def {
+- (id)objectForKey:(NSString *)key def:(id _Nullable)def {
     id v = [self.defaults objectForKey:key];
     if (v == nil || v == [NSNull null]) return def;
     return v;
