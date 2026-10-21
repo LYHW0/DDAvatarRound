@@ -72,31 +72,34 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCornerEnabledForView(self)) return;
+    UIView *view = (UIView *)self;
+    if (!WCRCornerEnabledForView(view)) return;
 
     WCRConfig *cfg = WCRCfg();
     CGFloat radius = cfg.globalCornerRadius;
     CGFloat margin = cfg.globalCornerMargin;
+    UITableViewCell *cell = (UITableViewCell *)view;
+    UIView *content = cell.contentView;
 
     // cell 本身透明，圆角套在 contentView 上，避免把分隔线一起裁掉
-    self.backgroundColor = [UIColor clearColor];
-    self.contentView.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
-                                                              cfg.globalCornerBackgroundColorDark);
-    WCRApplyCorner(self.contentView, radius, cfg.globalCornerStroke,
+    cell.backgroundColor = [UIColor clearColor];
+    content.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
+                                                      cfg.globalCornerBackgroundColorDark);
+    WCRApplyCorner(content, radius, cfg.globalCornerStroke,
                    WCRColorForAppearance(cfg.globalCornerStrokeColorLight,
                                          cfg.globalCornerStrokeColorDark), YES);
 
     if (@available(iOS 13.0, *)) {
-        self.contentView.layer.cornerCurve = kCACornerCurveContinuous;
+        content.layer.cornerCurve = kCACornerCurveContinuous;
     }
 
     // 会话列表卡片化：左右留白
-    if (margin > 0.01 && self.contentView.frame.size.width > margin * 2) {
-        CGRect f = self.contentView.frame;
+    if (margin > 0.01 && content.frame.size.width > margin * 2) {
+        CGRect f = content.frame;
         f.origin.x = margin;
-        f.size.width = self.bounds.size.width - margin * 2;
-        if (fabs(self.contentView.frame.origin.x - f.origin.x) > 0.5) {
-            self.contentView.frame = f;
+        f.size.width = view.bounds.size.width - margin * 2;
+        if (fabs(content.frame.origin.x - f.origin.x) > 0.5) {
+            content.frame = f;
         }
     }
 }
@@ -108,8 +111,9 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 - (void)layoutSubviews {
     %orig;
     if (!WCRCfg().mainFrameCornerEnabled) return;
-    self.backgroundColor = [UIColor clearColor];
-    self.separatorStyle = UITableViewCellSeparatorStyleNone;
+    UITableView *tableView = (UITableView *)self;
+    tableView.backgroundColor = [UIColor clearColor];
+    tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
 }
 
 %end
@@ -121,19 +125,21 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
     if (!WCRCfg().mainFrameCornerEnabled) return;
 
     WCRConfig *cfg = WCRCfg();
-    self.backgroundColor = [UIColor clearColor];
-    self.contentView.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
-                                                              cfg.globalCornerBackgroundColorDark);
-    WCRApplyCorner(self.contentView, cfg.globalCornerRadius, cfg.globalCornerStroke,
+    UITableViewCell *cell = (UITableViewCell *)self;
+    cell.backgroundColor = [UIColor clearColor];
+    UIView *content = cell.contentView;
+    content.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
+                                                      cfg.globalCornerBackgroundColorDark);
+    WCRApplyCorner(content, cfg.globalCornerRadius, cfg.globalCornerStroke,
                    WCRColorForAppearance(cfg.globalCornerStrokeColorLight,
                                          cfg.globalCornerStrokeColorDark), YES);
 
     CGFloat margin = cfg.globalCornerMargin;
     if (margin > 0.01) {
-        CGRect f = self.contentView.frame;
+        CGRect f = content.frame;
         f.origin.x = margin;
-        f.size.width = MAX(0, self.bounds.size.width - margin * 2);
-        self.contentView.frame = f;
+        f.size.width = MAX(0, cell.bounds.size.width - margin * 2);
+        content.frame = f;
     }
 }
 
