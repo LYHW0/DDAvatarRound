@@ -1,6 +1,6 @@
 Package: com.wcr.corner.reverse
 Name: WCCornerReverse
-Version: 1.0.0
+Version: 1.0.1
 Architecture: iphoneos-arm64
 Description: WCRefine「界面圆角」板块完整逆向复刻（设置界面 + 全部功能项 + 圆角渲染引擎）
 Maintainer: wcr

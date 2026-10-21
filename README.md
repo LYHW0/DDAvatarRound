@@ -4,24 +4,29 @@ WCRefine 2.1-9「界面圆角」板块的完整逆向复刻。
 只做这一个板块：设置界面 + 全部功能项 + 圆角渲染引擎。
 
 - 包名：`com.wcr.corner.reverse`
-- 架构：`iphoneos-arm64`（rootless，装到 `/var/jb`）
+- 版本：`1.0.1`
+- 架构：**arm64 单架构**（`iphoneos-arm64`，rootless，装到 `/var/jb`）
 - 最低系统：iOS 14.0
 - 注入目标：`com.tencent.xin`、`com.tencent.wx`、`com.tencent.mm.xin`、`com.tencent.qy.xin`
 
 ## 目录
 
 ```
-include/WCRCorner.h        头文件（配置表 X-Macro + 表格框架 + 引擎 + 注册器声明）
-src/WCRConfig.mm           配置层（存取 / clamp / 落盘 / 重置）
-src/WCRTable.mm            设置页表格框架（复刻微信 WCTableViewManager 视觉）
-src/WCRCornerVC.mm         主板块「界面圆角」（22 个分组）
-src/WCRGlobalVC.mm         子页「主页全局圆角」
-src/WCREngine.mm           圆角渲染引擎 + hook 安装
-src/WCRPlugin.mm           注册入口（WCPluginsMgr 为主通道）
-src/Tweak.xm               注入入口（logos）
-WCCornerReverse.plist      注入配置（4 个微信包名）
-build-deb.sh               本地一键出 deb
-.github/workflows/build.yml 推上去自动出 deb
+include/WCRCorner.h          头文件（配置表 X-Macro + 表格框架 + 引擎 + 注册器声明）
+src/WCRConfig.mm             配置层（存取 / clamp / 落盘 / 重置）
+src/WCRTable.mm              设置页表格框架（复刻微信 WCTableViewManager 视觉）
+src/WCRCornerVC.mm           主板块「界面圆角」（22 个分组）
+src/WCRGlobalVC.mm           子页「主页全局圆角」
+src/WCREngine.mm             圆角渲染引擎 + hook 安装
+src/WCRPlugin.mm             注册入口（WCPluginsMgr 为主通道）
+src/Tweak.xm                 注入入口（logos）
+WCCornerReverse.plist        注入配置（4 个微信包名）
+control                      deb 元信息
+Makefile                     Theos 工程（ARCHS = arm64）
+build-dylib.sh               本地一键出 dylib
+build-deb.sh                 本地一键出 deb
+prebuilt/Tweak.mm            logos 预处理结果（没装 Theos 时兜底）
+.github/workflows/build.yml  推到 GitHub 自动出 deb + dylib
 ```
 
 ## 入口
@@ -39,39 +44,86 @@ build-deb.sh               本地一键出 deb
 
 ## 构建
 
-### 方式一：GitHub Actions（推荐）
-
-推到仓库后 `.github/workflows/build.yml` 会自动在 macOS runner 上装 Theos、
-编译、打 rootless deb，产物在 Actions 的 artifacts 里。
-
-### 方式二：本地
-
-准备：Theos、iOS SDK、`ldid`、一个能交叉编译到 `aarch64-apple-ios` 的 clang。
-也可以直接用 zig 自带的 clang/lld（`build-deb.sh` 默认走这条）。
+### 方式一：GitHub Actions（推荐，不用本地装工具链）
 
 ```bash
-export THEOS=/path/to/theos
-export SDK=$THEOS/sdks/iPhoneOS16.5.sdk
-export LDID=/path/to/ldid
-./build-deb.sh
-# 产物: packages/com.wcr.corner.reverse_1.0.0_iphoneos-arm64.deb
+git init && git add -A && git commit -m "init"
+git remote add origin https://github.com/<你的账号>/<仓库名>.git
+git push -u origin main
 ```
 
-用 Theos 走标准流程也可以：
+推上去之后 Actions 自动开始跑（也可以到 Actions 页面点 `Run workflow` 手动触发）。
+
+流程：macOS runner → 装 Theos + iPhoneOS16.5 SDK → `make package ARCHS=arm64` →
+产出 rootless deb + dylib → 上传 artifacts。
+
+跑完在 **Actions → 对应那次 run → Artifacts** 里下载 `WCCornerReverse-arm64`，
+里面两个文件：
+
+```
+com.wcr.corner.reverse_1.0.1_iphoneos-arm64.deb
+WCCornerReverse.dylib
+```
+
+打 tag 会自动发 Release：
 
 ```bash
-make package FINALPACKAGE=1
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+> 只出 arm64 单架构：`Makefile` 里 `ARCHS = arm64`，CI 里也显式传了 `ARCHS=arm64`。
+> arm64e 设备（A12 及以上）加载 arm64 slice 正常，不需要额外架构。
+
+### 方式二：本地构建
+
+只需要一份 iOS SDK。编译器二选一：
+
+- macOS：Xcode 命令行工具自带 clang
+- Linux：zig 0.13+（自带 clang + lld）
+
+SDK 放这两个位置任意一个：
+
+```
+$THEOS/sdks/iPhoneOS16.5.sdk
+./sdks/iPhoneOS16.5.sdk
+```
+
+只出 dylib：
+
+```bash
+./build-dylib.sh
+# 产物: dist/WCCornerReverse.dylib（已 ldid 签名）
+```
+
+出 deb：
+
+```bash
+./build-deb.sh
+# 产物: packages/com.wcr.corner.reverse_1.0.1_iphoneos-arm64.deb
+```
+
+用 Theos 标准流程（macOS，装好 Theos 和 ldid）：
+
+```bash
+make package FINALPACKAGE=1 ARCHS=arm64 THEOS_PACKAGE_SCHEME=rootless
 ```
 
 ## 安装
 
 ```bash
 # 越狱设备上（rootless 环境）
-dpkg -i com.wcr.corner.reverse_1.0.0_iphoneos-arm64.deb
+dpkg -i com.wcr.corner.reverse_1.0.1_iphoneos-arm64.deb
 # 或者用 Sileo / Zebra 直接装 deb
 ```
 
-装完重启微信，从插件收纳里进「界面圆角」。
+只拿到 dylib 的话，手动放：
+
+```
+/var/jb/Library/MobileSubstrate/DynamicLibraries/WCCornerReverse.dylib
+/var/jb/Library/MobileSubstrate/DynamicLibraries/WCCornerReverse.plist
+```
+
+然后 `killall -9 WeChat`（或重启桌面）重进微信，从插件收纳里进「界面圆角」。
 
 ## 与上游的对照
 

@@ -1,5 +1,51 @@
 # 更新报告 —— 2026-10-21
 
+## v1.0.1：改成 GitHub 可直接打包 + arm64 单架构
+
+这次不动功能代码，只改构建这件事。
+
+### 1. 架构收成 arm64 单架构
+
+- `Makefile`：`ARCHS = arm64 arm64e` → `ARCHS = arm64`
+- `TARGET` 从 `latest` 固定为 `iphone:clang:16.5:14.0`，SDK 版本不再随环境漂
+- 产出的 dylib 已核对：`Mach-O 64-bit arm64 dynamically linked shared library`，
+  `LC_ID_DYLIB` = `/var/jb/Library/MobileSubstrate/DynamicLibraries/WCCornerReverse.dylib`
+- arm64e 设备（A12 及以上）加载 arm64 slice 正常，不需要双架构
+
+### 2. GitHub Actions 换成现在能跑通的写法
+
+旧的 workflow 有两个死点：
+
+| 问题 | 后果 | 改法 |
+|---|---|---|
+| `runs-on: macos-13` | GitHub 上 macos-13 runner 已彻底下线，job 直接排队失败 | 换 `macos-14` |
+| 靠 `sdks/archive/refs/heads/master.zip` 拉 SDK | 几百 MB 整包下载，动不动超时 | 改 `git clone --filter=blob:none --sparse`，只取 `iPhoneOS16.5.sdk` |
+
+另外补的：
+
+- Theos 目录加了 `actions/cache`，第二次构建不用重新 clone
+- 构建命令显式带 `ARCHS=arm64`，不依赖默认值
+- artifacts 里同时上传 **deb 和 dylib**，并且用 `lipo -info` 打印架构做自检
+- 打 `v*` tag 时自动挂到 Release（`softprops/action-gh-release`）
+
+### 3. 本地构建脚本重写
+
+- `build-dylib.sh`：只出 dylib，自动找 SDK（`$THEOS/sdks` 或 `./sdks`），
+  自动选编译器（macOS 用 clang，Linux 用 zig），自动 `ldid -S` 签名
+- `build-deb.sh`：改为复用 `build-dylib.sh` 的产物，只做打包，不再重复实现一遍编译逻辑
+- 没装 Theos 也能编：`prebuilt/Tweak.mm` 是 logos 的预处理结果，自动兜底
+
+### 4. 实测
+
+- 7 个编译单元（6 个源文件 + logos 生成的入口）全部 0 error
+- 链接 → arm64 Mach-O dylib，`LC_CODE_SIGNATURE` 已写入
+- `dpkg-deb` 出包，解包复核：dylib 405,584 字节 + plist 都在位
+- 从干净目录跑 `./build-deb.sh` 完整复现，结果一致
+
+---
+
+## v1.0.0：注册入口与界面校准
+
 本轮在原逆向成果上补齐两件事：**注册入口走 WCPluginsMgr**、**注入包名补齐 4 个**；
 同时按原版二进制反汇编重新核了一遍界面，把偏差改回去了。
 
@@ -72,8 +118,9 @@ com.tencent.xin   com.tencent.wx   com.tencent.mm.xin   com.tencent.qy.xin
 
 ## 六、注意事项
 
-1. **只出 arm64**。本地工具链不支持 arm64e 目标；arm64e 设备可以正常加载 arm64 slice。
-   要 arm64e 双架构就用仓库里的 GitHub Actions（Theos 那边会按 Makefile 的 `ARCHS = arm64 arm64e` 出双架构）。
+1. **只出 arm64（单架构）**。`Makefile` 里 `ARCHS = arm64`，CI 里同样显式传了 `ARCHS=arm64`。
+   arm64e 设备（A12 及以上）直接加载 arm64 slice，不需要额外架构。
+   哪天要加回 arm64e，只改 Makefile 一行 `ARCHS = arm64 arm64e`，CI 和脚本都不用动。
 2. **注册是否命中要看目标机**：`WCPluginsMgr` 的选择器名随微信版本变，
    这里做了多候选探测；万一某个版本一个都没命中，设置页右上角会有兜底入口，
    功能不受影响，只是位置不在收纳里。定位方法：进面板正常就说明走到了第 3 级。

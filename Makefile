@@ -1,5 +1,7 @@
+# 单架构：只出 arm64（arm64e 设备可直接加载 arm64 slice）
 ARCHS = arm64
-TARGET = iphone:clang:latest:14.0
+# 需要 iPhoneOS16.5.sdk；自己环境 SDK 版本不同就改这里的数字
+TARGET = iphone:clang:16.5:14.0
 THEOS_PACKAGE_SCHEME = rootless
 INSTALL_TARGET_PROCESSES = WeChat
 
