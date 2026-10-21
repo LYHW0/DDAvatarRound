@@ -1,24 +1,21 @@
-# 单架构：只出 arm64（arm64e 设备可直接加载 arm64 slice）
+TARGET := iphone:clang:latest:14.0
 ARCHS = arm64
-# 需要 iPhoneOS16.5.sdk；自己环境 SDK 版本不同就改这里的数字
-TARGET = iphone:clang:16.5:14.0
-THEOS_PACKAGE_SCHEME = rootless
 INSTALL_TARGET_PROCESSES = WeChat
+THEOS_PACKAGE_SCHEME = rootless
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = WCCornerReverse
+TWEAK_NAME = WCRefineRebuild
 
-WCCornerReverse_FILES = \
-	src/WCRConfig.mm \
-	src/WCRTable.mm \
-	src/WCRCornerVC.mm \
-	src/WCRGlobalVC.mm \
-	src/WCREngine.mm \
-	src/WCRPlugin.mm \
-	src/Tweak.xm
+WCRefineRebuild_FILES = Tweak.x $(wildcard Sources/*.x) $(wildcard Sources/*.m)
+WCRefineRebuild_CFLAGS = -fobjc-arc -ISources -Wno-deprecated-declarations -Wno-unused-function
+WCRefineRebuild_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics CoreFoundation
+WCRefineRebuild_LIBRARIES =
 
-WCCornerReverse_CFLAGS = -fobjc-arc -Iinclude -std=c++17 -Wno-unused-variable
-WCCornerReverse_FRAMEWORKS = UIKit Foundation CoreGraphics
+SUBPROJECTS += prefs
 
 include $(THEOS_MAKE_PATH)/tweak.mk
+include $(THEOS_MAKE_PATH)/aggregate.mk
+
+after-install::
+	install.exec "killall -9 WeChat || true"

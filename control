@@ -1,9 +1,9 @@
-Package: com.wcr.corner.reverse
-Name: WCCornerReverse
-Version: 1.0.1
+Package: com.qimiao.wcrefine.rebuild
+Name: WCRefineRebuild
+Version: 1.0.0
 Architecture: iphoneos-arm64
-Description: WCRefine「界面圆角」板块完整逆向复刻（设置界面 + 全部功能项 + 圆角渲染引擎）
-Maintainer: wcr
-Author: wcr
+Description: 微信界面美化（圆角 / 资料卡 / 消息横幅 / 菜单 / 头像框）重制版
+Maintainer: WCRefineRebuild
+Author: WCRefineRebuild
 Section: Tweaks
-Depends: mobilesubstrate
+Depends: mobilesubstrate, firmware (>= 14.0)

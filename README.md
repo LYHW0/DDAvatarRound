@@ -1,142 +1,149 @@
-# WCCornerReverse
+# WCRefineRebuild
 
-WCRefine 2.1-9「界面圆角」板块的完整逆向复刻。
-只做这一个板块：设置界面 + 全部功能项 + 圆角渲染引擎。
+微信界面美化的重制版 —— **界面圆角 / 资料卡美化 / 消息横幅美化 / 菜单美化 / 头像框圆角** 五个板块。
 
-- 包名：`com.wcr.corner.reverse`
-- 版本：`1.0.1`
-- 架构：**arm64 单架构**（`iphoneos-arm64`，rootless，装到 `/var/jb`）
-- 最低系统：iOS 14.0
-- 注入目标：`com.tencent.xin`、`com.tencent.wx`、`com.tencent.mm.xin`、`com.tencent.qy.xin`
+- 架构：**arm64 单架构**
+- 包格式：**rootless**（`/var/jb`，iOS 15+ 越狱通用；Dopamine / palera1n / Xina 等）
+- 编译：Theos + GitHub Actions，推上去自动出 deb，不用本地装环境
+- 支持微信包名：`com.tencent.xin` / `com.tencent.wx` / `com.tencent.mm.xin` / `com.tencent.qy.xin`（含各 share extension）
 
-## 目录
+---
+
+## 一、这五个板块都做了什么
+
+### 1. 界面圆角（`Sources/WCRCorner.x`）
+把列表切成"卡片"：会话列表、通讯录、发现页、收藏页、折叠分组。
+
+挂的类和原版一致：
 
 ```
-include/WCRCorner.h          头文件（配置表 X-Macro + 表格框架 + 引擎 + 注册器声明）
-src/WCRConfig.mm             配置层（存取 / clamp / 落盘 / 重置）
-src/WCRTable.mm              设置页表格框架（复刻微信 WCTableViewManager 视觉）
-src/WCRCornerVC.mm           主板块「界面圆角」（22 个分组）
-src/WCRGlobalVC.mm           子页「主页全局圆角」
-src/WCREngine.mm             圆角渲染引擎 + hook 安装
-src/WCRPlugin.mm             注册入口（WCPluginsMgr 为主通道）
-src/Tweak.xm                 注入入口（logos）
-WCCornerReverse.plist        注入配置（4 个微信包名）
-control                      deb 元信息
-Makefile                     Theos 工程（ARCHS = arm64）
-build-dylib.sh               本地一键出 dylib
-build-deb.sh                 本地一键出 deb
-prebuilt/Tweak.mm            logos 预处理结果（没装 Theos 时兜底）
-.github/workflows/build.yml  推到 GitHub 自动出 deb + dylib
+MMTableViewCell(layoutSubviews / setBackgroundColor:)
+MainFrameTableView(layoutSubviews)          NewMainFrameCell(layoutSubviews)
+MainFrameSectionFoldView(layoutSubviews)    MFBannerBtn / MFWebMMBtn(layoutSubviews)
+MMTableSectionHeaderView  MMMainTableView   MMTableView
+MMUnderlineTabsView  WCToolGroupsBannerView  MMFavImageComponent  FavImagePreview
+NewContactsItemCell  ThemeBoxSegmentedView   WCSegmentedControl
 ```
 
-## 入口
+设置项：圆角大小（默认 **15**，取自原版二进制默认值）、卡片间距、左右留白、描边宽度、深浅色背景/描边。
 
-主入口走 `WCPluginsMgr`（插件收纳的统一注册中心）。注册按三级降级，
-任何一级不存在都不会崩：
+### 2. 资料卡美化（`Sources/WCRProfileCard.x`）
+联系人资料页 / 名片页：背景图、背景色、卡片圆角（可跟随全局圆角）、昵称与签名配色、微信号默认隐藏。
 
-1. `WCPluginsMgr` —— 运行时按类名取，单例方法 / 类方法都试；
-   插件模型用 `WCPluginModel`，字段全部 `respondsToSelector:` 探测后再写。
-2. `WCRefinePluginHubManager -registerPluginForCustomEntry:` ——
-   条目格式 `界面圆角@WCRCornerViewController`。
-3. 设置页右上角兜底按钮 —— 只有前两级都没成功时才出现。
+```
+ContactInfoViewController(viewDidLoad / viewWillAppear: / viewDidLayoutSubviews)
+WCTimeLineCellView(showContactInfo / showProfileForUser:)
+```
 
-注册完成后广播 `WCPluginsMgrDidChangeNotification`，收纳列表即时刷新。
+### 3. 消息横幅美化（`Sources/WCRMsgBanner.x`）
+微信内新消息横幅：高度、宽度、外边距、正文截断字数、背景图/背景色、昵称与正文配色。
 
-## 构建
+```
+MMLocalNotificationUtil(showLocalNotificationWithIdentifier:...customHeadImage:)
+MainFrameLogicController(playNewMsgNotify:NotifyFlag:)
+```
 
-### 方式一：GitHub Actions（推荐，不用本地装工具链）
+横幅窗口是运行时动态创建的，这里用"结构扫描 + 定时补样式"定位，
+不写死私有类名，微信小版本升级不会直接失效。
+
+### 4. 菜单美化（`Sources/WCRMenu.x`）
+长按菜单 / 加号菜单：圆角、描边、底色、背景图、文字色、图标色、宽度、去掉分割线。
+
+```
+MMMenuContentView(layoutSubviews / addSeparatorLineInY:left:right:)
+MMMenuController(setMenuStyle:)
+```
+
+### 5. 头像框圆角（`Sources/WCRAvatar.x`）
+头像圆角按**百分比**控制（默认 **100%** = 正圆，与原版默认值一致），可加描边、可缩放留白。
+
+```
+MMHeadImageView(layoutSubviews / setFrame: / setBounds: / setHeadImageViewCornerRadius:)
+MMUILongPressImageView(setImage:)   FakeHeadImageView   WCFinderHeadImageView
+```
+
+---
+
+## 二、编译（GitHub Actions，推荐）
+
+1. 新建一个仓库，把本目录所有文件推上去（保持 `Makefile`、`control`、`Tweak.x`、`Sources/`、`prefs/`、`.github/` 的相对位置）。
+2. 仓库 → **Actions** → 选 `Build` → **Run workflow**。
+3. 跑完在 **Artifacts** 里下载 `WCRefineRebuild-deb`，里面是 `com.qimiao.wcrefine.rebuild_1.0.0_iphoneos-arm64.deb`。
+
+工作流做的事：装 Theos → 把 Xcode 的 iPhoneOS SDK 链到 `$THEOS/sdks` → `make package FINALPACKAGE=1` → 上传 deb。
+
+## 三、编译（本地 macOS）
 
 ```bash
-git init && git add -A && git commit -m "init"
-git remote add origin https://github.com/<你的账号>/<仓库名>.git
-git push -u origin main
+export THEOS=~/theos
+git clone --recursive https://github.com/theos/theos.git $THEOS
+brew install ldid xz make
+
+mkdir -p $THEOS/sdks
+ln -sfn "$(xcrun --sdk iphoneos --show-sdk-path)" \
+        "$THEOS/sdks/iPhoneOS$(xcrun --sdk iphoneos --show-sdk-version).sdk"
+
+make clean && make package FINALPACKAGE=1
+# 产物在 packages/
 ```
 
-推上去之后 Actions 自动开始跑（也可以到 Actions 页面点 `Run workflow` 手动触发）。
+本地 Linux 也可以：把 `theos/sdks` 里的 iPhoneOS SDK 放到 `$THEOS/sdks/` 即可。
 
-流程：macOS runner → 装 Theos + iPhoneOS16.5 SDK → `make package ARCHS=arm64` →
-产出 rootless deb + dylib → 上传 artifacts。
-
-跑完在 **Actions → 对应那次 run → Artifacts** 里下载 `WCCornerReverse-arm64`，
-里面两个文件：
-
-```
-com.wcr.corner.reverse_1.0.1_iphoneos-arm64.deb
-WCCornerReverse.dylib
-```
-
-打 tag 会自动发 Release：
+## 四、安装
 
 ```bash
-git tag v1.0.1 && git push origin v1.0.1
+# rootless（/var/jb）
+dpkg -i com.qimiao.wcrefine.rebuild_1.0.0_iphoneos-arm64.deb
+# 或者用 Sileo / Filza 直接点开 deb 安装
+
+killall -9 WeChat   # 重开微信
 ```
 
-> 只出 arm64 单架构：`Makefile` 里 `ARCHS = arm64`，CI 里也显式传了 `ARCHS=arm64`。
-> arm64e 设备（A12 及以上）加载 arm64 slice 正常，不需要额外架构。
+装完在 **设置** 里会多一个 **WCRefine** 入口，五个板块的设置都在里面，改完立刻生效（走 Darwin 通知，不用重启微信）。
 
-### 方式二：本地构建
+配置存放位置：`/var/mobile/Library/Preferences/com.qimiao.WCRefine.rebuild.plist`
 
-只需要一份 iOS SDK。编译器二选一：
+---
 
-- macOS：Xcode 命令行工具自带 clang
-- Linux：zig 0.13+（自带 clang + lld）
-
-SDK 放这两个位置任意一个：
+## 五、目录结构
 
 ```
-$THEOS/sdks/iPhoneOS16.5.sdk
-./sdks/iPhoneOS16.5.sdk
+WCRefineRebuild/
+├── Makefile                  # 主工程（arm64 / rootless）
+├── control                   # deb 元信息
+├── WCRefineRebuild.plist     # 注入过滤（微信各包名）
+├── Tweak.x                   # 入口：配置加载 + 跨进程设置同步
+├── Sources/
+│   ├── WCRCommon.h/.m        # 颜色解析 / 圆角 / 视图工具
+│   ├── WCRConfig.h/.m        # 配置中心（key 与原版同名）
+│   ├── WCRCorner.x           # 模块一：界面圆角
+│   ├── WCRProfileCard.x      # 模块二：资料卡美化
+│   ├── WCRMsgBanner.x        # 模块三：消息横幅美化
+│   ├── WCRMenu.x             # 模块四：菜单美化
+│   └── WCRAvatar.x           # 模块五：头像框圆角
+├── prefs/                    # 设置面板（PreferenceBundle）
+│   ├── WCRRootListController.m
+│   ├── Resources/Info.plist
+│   └── layout/Library/PreferenceLoader/Preferences/WCRefineRebuild.plist
+└── .github/workflows/build.yml
 ```
 
-只出 dylib：
+---
 
-```bash
-./build-dylib.sh
-# 产物: dist/WCCornerReverse.dylib（已 ldid 签名）
-```
+## 六、关于"还原度"的说明
 
-出 deb：
+这份源码是**按原版 deb 里的 arm64 二进制反编译结果重建的**：
 
-```bash
-./build-deb.sh
-# 产物: packages/com.wcr.corner.reverse_1.0.1_iphoneos-arm64.deb
-```
+- hook 的类、方法、顺序：从二进制 `__init_offsets` 里的 212 个初始化函数逐个反汇编还原（`MSHookMessageEx` 的目标类名 + 选择器）；
+- 配置键（`homepageCornerEnabled` / `globalCornerRadius` / `avatarCornerRadius` / `msgBanner*` / `menu*` / `profileCard*` 等）：从 `WCRefineConfig` 类的 4861 个方法表里导出；
+- 默认值：从对应 getter 的汇编里读出的立即数（圆角 15、头像圆角 100% 等）。
 
-用 Theos 标准流程（macOS，装好 Theos 和 ldid）：
+**必须说清楚的一点**：原始 `.m` 源码没有随 deb 发布，编译器优化后的产物不可能逐字节还原成原始工程。
+所以这份是**功能等价、hook 点一致、配置键一致**重写版，不是原作者的原始工程文件。
+五个板块的功能都实现了、能出效果；但原版里另外上百个无关功能（群发、AI、主题、视频号下载等）没有包含进来——你只要这五个。
 
-```bash
-make package FINALPACKAGE=1 ARCHS=arm64 THEOS_PACKAGE_SCHEME=rootless
-```
+## 七、改色 / 改默认值
 
-## 安装
-
-```bash
-# 越狱设备上（rootless 环境）
-dpkg -i com.wcr.corner.reverse_1.0.1_iphoneos-arm64.deb
-# 或者用 Sileo / Zebra 直接装 deb
-```
-
-只拿到 dylib 的话，手动放：
-
-```
-/var/jb/Library/MobileSubstrate/DynamicLibraries/WCCornerReverse.dylib
-/var/jb/Library/MobileSubstrate/DynamicLibraries/WCCornerReverse.plist
-```
-
-然后 `killall -9 WeChat`（或重启桌面）重进微信，从插件收纳里进「界面圆角」。
-
-## 与上游的对照
-
-界面结构按原版 `reloadTableData` 的 cell 构造顺序逐条还原：
-
-- 主板块 22 个分组：全局cell圆角 / 搜索框 / 输入框 / 输入法 / 顶栏 / 底栏 /
-  表情包 / 聊天图片 / 气泡 / 聊天时间 / 消息引用 / 语音转文字 / 拍一拍 /
-  系统通知 / 朋友圈 / 视频号 / 服务页 / 加号菜单 / 发送发布按钮 / 系统弹窗 /
-  左滑菜单 / 已独立的圆角
-- 子页「主页全局圆角」18 行：主页圆角 → 微信页面 → 我的页面 → 好友资料 →
-  发现页面 → 禁用页面 → TP 模式 → 圆角大小 → 边距大小 → 间距大小 →
-  置顶上间距 → 置顶下间距 → 间距一统 → 背景颜色 → 描边大小 → 描边颜色 →
-  描边样式 → 置顶透明
-
-配置键名沿用原插件命名（`searchCornerRadius`、`chatBubbleCornerBorderSize` …），
-方便与原版配置互相迁移。
+- 改默认值：`Sources/WCRConfig.m` 里每个宏后面第三个参数就是默认值。
+- 加设置项：`prefs/WCRRootListController.m` 的 `-specifiers` 里照着 `switchRow/sliderRow/textRow` 加一行即可。
+- 想让某个页面也上圆角：在 `WCRCorner.x` 里照着现有写法加个 `%hook 类名 - (void)layoutSubviews { %orig; WCRApplyCorner(...); }`。

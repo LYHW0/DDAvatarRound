@@ -1,0 +1,8 @@
+{
+    entry = {
+        bundle = WCRefineRebuildPrefs;
+        cell = PSLinkCell;
+        detail = WCRRootListController;
+        label = "WCRefine";
+    };
+}

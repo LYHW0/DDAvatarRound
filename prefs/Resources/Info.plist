@@ -1,0 +1,11 @@
+{
+    CFBundleDevelopmentRegion = "zh_CN";
+    CFBundleExecutable = "WCRefineRebuildPrefs";
+    CFBundleIdentifier = "com.qimiao.wcrefine.rebuild.prefs";
+    CFBundleInfoDictionaryVersion = "6.0";
+    CFBundleName = "WCRefineRebuildPrefs";
+    CFBundlePackageType = "BNDL";
+    CFBundleShortVersionString = "1.0.0";
+    CFBundleVersion = "1.0.0";
+    NSPrincipalClass = "WCRRootListController";
+}

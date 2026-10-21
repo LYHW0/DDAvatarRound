@@ -1,42 +1,39 @@
-name: build-arm64
+name: Build
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
-    tags:
-      - "v*"
-
-permissions:
-  contents: read
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-14
-    env:
-      SIGN_MODE: adhoc
     steps:
-      - uses: actions/checkout@v4
-      - name: Select iOS SDK and install dpkg
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Theos
         run: |
-          brew install dpkg
-          SDK_PATH="$(xcrun --sdk iphoneos --show-sdk-path)"
-          test -d "$SDK_PATH/System/Library/Frameworks"
-          echo "SDK=$SDK_PATH" >> "$GITHUB_ENV"
-      - name: Build signed arm64 dylib
-        run: ./build-dylib.sh
-      - name: Verify arm64 and signature
-        run: |
-          file dist/WCCornerReverse.dylib
-          lipo -info dist/WCCornerReverse.dylib
-          codesign --verify --strict --verbose=2 dist/WCCornerReverse.dylib
-      - name: Package deb
-        run: ./build-deb.sh
-      - uses: actions/upload-artifact@v4
+          brew install ldid xz make || true
+          export THEOS=$HOME/theos
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
+          mkdir -p "$THEOS/sdks"
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          SDK_VER=$(xcrun --sdk iphoneos --show-sdk-version)
+          ln -sfn "$SDK_PATH" "$THEOS/sdks/iPhoneOS${SDK_VER}.sdk"
+          echo "Linked SDK: iPhoneOS${SDK_VER}.sdk -> $SDK_PATH"
+          ls -l "$THEOS/sdks"
+
+      - name: Build package (arm64 / rootless)
+        run: make clean && make package FINALPACKAGE=1
+
+      - name: Show output
+        run: ls -lh packages/
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
         with:
-          name: WCCornerReverse-arm64
-          path: |
-            packages/*.deb
-            dist/WCCornerReverse.dylib
+          name: WCRefineRebuild-deb
+          path: packages/*.deb
           if-no-files-found: error
-          retention-days: 14

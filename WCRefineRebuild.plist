@@ -1,0 +1,18 @@
+{
+    Filter = {
+        Bundles = (
+            "com.tencent.xin",
+            "com.tencent.wx",
+            "com.tencent.mm.xin",
+            "com.tencent.qy.xin",
+            "com.tencent.xin.sharetimeline",
+            "com.tencent.wx.sharetimeline",
+            "com.tencent.qy.xin.sharetimeline",
+            "com.tencent.mm.xin.sharetimeline"
+        );
+        Executables = (
+            "WeChat",
+            "WeChatShareExtensionNew"
+        );
+    };
+}
