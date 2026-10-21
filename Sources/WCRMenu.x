@@ -102,15 +102,16 @@ static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRStyleMenuContainer(self, NO);
+    WCRStyleMenuContainer((UIView *)self, NO);
 
     // 菜单宽度
     WCRConfig *cfg = WCRMCfg();
+    UIView *menuView = (UIView *)self;
     if (cfg.menuSizeEnabled && cfg.menuWidth > 0.01) {
-        CGRect f = self.frame;
+        CGRect f = menuView.frame;
         if (fabs(f.size.width - cfg.menuWidth) > 0.5) {
             f.size.width = cfg.menuWidth;
-            self.frame = f;
+            menuView.frame = f;
         }
     }
 }
@@ -131,9 +132,10 @@ static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
     %orig;
     if (!WCRMCfg().menuCornerEnabled) return;
 
+    id controller = (id)self;
     UIView *menuView = nil;
     @try {
-        menuView = [self valueForKey:@"menuView"];
+        menuView = [controller valueForKey:@"menuView"];
     } @catch (NSException *e) { (void)e; }
 
     if ([menuView isKindOfClass:[UIView class]]) {
