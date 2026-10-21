@@ -233,12 +233,11 @@
             Class wcpluginsMgr = NSClassFromString(@"WCPluginsMgr");
             if (wcpluginsMgr) {
                 id mgr = [wcpluginsMgr performSelector:@selector(sharedInstance)];
-                SEL registerSel = @selector(registerControllerWithTitle:version:controller:);
-                if ([mgr respondsToSelector:registerSel]) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                    [mgr performSelector:registerSel withObject:@"DD圆角美化" withObject:@"v1.0.9" withObject:@"DDAvatarCornerSettingsViewController"];
-#pragma clang diagnostic pop
+                if (mgr) {
+                    // 使用 objc_msgSend 调用三参数方法
+                    typedef id (*func_t)(id, SEL, id, id, id);
+                    func_t method = (func_t)(void *)objc_msgSend;
+                    method(mgr, sel_registerName("registerControllerWithTitle:version:controller:"), @"DD圆角美化", @"v1.0.10", @"DDAvatarCornerSettingsViewController");
                 }
             }
         }
