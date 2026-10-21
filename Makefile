@@ -1,19 +1,22 @@
-TARGET := iphone:clang:latest:14.0
-ARCHS = arm64
-export THEOS_PACKAGE_SCHEME = rootless
-
+ARCHS = arm64 arm64e
+TARGET = iphone:clang:latest:14.0
+THEOS_PACKAGE_SCHEME = rootless
 INSTALL_TARGET_PROCESSES = WeChat
 
-TWEAK_NAME = DDAvatarRound
-DISPLAY_NAME = DD头像圆角
-BUNDLE_ID = com.cyansmoke.ddavatarrond
-
-DDAvatarRound_FILES = Sources/DDAvatarRound.xm Sources/DDSettingsVC.xm
-DDAvatarRound_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
-DDAvatarRound_FRAMEWORKS = UIKit CoreGraphics
-
 include $(THEOS)/makefiles/common.mk
-include $(THEOS_MAKE_PATH)/tweak.mk
 
-after-install::
-	install.exec "killall WeChat"
+TWEAK_NAME = WCCornerReverse
+
+WCCornerReverse_FILES = \
+	src/WCRConfig.mm \
+	src/WCRTable.mm \
+	src/WCRCornerVC.mm \
+	src/WCRGlobalVC.mm \
+	src/WCREngine.mm \
+	src/WCRPlugin.mm \
+	src/Tweak.xm
+
+WCCornerReverse_CFLAGS = -fobjc-arc -Iinclude -std=c++17 -Wno-unused-variable
+WCCornerReverse_FRAMEWORKS = UIKit Foundation CoreGraphics
+
+include $(THEOS_MAKE_PATH)/tweak.mk

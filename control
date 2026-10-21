@@ -1,10 +1,9 @@
-Section: Tweaks
+Package: com.wcr.corner.reverse
+Name: WCCornerReverse
+Version: 1.0.0
 Architecture: iphoneos-arm64
-Name: DD头像圆角
-Version: 1.0.14
-Package: com.cyansmoke.ddavatarrond
+Description: WCRefine「界面圆角」板块完整逆向复刻（设置界面 + 全部功能项 + 圆角渲染引擎）
+Maintainer: wcr
+Author: wcr
+Section: Tweaks
 Depends: mobilesubstrate
-Maintainer: cyansmoke
-Author: cyansmoke
-Description: 微信头像圆角美化插件，支持头像圆角自定义及全局列表卡片化圆角（微信/通讯录/发现/我的）
-Config: *

@@ -1,0 +1,1 @@
+{ Filter = { Bundles = ( "com.tencent.xin", "com.tencent.wx", "com.tencent.mm.xin", "com.tencent.qy.xin" ); }; }

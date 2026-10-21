@@ -1,38 +1,46 @@
-name: Build
+name: build-deb
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
     tags: [ 'v*' ]
   pull_request:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-14
-    permissions:
-      contents: write
+    runs-on: macos-13
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install build deps
+        run: |
+          brew install ldid xz make
+
       - name: Setup Theos
-        uses: Randomblock1/theos-action@v1
+        run: |
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$HOME/theos"
+          mkdir -p "$HOME/theos/sdks"
+          curl -sL https://github.com/theos/sdks/archive/refs/heads/master.zip -o /tmp/sdks.zip
+          unzip -q /tmp/sdks.zip -d /tmp/sdks
+          cp -r /tmp/sdks/sdks-master/*.sdk "$HOME/theos/sdks/"
 
       - name: Build package
         run: |
           make clean || true
-          make package FINALPACKAGE=1
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
 
-      - name: Upload artifact
+      - name: Collect artifacts
+        run: |
+          mkdir -p artifacts
+          find packages -name '*.deb' -exec cp {} artifacts/ \;
+          ls -la artifacts
+
+      - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: ddavatarrond-deb
-          path: packages/*.deb
+          name: WCCornerReverse-deb
+          path: artifacts/*.deb
           if-no-files-found: error
-
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: packages/*.deb
