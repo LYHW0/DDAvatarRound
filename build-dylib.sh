@@ -108,13 +108,31 @@ $CC "${CFLAGS[@]}" \
   "${OBJS[@]}" -o "dist/${PKG_NAME}.dylib"
 
 # ---------- 6. 签名 ----------
-if command -v ldid >/dev/null 2>&1; then
-  ldid -S "dist/${PKG_NAME}.dylib"
-elif [ -n "${LDID:-}" ] && [ -x "$LDID" ]; then
-  "$LDID" -S "dist/${PKG_NAME}.dylib"
-else
-  echo "!! 没找到 ldid，dylib 未签名（越狱设备多数仍可加载，建议装上 ldid）"
-fi
+# iOS dlopen validates the embedded code-signature blob. ldid signatures are
+# suitable for jailbreak package workflows, but may be rejected by strict loaders.
+SIGN_MODE="${SIGN_MODE:-ldid}"
+case "$SIGN_MODE" in
+  adhoc)
+    command -v codesign >/dev/null 2>&1 || { echo "!! SIGN_MODE=adhoc requires Apple's codesign"; exit 1; }
+    codesign --force --sign - --timestamp=none "dist/${PKG_NAME}.dylib"
+    codesign --verify --strict --verbose=2 "dist/${PKG_NAME}.dylib"
+    ;;
+  ldid)
+    if command -v ldid >/dev/null 2>&1; then
+      ldid -S "dist/${PKG_NAME}.dylib"
+    elif [ -n "${LDID:-}" ] && [ -x "$LDID" ]; then
+      "$LDID" -S "dist/${PKG_NAME}.dylib"
+    else
+      echo "!! 没找到 ldid，dylib 未签名"; exit 1
+    fi
+    ;;
+  none)
+    echo "==> 跳过签名（仅用于调试/后续外部重签）"
+    ;;
+  *)
+    echo "!! 未知 SIGN_MODE: $SIGN_MODE (可选 ldid/adhoc/none)"; exit 1
+    ;;
+esac
 
 echo
 echo "OK -> dist/${PKG_NAME}.dylib"
