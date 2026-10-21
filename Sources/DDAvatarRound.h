@@ -27,6 +27,13 @@
 - (void)reloadTableView;
 @end
 
+// ========== 微信会话列表类声明 ==========
+@interface MMTableViewCell : UIView
+@end
+
+@interface MMConversationListViewController : NSObject
+@end
+
 // ========== 原有功能类声明 ==========
 @interface MMHeadImageView : UIView
 @property(retain, nonatomic) UIView *headImageView;
@@ -36,17 +43,6 @@
 @interface FakeHeadImageView : UIView
 @property(readonly, nonatomic) BOOL m_bRoundedCorner;
 - (id)initWithRoundCorner:(BOOL)arg1;
-@end
-
-// ========== 列表圆角类声明 ==========
-@interface MMTableViewCell : UIView
-@property(retain, nonatomic) CALayer *bgView;
-@end
-
-@interface MMConversationListViewController : NSObject
-@property(nonatomic, assign) CGFloat pinnedSectionHeight;
-@property(nonatomic, assign) CGFloat belowPinnedSectionHeight;
-@property(nonatomic, assign) CGFloat belowPinnedContentGap;
 @end
 
 // ========== 配置常量 ==========
