@@ -64,20 +64,6 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         @{ @"header": @"头像", @"items": @[
                WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
                WCRItem(@"圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
-               WCRItem(@"头像描边", @"avatarCornerBorderEnabled", @"bool", 0, 1),
-               WCRItem(@"描边宽度", @"avatarCornerBorderSize", @"num", 0, 10),
-        ] },
-        @{ @"header": @"菜单", @"items": @[
-               WCRItem(@"菜单圆角", @"menuCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"菜单圆角半径", @"menuCornerRadius", @"num", 0, 30),
-               WCRItem(@"加号菜单圆角", @"plusMenuCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"菜单宽度", @"menuWidth", @"num", 0, 400),
-        ] },
-        @{ @"header": @"资料卡", @"items": @[
-               WCRItem(@"资料卡圆角", @"profileCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"卡片美化", @"profileCardBeautifyEnabled", @"bool", 0, 1),
-               WCRItem(@"卡片圆角半径", @"profileCornerRadius", @"num", 0, 30),
-               WCRItem(@"卡片透明度", @"profileCardCardAlpha", @"num", 0, 1),
         ] },
     ];
 

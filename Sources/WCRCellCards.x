@@ -118,8 +118,15 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
                [tv numberOfRowsInSection:secLast + 1] > 0) secLast++;
     }
     NSInteger fr = 0, lr = rows - 1;
-    while (fr < lr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:fr inSection:ip.section]].size.height <= 1.0) fr++;
-    while (lr > fr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:lr inSection:ip.section]].size.height <= 1.0) lr--;
+    CGFloat skipH = timeline ? 14.0 : 1.0;
+    while (fr < lr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:fr inSection:ip.section]].size.height <= skipH) fr++;
+    while (lr > fr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:lr inSection:ip.section]].size.height <= skipH) lr--;
+    if (timeline && ip.row > lr) {
+        cell.backgroundView = nil; cell.selectedBackgroundView = nil; cell.backgroundColor = [UIColor clearColor];
+        cell.contentView.backgroundColor = [UIColor clearColor];
+        for (UIView *sv in cell.contentView.subviews) { sv.backgroundColor = [UIColor clearColor]; sv.hidden = YES; }
+        return;
+    }
     BOOL isFirstRow = (ip.section == secFirst && ip.row <= fr);
     BOOL isLastRow = (ip.section == secLast && ip.row >= lr);
 
@@ -300,7 +307,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     [labels sortUsingComparator:^NSComparisonResult(UILabel *a, UILabel *b) {
         return a.font.pointSize > b.font.pointSize ? NSOrderedAscending : NSOrderedDescending; }];
     UILabel *name = labels[0], *wid = labels[1];
-    CGFloat cardTop = 0, cardH = 257, mx = 8;
+    CGFloat cardTop = -24, cardH = 257, mx = 8;
     UIView *card = [h viewWithTag:0x574354];
     if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
