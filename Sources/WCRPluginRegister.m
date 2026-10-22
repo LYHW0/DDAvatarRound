@@ -37,7 +37,7 @@ static void WCRTryRegisterPluginEntry(NSInteger attempt) {
                 [inv setTarget:mgr];
                 [inv setSelector:@selector(registerControllerWithTitle:version:controller:)];
 
-                NSString *title = @"微信美化";
+                NSString *title = @"兰因后悟";
                 NSString *version = @"1.0.0";
                 NSString *controllerName = @"WCRPluginSettingsViewController";
                 [inv setArgument:&title atIndex:2];

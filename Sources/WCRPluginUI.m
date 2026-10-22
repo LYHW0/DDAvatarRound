@@ -5,6 +5,8 @@
 
 #import "WCRPluginUI.h"
 #import "WCRConfig.h"
+#import "WPGroupManager.h"
+#import "ZFXFloatTabSettings.h"
 #import <objc/runtime.h>
 
 static NSString * const kCellID = @"WCRPluginCell";
@@ -39,7 +41,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.title = self.pageTitle ?: @"微信美化";
+    self.title = self.pageTitle ?: @"兰因后悟";
     self.tableView.rowHeight = 52.0;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
@@ -49,6 +51,8 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     if (self.sections) return;
     #define P(t, ...) WCRPage(t, @[__VA_ARGS__])
     NSArray *pages = @[
+        @{ @"title": @"悬浮底栏", @"kind": @"vc", @"vc": @"float" },
+        @{ @"title": @"分组功能", @"kind": @"vc", @"vc": @"group" },
         P(@"微信主页", WCRItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
                       WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
                       WCRItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
@@ -80,21 +84,23 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         P(@"转发页面", WCRItem(@"转发选择器圆角", @"forwardPickerCornerEnabled", @"bool", 0, 1),
                       WCRItem(@"圆角半径", @"forwardPickerCornerRadius", @"num", 2, 40)),
         P(@"微信设置页", WCRItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
-        P(@"资料页圆角", WCRItem(@"好友 / 群聊资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1)),
+        P(@"资料页圆角", WCRItem(@"好友资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1),
+                       WCRItem(@"群聊资料页圆角", @"groupInfoCornerEnabled", @"bool", 0, 1)),
     ];
     #undef P
-    self.sections = @[ @{ @"header": @"微信美化", @"items": pages },
+    self.sections = @[ @{ @"header": @"兰因后悟", @"items": pages },
                        @{ @"header": @"配置管理", @"items": @[
                            @{ @"title": @"导出配置", @"kind": @"action", @"action": @"export" },
                            @{ @"title": @"导入配置", @"kind": @"action", @"action": @"import" } ] } ];
 
     if (!self.pageTitle) {
         UILabel *by = [UILabel new];
-        by.text = @"by懒小王";
+        by.text = @"休恋逝水 早悟兰因     by懒小王";
+        by.numberOfLines = 0;
         by.textAlignment = NSTextAlignmentCenter;
         by.font = [UIFont systemFontOfSize:13];
         by.textColor = [UIColor colorWithWhite:0.6 alpha:1];
-        by.frame = CGRectMake(0, 0, 320, 56);
+        by.frame = CGRectMake(0, 0, 320, 60);
         self.tableView.tableFooterView = by;
     }
 }
@@ -182,7 +188,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     NSDictionary *item = [self itemAtIndexPath:indexPath];
     cell.textLabel.text = item[@"title"];
 
-    if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"]) {
+    if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"] || [item[@"kind"] isEqualToString:@"vc"]) {
         cell.detailTextLabel.text = nil;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -212,6 +218,14 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         sub.pageTitle = item[@"title"];
         sub.sections = @[ @{ @"header": item[@"title"], @"items": item[@"items"] } ];
         [self.navigationController pushViewController:sub animated:YES];
+        return;
+    }
+    if ([item[@"kind"] isEqualToString:@"vc"]) {
+        UIViewController *vc = nil;
+        if ([item[@"vc"] isEqualToString:@"float"]) vc = [[ZFXFloatTabSettingsViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+        else vc = [[WPGroupManager shared] makeSettingsViewController];
+        vc.title = item[@"title"];
+        if (vc) [self.navigationController pushViewController:vc animated:YES];
         return;
     }
     if ([item[@"kind"] isEqualToString:@"action"]) {
@@ -257,7 +271,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     if (!data) { [self toast:@"导出失败" msg:@"配置无法序列化"]; return; }
     NSString *json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     [UIPasteboard generalPasteboard].string = json;
-    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"WCRefine-config.json"];
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"LYHW-config.json"];
     [data writeToFile:path atomically:YES];
     UIActivityViewController *vc = [[UIActivityViewController alloc] initWithActivityItems:@[[NSURL fileURLWithPath:path]] applicationActivities:nil];
     vc.popoverPresentationController.sourceView = self.view;
