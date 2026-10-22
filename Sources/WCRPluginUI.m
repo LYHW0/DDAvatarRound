@@ -39,14 +39,19 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
 
     self.sections = @[
-        @{ @"header": @"界面圆角", @"items": @[
-               WCRItem(@"主页圆角", @"homepageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"主框架卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"发现页圆角", @"discoverPageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"我的页圆角", @"myPageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"全局圆角半径", @"globalCornerRadius", @"num", 2, 30),
-               WCRItem(@"卡片左右留白", @"globalCornerMargin", @"num", 0, 30),
-               WCRItem(@"卡片间距", @"globalCornerSpacing", @"num", 0, 20),
+        @{ @"header": @"页面卡片圆角", @"items": @[
+               WCRItem(@"微信页（消息列表）", @"mainFrameCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"通讯录页", @"homepageCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"发现页", @"discoverPageCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"我的页", @"myPageCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
+        ] },
+        @{ @"header": @"发现页卡片参数", @"items": @[
+               WCRItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
+               WCRItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30),
+        ] },
+        @{ @"header": @"底部栏", @"items": @[
+               WCRItem(@"悬浮胶囊 TabBar", @"floatingTabBarEnabled", @"bool", 0, 1),
         ] },
         @{ @"header": @"头像", @"items": @[
                WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),

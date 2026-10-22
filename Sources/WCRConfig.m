@@ -305,4 +305,7 @@ WCR_STRING(menuIconColorLight, menuIconColorLight, @"#111111")
 WCR_STRING(menuIconColorDark, menuIconColorDark, @"#F2F2F7")
 WCR_BOOL(menuTextCenterEnabled, menuTextCenterEnabled, NO)
 
+WCR_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, YES)
+WCR_BOOL(cardShadowEnabled, cardShadowEnabled, YES)
+
 @end

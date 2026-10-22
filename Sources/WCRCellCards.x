@@ -39,6 +39,18 @@ static BOOL WCRInChatPage(UIView *v) {
     return NO;
 }
 
+static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 0其他
+    for (UIResponder *r = v; r; r = r.nextResponder) {
+        if (![r isKindOfClass:[UIViewController class]]) continue;
+        NSString *n = NSStringFromClass([r class]);
+        if ([n containsString:@"FindFriend"]) return 4;
+        if ([n containsString:@"NewMainFrame"]) return 1;
+        if ([n containsString:@"ContactsViewController"]) return 2;
+        if ([n hasPrefix:@"MoreViewController"]) return 3;
+    }
+    return 0;
+}
+
 static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
     if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
@@ -50,8 +62,13 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!ip) return;
 
     WCRConfig *c = WCRCCfg();
-    CGFloat radius = c.globalCornerRadius > 0 ? c.globalCornerRadius : 24.0;
-    CGFloat margin = c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0;
+    NSInteger kind = WCRPageKind(tv);
+    if (kind == 0) return;
+    if ((kind == 1 && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
+        (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !c.discoverPageCornerEnabled)) return;
+    BOOL fancy = (kind != 4);
+    CGFloat radius = fancy ? 22.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 24.0);
+    CGFloat margin = fancy ? 9.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0);
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
 
     // 列表底色：浅灰，卡片为白
@@ -61,6 +78,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }];
     tv.backgroundColor = bg;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
+    if (fancy) tv.clipsToBounds = NO;
 
     cell.backgroundColor = [UIColor clearColor];
     cell.contentView.backgroundColor = [UIColor clearColor];
@@ -75,13 +93,23 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.frame = CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height);
     card.backgroundColor = WCRCardFill();
     card.layer.cornerRadius = radius;
-    card.layer.masksToBounds = YES;
+    card.layer.masksToBounds = !fancy;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     CACornerMask m = 0;
     if (ip.row == 0) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     if (ip.row == rows - 1) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     card.layer.maskedCorners = m;
     if (m == 0) card.layer.cornerRadius = 0;
+    if (fancy) {
+        card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
+        BOOL last = (ip.row == rows - 1);
+        card.layer.shadowOpacity = (c.cardShadowEnabled && last) ? 0.14 : 0;
+        card.layer.shadowRadius = 5;
+        card.layer.shadowOffset = CGSizeMake(0, 3);
+        card.layer.shadowColor = [UIColor blackColor].CGColor;
+        card.layer.shadowPath = last ? [UIBezierPath bezierPathWithRoundedRect:card.bounds
+            byRoundingCorners:UIRectCornerAllCorners cornerRadii:CGSizeMake(radius, radius)].CGPath : NULL;
+    }
 }
 
 %hook UITableViewCell

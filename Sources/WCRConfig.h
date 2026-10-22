@@ -300,6 +300,9 @@ extern NSString * const WCRSettingsChangedNotification;
 @property (nonatomic, copy)   NSString *menuIconColorDark;
 @property (nonatomic, assign) BOOL menuTextCenterEnabled;
 
+@property (nonatomic, assign) BOOL floatingTabBarEnabled;
+@property (nonatomic, assign) BOOL cardShadowEnabled;
+
 @end
 
 NS_ASSUME_NONNULL_END
