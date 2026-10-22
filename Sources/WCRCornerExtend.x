@@ -22,7 +22,34 @@
 
 static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
 
+static void WCRTopRound(UIView *v, CGFloat r) {
+    if (!v) return;
+    v.layer.cornerRadius = r;
+    v.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (@available(iOS 13.0, *)) v.layer.cornerCurve = kCACornerCurveContinuous;
+    v.clipsToBounds = YES;
+}
+
+
+
 #pragma mark - MMSearchBar / UISearchBar (搜索框圆角)
+
+static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
+    if (depth > 6) return;
+    for (UIView *sv in v.subviews) {
+        if ([sv isKindOfClass:[UITextField class]]) {
+            CGFloat rr = MIN(r, sv.bounds.size.height / 2.0);
+            sv.layer.cornerRadius = rr;
+            if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
+            sv.clipsToBounds = YES;
+            for (UIView *bgv in sv.subviews) {
+                if ([NSStringFromClass([bgv class]) containsString:@"Background"]) { bgv.layer.cornerRadius = rr; bgv.clipsToBounds = YES; }
+            }
+            continue;
+        }
+        WCRRoundSearchFields(sv, r, depth + 1);
+    }
+}
 
 %hook MMSearchBar
 
@@ -36,7 +63,8 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
     UIColor *borderColor = WCRColorForAppearance(cfg.searchCornerBorderColorLight,
                                                   cfg.searchCornerBorderColorDark);
     
-    WCRApplyCorner((UIView *)self, radius, borderSize, borderColor, YES);
+    (void)borderSize; (void)borderColor;
+    WCRRoundSearchFields((UIView *)self, radius, 0);
     
     // 边距调整（如果 layout 支持）
     if (cfg.searchCornerMargin > 0.01) {
@@ -58,21 +86,21 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
 %end
 
 %hook UISearchBar
-
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
     if (!cfg.searchCornerEnabled) return;
-    
-    double radius = cfg.searchCornerRadius;
-    UITextField *textField = [self valueForKey:@"searchField"];
-    if (textField) {
-        WCRApplyCorner(textField, radius, cfg.searchCornerBorderSize,
-                      WCRColorForAppearance(cfg.searchCornerBorderColorLight,
-                                            cfg.searchCornerBorderColorDark), YES);
-    }
+    WCRRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
 }
+%end
 
+%hook MMUISearchBar
+- (void)layoutSubviews {
+    %orig;
+    WCRConfig *cfg = WCRCfgEx();
+    if (!cfg.searchCornerEnabled) return;
+    WCRRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
+}
 %end
 
 #pragma mark - MMGrowTextView / InputToolView (输入框圆角)
@@ -104,6 +132,7 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
+    if (cfg.toolbarCornerEnabled) WCRTopRound((UIView *)self, cfg.toolbarCornerRadius);
     if (!cfg.inputCornerEnabled) return;
     
     for (UIView *sub in ((UIView *)self).subviews) {
@@ -118,244 +147,62 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
 
 %end
 
-#pragma mark - UINavigationBar (导航栏圆角)
+#pragma mark - 顶栏圆角（导航栏背景只圆下角）
+
+static UIView *WCRBarBackground(UIView *bar) {
+    for (UIView *sv in bar.subviews) {
+        NSString *cn = NSStringFromClass([sv class]);
+        if ([cn containsString:@"BarBackground"] || [cn containsString:@"BackgroundView"]) return sv;
+    }
+    return nil;
+}
 
 %hook UINavigationBar
-
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.topbarCornerEnabled) return;
-    
-    double radius = cfg.topbarCornerRadius;
-    double borderSize = cfg.topbarCornerBorderSize;
-    
-    // 顶边拉平：只圆角底部两个角
-    if (cfg.topbarCornerTopFlatEnabled) {
-        UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.bounds
-                                                   byRoundingCorners:UIRectCornerBottomLeft | UIRectCornerBottomRight
-                                                         cornerRadii:CGSizeMake(radius, radius)];
-        CAShapeLayer *mask = [CAShapeLayer layer];
-        mask.path = path.CGPath;
-        self.layer.mask = mask;
-        
-        if (borderSize > 0) {
-            self.layer.borderWidth = borderSize;
-            self.layer.borderColor = WCRColorForAppearance(cfg.topbarCornerBorderColorLight,
-                                                           cfg.topbarCornerBorderColorDark).CGColor;
-        }
-    } else {
-        WCRApplyCorner((UIView *)self, radius, borderSize,
-                      WCRColorForAppearance(cfg.topbarCornerBorderColorLight,
-                                            cfg.topbarCornerBorderColorDark), YES);
+    UIView *bar = (UIView *)self;
+    UIView *bg = WCRBarBackground(bar);
+    if (!cfg.topbarCornerEnabled) {
+        if (bg && bg.tag == 0x574E42) { bg.layer.cornerRadius = 0; bg.clipsToBounds = NO; bg.tag = 0; }
+        return;
+    }
+    CGFloat r = cfg.topbarCornerRadius;
+    UIView *target = bg ?: bar;
+    target.tag = 0x574E42;
+    target.layer.cornerRadius = r;
+    target.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    if (@available(iOS 13.0, *)) target.layer.cornerCurve = kCACornerCurveContinuous;
+    target.clipsToBounds = YES;
+    for (UIView *sv in target.subviews) {
+        if (sv.bounds.size.height <= 1.0) sv.hidden = YES;   // 去掉底部分割线
     }
 }
-
 %end
 
-#pragma mark - UITabBar (底部栏圆角)
+#pragma mark - 底栏圆角（TabBar / 聊天输入栏 只圆上角）
 
 %hook UITabBar
-
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.toolbarCornerEnabled) return;
-    
-    double radius = cfg.toolbarCornerRadius;
-    double borderSize = cfg.toolbarCornerBorderSize;
-    
-    // 底边拉平：只圆角顶部两个角
-    if (cfg.toolbarCornerBottomFlatEnabled) {
-        UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.bounds
-                                                   byRoundingCorners:UIRectCornerTopLeft | UIRectCornerTopRight
-                                                         cornerRadii:CGSizeMake(radius, radius)];
-        CAShapeLayer *mask = [CAShapeLayer layer];
-        mask.path = path.CGPath;
-        self.layer.mask = mask;
-        
-        if (borderSize > 0) {
-            self.layer.borderWidth = borderSize;
-            self.layer.borderColor = WCRColorForAppearance(cfg.toolbarCornerBorderColorLight,
-                                                           cfg.toolbarCornerBorderColorDark).CGColor;
-        }
-    } else {
-        WCRApplyCorner((UIView *)self, radius, borderSize,
-                      WCRColorForAppearance(cfg.toolbarCornerBorderColorLight,
-                                            cfg.toolbarCornerBorderColorDark), YES);
-    }
+    if (!cfg.toolbarCornerEnabled || cfg.floatingTabBarEnabled) return;
+    UIView *bg = WCRBarBackground((UIView *)self);
+    WCRTopRound(bg ?: (UIView *)self, cfg.toolbarCornerRadius);
 }
-
 %end
 
-#pragma mark - 聊天气泡圆角（MessageNodeView / MMMessageCellView）
-
-%hook MessageNodeView
-
+%hook MMTabBar
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.chatBubbleCornerEnabled) return;
-    
-    double radius = cfg.chatBubbleCornerRadius;
-    double borderSize = cfg.chatBubbleCornerBorderSize;
-    
-    WCRApplyCorner((UIView *)self, radius, borderSize,
-                  WCRColorForAppearance(cfg.chatBubbleCornerBorderColorLight,
-                                        cfg.chatBubbleCornerBorderColorDark), YES);
-    
-    // 隐藏气泡尾巴（通过修改背景视图的 mask，这需要具体分析 MessageNodeView 的视图层级）
-    if (cfg.chatBubbleArrowHidden) {
-        // 找到气泡背景视图（通常是第一个 UIImageView 或 UIView）
-        for (UIView *sub in ((UIView *)self).subviews) {
-            if ([sub isKindOfClass:[UIImageView class]]) {
-                // 移除默认气泡图片的"尾巴"
-                sub.layer.mask = [CAShapeLayer layer];
-                ((CAShapeLayer *)sub.layer.mask).path = [UIBezierPath bezierPathWithRoundedRect:sub.bounds
-                                                                                    cornerRadius:radius].CGPath;
-                break;
-            }
-        }
-    }
+    if (!cfg.toolbarCornerEnabled || cfg.floatingTabBarEnabled) return;
+    UIView *me = (UIView *)self;
+    UIView *bg = nil;
+    if ([me respondsToSelector:@selector(backgroundView)]) bg = [me valueForKey:@"backgroundView"];
+    if (![bg isKindOfClass:[UIView class]]) bg = WCRBarBackground(me);
+    WCRTopRound(bg ?: me, cfg.toolbarCornerRadius);
 }
-
-%end
-
-%hook MMMessageCellView
-
-- (void)layoutSubviews {
-    %orig;
-    WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.chatBubbleCornerEnabled) return;
-    
-    // 找到气泡容器（通常是 MessageNodeView）
-    for (UIView *sub in ((UIView *)self).subviews) {
-        NSString *className = NSStringFromClass([sub class]);
-        if ([className containsString:@"MessageNode"]) {
-            WCRApplyCorner(sub, cfg.chatBubbleCornerRadius, cfg.chatBubbleCornerBorderSize,
-                          WCRColorForAppearance(cfg.chatBubbleCornerBorderColorLight,
-                                                cfg.chatBubbleCornerBorderColorDark), YES);
-        }
-    }
-}
-
-%end
-
-#pragma mark - 聊天图片圆角（BaseMessageNodeData / MMImageMessageCellView）
-
-%hook MMImageMessageCellView
-
-- (void)layoutSubviews {
-    %orig;
-    WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.chatImageCornerEnabled) return;
-    
-    double radius = cfg.chatImageCornerRadius;
-    double borderSize = cfg.chatImageCornerBorderSize;
-    
-    // 找到图片视图
-    for (UIView *sub in ((UIView *)self).subviews) {
-        if ([sub isKindOfClass:[UIImageView class]]) {
-            WCRApplyCornerToImageView((UIImageView *)sub, radius, borderSize,
-                                     WCRColorForAppearance(cfg.chatImageCornerBorderColorLight,
-                                                           cfg.chatImageCornerBorderColorDark));
-        }
-    }
-}
-
-%end
-
-#pragma mark - 聊天时间戳圆角（MMTimeLabelView / MMNewSessionMsgCell）
-
-%hook MMTimeLabelView
-
-- (void)layoutSubviews {
-    %orig;
-    WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.chatTimeRoundCornerEnabled) return;
-    
-    double radius = cfg.chatTimeRoundCornerRadius;
-    double borderSize = cfg.chatTimeRoundCornerBorderSize;
-    
-    WCRApplyCorner((UIView *)self, radius, borderSize,
-                  WCRColorForAppearance(cfg.chatTimeRoundCornerBorderColorLight,
-                                        cfg.chatTimeRoundCornerBorderColorDark), YES);
-}
-
-%end
-
-%hook MMNewSessionMsgCell
-
-- (void)layoutSubviews {
-    %orig;
-    WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.chatTimeRoundCornerEnabled) return;
-    
-    // 找到时间标签
-    UITableViewCell *cell = (UITableViewCell *)self;
-    for (UIView *sub in cell.contentView.subviews) {
-        NSString *className = NSStringFromClass([sub class]);
-        if ([className containsString:@"TimeLabel"]) {
-            WCRApplyCorner(sub, cfg.chatTimeRoundCornerRadius, cfg.chatTimeRoundCornerBorderSize,
-                          WCRColorForAppearance(cfg.chatTimeRoundCornerBorderColorLight,
-                                                cfg.chatTimeRoundCornerBorderColorDark), YES);
-        }
-    }
-}
-
-%end
-
-#pragma mark - 系统弹窗圆角（UIAlertController）
-
-%hook UIAlertController
-
-- (void)viewWillLayoutSubviews {
-    %orig;
-    WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.systemPopupCornerEnabled) return;
-    
-    double radius = cfg.systemPopupCornerRadius;
-    double borderSize = cfg.systemPopupCornerBorderSize;
-    
-    WCRApplyCorner(self.view, radius, borderSize,
-                  WCRColorForAppearance(cfg.systemPopupCornerBorderColorLight,
-                                        cfg.systemPopupCornerBorderColorDark), YES);
-}
-
-%end
-
-#pragma mark - Emoji 面板圆角（MMEmojiView / EmoticonBoardView）
-
-%hook MMEmojiView
-
-- (void)layoutSubviews {
-    %orig;
-    WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.emojiCornerEnabled) return;
-    
-    double radius = cfg.emojiCornerRadius;
-    double borderSize = cfg.emojiCornerBorderSize;
-    
-    WCRApplyCorner((UIView *)self, radius, borderSize,
-                  WCRColorForAppearance(cfg.emojiCornerBorderColorLight,
-                                        cfg.emojiCornerBorderColorDark), YES);
-}
-
-%end
-
-%hook EmoticonBoardView
-
-- (void)layoutSubviews {
-    %orig;
-    WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.emojiCornerEnabled) return;
-    
-    double radius = cfg.emojiCornerRadius;
-    WCRApplyCorner((UIView *)self, radius, cfg.emojiCornerBorderSize,
-                  WCRColorForAppearance(cfg.emojiCornerBorderColorLight,
-                                        cfg.emojiCornerBorderColorDark), YES);
-}
-
 %end
 
 #pragma mark - 菜单圆角（UIMenuController / UIMenuView）

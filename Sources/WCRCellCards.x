@@ -116,7 +116,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     BOOL fancy = (kind != 4);
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
-    if (picker) { radius = c.forwardPickerCornerRadius; margin = 14.0; }
+    if (picker) { radius = c.forwardPickerCornerRadius; margin = 14.0; fancy = YES; }
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
     NSInteger secFirst = ip.section, secLast = ip.section;
@@ -146,6 +146,22 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark
             ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1];
     }];
+    if (picker) {
+        bg = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.0 alpha:1] : [UIColor whiteColor]; }];
+        UIView *th = tv.tableHeaderView;
+        if (th && th.bounds.size.height > 60) {
+            UIView *hc = [th viewWithTag:0x574648];
+            if (!hc) { hc = [UIView new]; hc.tag = 0x574648; hc.userInteractionEnabled = NO; [th insertSubview:hc atIndex:0]; }
+            hc.frame = CGRectMake(margin, 6, th.bounds.size.width - margin * 2, th.bounds.size.height - 12);
+            hc.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+                return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.957 alpha:1]; }];
+            hc.layer.cornerRadius = radius;
+            if (@available(iOS 13.0, *)) hc.layer.cornerCurve = kCACornerCurveContinuous;
+            th.backgroundColor = [UIColor clearColor];
+            for (UIView *sv in th.subviews) if (sv != hc && sv.bounds.size.width >= th.bounds.size.width * 0.9 && sv.bounds.size.height > 40) sv.backgroundColor = [UIColor clearColor];
+        }
+    }
     tv.backgroundColor = bg;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
     tv.sectionIndexBackgroundColor = [UIColor clearColor];
@@ -170,6 +186,8 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     // 同组整块：上下不留缝，只有首尾行有圆角
     card.frame = CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height);
     card.backgroundColor = WCRCardFill();
+    if (picker) card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.957 alpha:1]; }];
     if (kind == 1 && !timeline) {
         card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
             return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
@@ -239,7 +257,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         cell.clipsToBounds = NO;
     }
     {
-        double strength = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
+        double strength = (c.cardShadowEnabled && !picker) ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
         BOOL last = single || isLastRow;
         CGFloat rr = card.layer.cornerRadius;
         card.layer.masksToBounds = NO;
@@ -336,7 +354,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     [labels sortUsingComparator:^NSComparisonResult(UILabel *a, UILabel *b) {
         return a.font.pointSize > b.font.pointSize ? NSOrderedAscending : NSOrderedDescending; }];
     UILabel *name = labels[0], *wid = labels[1];
-    CGFloat cardTop = -10, cardH = 257, mx = 8;
+    CGFloat cardTop = -34, cardH = 232, mx = 8;
     h.clipsToBounds = NO;
     UIView *card = [h viewWithTag:0x574354];
     if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
@@ -349,9 +367,9 @@ static void WCRStyleMyHeader(UITableView *tv) {
     stopW = W;
     WCRClearBg(h, nil);
     name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
-    WCRPlace(avatar, h, W / 2, cardTop + 49);
-    WCRPlace(name, h, W / 2, cardTop + 114);
-    WCRPlace(wid, h, W / 2, cardTop + 150);
+    WCRPlace(avatar, h, W / 2, cardTop + 62);
+    WCRPlace(name, h, W / 2, cardTop + 128);
+    WCRPlace(wid, h, W / 2, cardTop + 163);
     if (status) {
         UIView *circle = nil;
         NSMutableArray *st2 = [NSMutableArray arrayWithObject:h];
@@ -367,9 +385,9 @@ static void WCRStyleMyHeader(UITableView *tv) {
         CGFloat pw = status.bounds.size.width, cw = circle ? circle.bounds.size.width : 0, gap = 8;
         CGFloat total = pw + (circle ? gap + cw : 0);
         if (circle) {
-            WCRPlace(circle, h, W / 2 - total / 2 + cw / 2, cardTop + 188);
-            WCRPlace(status, h, W / 2 + total / 2 - pw / 2, cardTop + 188);
-        } else WCRPlace(status, h, W / 2, cardTop + 188);
+            WCRPlace(circle, h, W / 2 - total / 2 + cw / 2, cardTop + 200);
+            WCRPlace(status, h, W / 2 + total / 2 - pw / 2, cardTop + 200);
+        } else WCRPlace(status, h, W / 2, cardTop + 200);
     }
     if (fabs(h.bounds.size.height - (cardTop + cardH)) > 0.5) {
         CGRect hf = h.frame; hf.size.height = cardTop + cardH; h.frame = hf; tv.tableHeaderView = h;
@@ -432,15 +450,19 @@ static BOOL WCRIsWhiteish(UIColor *c) {
     if (!c.timelineCommentCornerEnabled) return;
     UIView *me = (UIView *)self;
     UIView *box = nil;
-    if (!WCRIsWhiteish(me.backgroundColor)) box = me;
-    else {
-        CGFloat best = 0;
-        for (UIView *sv in me.subviews) {
-            if ([sv isKindOfClass:[UILabel class]]) continue;
-            CGFloat area = sv.bounds.size.width * sv.bounds.size.height;
-            if (!WCRIsWhiteish(sv.backgroundColor) && area > best) { best = area; box = sv; }
+    CGFloat best = 0, W = me.bounds.size.width;
+    NSMutableArray *st = [NSMutableArray arrayWithObject:me];
+    while (st.count) {
+        UIView *v = st.lastObject; [st removeLastObject];
+        for (UIView *sv in v.subviews) {
+            if ([sv isKindOfClass:[UILabel class]] || sv.hidden) continue;
+            CGSize z = sv.bounds.size;
+            BOOL filled = !WCRIsWhiteish(sv.backgroundColor) || ([sv isKindOfClass:[UIImageView class]] && ((UIImageView *)sv).image);
+            if (filled && z.width >= W * 0.6 && z.height >= 16 && z.width * z.height > best) { best = z.width * z.height; box = sv; }
+            if (z.width >= W * 0.6) [st addObject:sv];
         }
     }
+    if (!box && !WCRIsWhiteish(me.backgroundColor)) box = me;
     if (!box) return;
     BOOL top = YES, bot = YES;
     if ([me respondsToSelector:@selector(needTopRoundCorner)]) top = ((BOOL (*)(id, SEL))objc_msgSend)(me, @selector(needTopRoundCorner));
