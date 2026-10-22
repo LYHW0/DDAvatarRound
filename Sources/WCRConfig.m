@@ -307,5 +307,7 @@ WCR_BOOL(menuTextCenterEnabled, menuTextCenterEnabled, NO)
 
 WCR_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, YES)
 WCR_BOOL(cardShadowEnabled, cardShadowEnabled, YES)
+WCR_DOUBLE(myPageCornerRadius, myPageCornerRadius, 24.0)
+WCR_DOUBLE(myPageCornerMargin, myPageCornerMargin, 20.0)
 
 @end

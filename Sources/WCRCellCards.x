@@ -40,12 +40,18 @@ static BOOL WCRInChatPage(UIView *v) {
 }
 
 static void WCRHideLines(UITableViewCell *cell) {
-    NSMutableArray *all = [NSMutableArray arrayWithObject:cell];
-    [all addObject:cell.contentView];
-    for (UIView *host in all)
+    // 只隐藏确认是分割线的视图：精确 UIView/名字含 Line/Separator，无子视图，且已完成布局
+    NSArray *hosts = @[cell, cell.contentView];
+    for (UIView *host in hosts)
         for (UIView *v in host.subviews) {
-            if (v.tag == 0x574352) continue;
-            if (v.bounds.size.height <= 1.5 && v.bounds.size.width >= cell.bounds.size.width * 0.4) v.hidden = YES;
+            if (v.tag == 0x574352 || v.subviews.count > 0) continue;
+            NSString *cn = NSStringFromClass([v class]);
+            BOOL nameHit = [cn rangeOfString:@"Separator" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                           [cn rangeOfString:@"Line" options:NSCaseInsensitiveSearch].location != NSNotFound;
+            BOOL plain = [cn isEqualToString:@"UIView"];
+            if (!nameHit && !plain) continue;
+            CGFloat h = v.bounds.size.height, w = v.bounds.size.width;
+            if (h > 0.1 && h <= 1.5 && w >= cell.bounds.size.width * 0.4) v.hidden = YES;
         }
 }
 
@@ -80,9 +86,8 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if ((kind == 1 && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
         (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !c.discoverPageCornerEnabled)) return;
     BOOL fancy = (kind != 4);
-    BOOL mainList = (kind == 1 && !timeline);
-    CGFloat radius = kind == 1 ? 22.0 : (fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
-    CGFloat margin = kind == 1 ? 9.0 : (fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0));
+        CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
+    CGFloat margin = kind == 1 ? 9.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0));
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
 
     // 列表底色：浅灰，卡片为白
@@ -95,22 +100,6 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (fancy) tv.clipsToBounds = NO;
 
     cell.backgroundColor = [UIColor clearColor];
-    if (mainList) {
-        if (cell.backgroundView.tag == 0x574352) cell.backgroundView = nil;
-        UIView *cv = cell.contentView;
-        cv.backgroundColor = WCRCardFill();
-        cv.layer.cornerRadius = radius;
-        cv.layer.masksToBounds = NO;
-        if (@available(iOS 13.0, *)) cv.layer.cornerCurve = kCACornerCurveContinuous;
-        cv.frame = CGRectMake(margin, 3, cell.bounds.size.width - margin * 2, cell.bounds.size.height - 6);
-        cv.layer.shadowColor = [UIColor blackColor].CGColor;
-        cv.layer.shadowOpacity = c.cardShadowEnabled ? 0.12 : 0;
-        cv.layer.shadowRadius = 5;
-        cv.layer.shadowOffset = CGSizeMake(0, 3);
-        cv.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:cv.bounds cornerRadius:radius].CGPath;
-        WCRHideLines(cell);
-        return;
-    }
     cell.contentView.backgroundColor = [UIColor clearColor];
     UIView *card = cell.backgroundView;
     if (!card || card.tag != 0x574352) {

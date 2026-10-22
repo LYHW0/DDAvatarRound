@@ -50,6 +50,10 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
                WCRItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
                WCRItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30),
         ] },
+        @{ @"header": @"我的页卡片参数", @"items": @[
+               WCRItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
+               WCRItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
+        ] },
         @{ @"header": @"底部栏", @"items": @[
                WCRItem(@"悬浮胶囊 TabBar", @"floatingTabBarEnabled", @"bool", 0, 1),
         ] },

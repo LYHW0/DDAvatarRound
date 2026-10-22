@@ -302,6 +302,8 @@ extern NSString * const WCRSettingsChangedNotification;
 
 @property (nonatomic, assign) BOOL floatingTabBarEnabled;
 @property (nonatomic, assign) BOOL cardShadowEnabled;
+@property (nonatomic, assign) double myPageCornerRadius;
+@property (nonatomic, assign) double myPageCornerMargin;
 
 @end
 
