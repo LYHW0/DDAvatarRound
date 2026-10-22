@@ -80,8 +80,9 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if ((kind == 1 && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
         (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !c.discoverPageCornerEnabled)) return;
     BOOL fancy = (kind != 4);
-    CGFloat radius = fancy ? 22.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0);
-    CGFloat margin = fancy ? 9.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0);
+    BOOL mainList = (kind == 1 && !timeline);
+    CGFloat radius = kind == 1 ? 22.0 : (fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
+    CGFloat margin = kind == 1 ? 9.0 : (fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0));
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
 
     // 列表底色：浅灰，卡片为白
@@ -94,6 +95,22 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (fancy) tv.clipsToBounds = NO;
 
     cell.backgroundColor = [UIColor clearColor];
+    if (mainList) {
+        if (cell.backgroundView.tag == 0x574352) cell.backgroundView = nil;
+        UIView *cv = cell.contentView;
+        cv.backgroundColor = WCRCardFill();
+        cv.layer.cornerRadius = radius;
+        cv.layer.masksToBounds = NO;
+        if (@available(iOS 13.0, *)) cv.layer.cornerCurve = kCACornerCurveContinuous;
+        cv.frame = CGRectMake(margin, 3, cell.bounds.size.width - margin * 2, cell.bounds.size.height - 6);
+        cv.layer.shadowColor = [UIColor blackColor].CGColor;
+        cv.layer.shadowOpacity = c.cardShadowEnabled ? 0.12 : 0;
+        cv.layer.shadowRadius = 5;
+        cv.layer.shadowOffset = CGSizeMake(0, 3);
+        cv.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:cv.bounds cornerRadius:radius].CGPath;
+        WCRHideLines(cell);
+        return;
+    }
     cell.contentView.backgroundColor = [UIColor clearColor];
     UIView *card = cell.backgroundView;
     if (!card || card.tag != 0x574352) {
@@ -126,7 +143,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (fancy) {
         card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
         BOOL last = single || (ip.row == rows - 1);
-        card.layer.shadowOpacity = (c.cardShadowEnabled && last) ? 0.14 : 0;
+        card.layer.shadowOpacity = (c.cardShadowEnabled && last && kind == 1 && !timeline) ? 0.14 : 0;
         card.layer.shadowRadius = 5;
         card.layer.shadowOffset = CGSizeMake(0, 3);
         card.layer.shadowColor = [UIColor blackColor].CGColor;

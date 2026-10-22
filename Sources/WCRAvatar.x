@@ -1,145 +1,79 @@
 //
-//  WCRAvatar.x  —  模块五：头像框圆角 / 头像美化
+//  WCRAvatar.x — 头像圆角（采用 DD头像圆角 的实现）
+//  radiusRatio = avatarCornerRadius / 100，1.0 = 正圆
 //
-//  原版 hook 点（二进制初始化函数还原）：
-//    MMHeadImageView(layoutSubviews / setFrame: / setBounds: / setHeadImageViewCornerRadius:
-//                    / updateUsrName:withHeadImgUrl: / setHeadImageByName: / updateHeadImage:
-//                    / ImageDidLoad:Url: / resetToDefaultImage / checkAndUpdateImage)
-//    MMUILongPressImageView(setImage:)  FakeHeadImageView  WCFinderHeadImageView
-//
-//  效果：头像圆角按"百分比"控制（100% = 正圆，与原版默认值 100 一致），
-//  可单独配描边颜色/粗细、头像缩放（留白），聊天页与列表页可分别设置。
-//
-
+#import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 #import "WCRConfig.h"
-#import "WCRCommon.h"
 
-static inline WCRConfig *WCRACfg(void) { return [WCRConfig shared]; }
+@interface MMHeadImageView : UIView
+@property(retain, nonatomic) UIView *headImageView;
+- (id)initWithUsrName:(id)arg1 headImgUrl:(id)arg2 bAutoUpdate:(BOOL)arg3 bRoundCorner:(BOOL)arg4;
+@end
 
-/// 算出某个头像视图该用的圆角
-static CGFloat WCRAvatarRadiusForView(UIView *view, BOOL chatPage) {
-    WCRConfig *cfg = WCRACfg();
-    if (!view) return 0;
+@interface FakeHeadImageView : UIView
+- (id)initWithRoundCorner:(BOOL)arg1;
+@end
 
-    CGSize size = view.bounds.size;
-    CGFloat minSide = MIN(size.width, size.height);
-    if (minSide <= 1) return 0;
-
-    if (chatPage && cfg.avatarCornerChatPageEnabled) {
-        // 聊天页支持固定值（pt），超过半径就按正圆处理
-        CGFloat r = cfg.avatarCornerChatPageRadius;
-        return MIN(r, minSide / 2.0);
-    }
-
-    // 其它位置按百分比：100% → 正圆
-    CGFloat percent = cfg.avatarCornerRadius / 100.0;
-    percent = MAX(0.0, MIN(1.0, percent));
-    return (minSide / 2.0) * percent;
+static inline BOOL WCRAvOn(void) { return [WCRConfig shared].avatarCornerEnabled; }
+static inline CGFloat WCRAvRatio(void) {
+    double r = [WCRConfig shared].avatarCornerRadius / 100.0;
+    if (r <= 0) r = 1.0;
+    return (CGFloat)MIN(1.0, MAX(0.1, r));
 }
-
-/// 找到头像视图内部真正的图片视图
-static UIImageView *WCRAvatarInnerImageView(UIView *view) {
-    if (!view) return nil;
-    if ([view isKindOfClass:[UIImageView class]]) return (UIImageView *)view;
-
-    // MMHeadImageView 暴露了 headImageView 属性
-    @try {
-        if ([view respondsToSelector:NSSelectorFromString(@"headImageView")]) {
-            id inner = [view valueForKey:@"headImageView"];
-            if ([inner isKindOfClass:[UIImageView class]]) return (UIImageView *)inner;
-        }
-    } @catch (NSException *e) { (void)e; }
-
-    return (UIImageView *)WCRFirstSubviewOfClass(view, [UIImageView class]);
-}
-
-/// 统一套用头像样式
-static void WCRApplyAvatarStyle(UIView *view, BOOL chatPage) {
-    if (!view) return;
-    WCRConfig *cfg = WCRACfg();
-    if (!cfg.avatarCornerEnabled) return;
-
-    CGFloat radius = WCRAvatarRadiusForView(view, chatPage);
-    BOOL borderOn = chatPage ? cfg.avatarCornerChatPageBorderEnabled : cfg.avatarCornerBorderEnabled;
-    CGFloat borderSize = chatPage ? cfg.avatarCornerChatPageBorderSize : cfg.avatarCornerBorderSize;
-    UIColor *borderColor = chatPage
-        ? WCRColorForAppearance(cfg.avatarCornerChatPageBorderColorLight, cfg.avatarCornerChatPageBorderColorDark)
-        : WCRColorForAppearance(cfg.avatarCornerBorderColorLight, cfg.avatarCornerBorderColorDark);
-
-    UIImageView *inner = WCRAvatarInnerImageView(view);
-    if (inner) {
-        WCRApplyCornerToImageView(inner, radius, borderOn ? borderSize : 0, borderColor);
-
-        // 头像缩放：向内收一点，视觉上更"圆润"
-        if (cfg.avatarCornerScaleEnabled && cfg.avatarCornerScale > 0.1f && cfg.avatarCornerScale < 1.0f) {
-            CGFloat s = cfg.avatarCornerScale;
-            CGSize target = CGSizeMake(inner.bounds.size.width * s, inner.bounds.size.height * s);
-            if (target.width > 1 && !CGSizeEqualToSize(inner.bounds.size, target)) {
-                inner.bounds = (CGRect){CGPointZero, target};
-            }
-        }
-    }
-
-    // 外层容器也裁一下，避免圆角外露出方角
-    if (radius > 0.5) {
-        view.layer.masksToBounds = YES;
-        view.layer.cornerRadius = radius;
-        if (@available(iOS 13.0, *)) view.layer.cornerCurve = kCACornerCurveContinuous;
-    }
-    if (borderOn && borderSize > 0.01) {
-        view.layer.borderWidth = borderSize;
-        view.layer.borderColor = borderColor.CGColor;
-    }
+static inline CGFloat WCRAvRadius(CGFloat w, CGFloat h) {
+    CGFloat ratio = WCRAvRatio();
+    return ratio >= 0.99f ? MIN(w, h) / 2.0f : MIN(w, h) / 2.0f * ratio;
 }
 
 %hook MMHeadImageView
-
+- (id)initWithUsrName:(id)a headImgUrl:(id)b bAutoUpdate:(BOOL)c bRoundCorner:(BOOL)d {
+    return %orig(a, b, c, WCRAvOn() || d);
+}
 - (void)layoutSubviews {
     %orig;
-    WCRApplyAvatarStyle((UIView *)self, NO);
+    if (!WCRAvOn()) return;
+    CGFloat w = self.frame.size.width, h = self.frame.size.height;
+    if (w > 0 && h > 0) {
+        self.layer.cornerRadius = WCRAvRadius(w, h);
+        self.layer.masksToBounds = YES;
+        if (self.headImageView) {
+            CGFloat iw = self.headImageView.frame.size.width, ih = self.headImageView.frame.size.height;
+            if (iw > 0 && ih > 0) {
+                self.headImageView.layer.cornerRadius = WCRAvRadius(iw, ih);
+                self.headImageView.layer.masksToBounds = YES;
+            }
+        }
+    }
 }
-
-- (void)setFrame:(CGRect)frame {
-    %orig;
-    WCRApplyAvatarStyle((UIView *)self, NO);
-}
-
-- (void)setBounds:(CGRect)bounds {
-    %orig;
-    WCRApplyAvatarStyle((UIView *)self, NO);
-}
-
-- (void)setHeadImageViewCornerRadius:(double)radius {
-    %orig;
-    WCRApplyAvatarStyle((UIView *)self, NO);
-}
-
-%end
-
-%hook MMUILongPressImageView
-
-- (void)setImage:(UIImage *)image {
-    %orig;
-    if (!WCRACfg().avatarCornerEnabled) return;
-    WCRApplyAvatarStyle((UIView *)self, NO);
-}
-
 %end
 
 %hook FakeHeadImageView
-
+- (id)initWithRoundCorner:(BOOL)arg1 {
+    return %orig(WCRAvOn() || arg1);
+}
 - (void)layoutSubviews {
     %orig;
-    WCRApplyAvatarStyle((UIView *)self, NO);
+    if (!WCRAvOn()) return;
+    CGFloat w = self.frame.size.width, h = self.frame.size.height;
+    if (w <= 0 || h <= 0) return;
+    self.layer.cornerRadius = WCRAvRadius(w, h);
+    self.layer.masksToBounds = YES;
+    unsigned int count = 0;
+    Ivar *ivars = class_copyIvarList([self class], &count);
+    for (unsigned int i = 0; i < count; i++) {
+        NSString *n = [NSString stringWithUTF8String:ivar_getName(ivars[i])];
+        if ([n hasPrefix:@"m_"] && [n containsString:@"ImageView"]) {
+            id v = object_getIvar(self, ivars[i]);
+            if ([v isKindOfClass:[UIImageView class]]) {
+                UIImageView *iv = v;
+                if (iv.frame.size.width > 0 && iv.frame.size.height > 0) {
+                    iv.layer.cornerRadius = WCRAvRadius(iv.frame.size.width, iv.frame.size.height);
+                    iv.layer.masksToBounds = YES;
+                }
+            }
+        }
+    }
+    free(ivars);
 }
-
-%end
-
-%hook WCFinderHeadImageView
-
-- (void)layoutSubviews {
-    %orig;
-    WCRApplyAvatarStyle((UIView *)self, NO);
-}
-
 %end

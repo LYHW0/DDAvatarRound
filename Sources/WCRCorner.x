@@ -239,7 +239,7 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().homepageCornerEnabled) return;
+    return; // 由 WCRCellCards.x 统一处理
     WCRConfig *cfg = WCRCfg();
     ((UITableViewCell *)self).contentView.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
                                                               cfg.globalCornerBackgroundColorDark);
