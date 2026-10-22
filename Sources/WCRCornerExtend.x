@@ -15,6 +15,7 @@
 //  补全 WCRefine 原版的 150+ 配置键对应的运行时效果
 //
 
+#import <objc/message.h>
 #import "WCRConfig.h"
 #import "WCRCommon.h"
 
@@ -127,12 +128,41 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
 
 %end
 
+%hook MMInputToolView
+- (void)layoutSubviews {
+    %orig;
+    WCRConfig *cfg = WCRCfgEx();
+    UIView *me = (UIView *)self;
+    UIView *mine = [me viewWithTag:0x574954];
+    if (!cfg.toolbarCornerEnabled) { mine.hidden = YES; return; }
+    if (!mine) { mine = [UIView new]; mine.tag = 0x574954; mine.userInteractionEnabled = NO; }
+    if (mine.superview != me) [me insertSubview:mine atIndex:0]; else [me sendSubviewToBack:mine];
+    me.clipsToBounds = NO;
+    me.backgroundColor = [UIColor clearColor];
+    CGFloat W = me.bounds.size.width;
+    for (UIView *sv in me.subviews) {
+        if (sv == mine) continue;
+        if (sv.bounds.size.width >= W * 0.95 && sv.bounds.size.height >= me.bounds.size.height * 0.6) {
+            if ([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]] || [NSStringFromClass([sv class]) containsString:@"Background"]) sv.alpha = 0;
+            else sv.backgroundColor = [UIColor clearColor];
+        }
+        if (sv.bounds.size.height <= 1.0 && sv.bounds.size.width >= W * 0.9) sv.hidden = YES;
+    }
+    mine.hidden = NO;
+    mine.frame = CGRectMake(0, 0, W, me.bounds.size.height + 60);
+    mine.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.965 alpha:1]; }];
+    mine.layer.cornerRadius = cfg.toolbarCornerRadius;
+    mine.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (@available(iOS 13.0, *)) mine.layer.cornerCurve = kCACornerCurveContinuous;
+}
+%end
+
 %hook InputToolView
 
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
-    if (cfg.toolbarCornerEnabled) WCRTopRound((UIView *)self, cfg.toolbarCornerRadius);
     if (!cfg.inputCornerEnabled) return;
     
     for (UIView *sub in ((UIView *)self).subviews) {
@@ -157,26 +187,41 @@ static UIView *WCRBarBackground(UIView *bar) {
     return nil;
 }
 
+static UIColor *WCRBarFill(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
+}
+
 %hook UINavigationBar
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
     UIView *bar = (UIView *)self;
+    UIView *mine = [bar viewWithTag:0x574E43];
+    BOOL transparent = NO;
+    if ([bar respondsToSelector:@selector(isTransparentNavBar)]) transparent = ((BOOL (*)(id, SEL))objc_msgSend)(bar, @selector(isTransparentNavBar));
     UIView *bg = WCRBarBackground(bar);
-    if (!cfg.topbarCornerEnabled) {
-        if (bg && bg.tag == 0x574E42) { bg.layer.cornerRadius = 0; bg.clipsToBounds = NO; bg.tag = 0; }
+    if (!cfg.topbarCornerEnabled || transparent || (bg && (bg.hidden || bg.alpha < 0.05))) {
+        mine.hidden = YES;
+        if (bg && bg.tag == 0x574E42) { bg.alpha = 1; bg.tag = 0; }
         return;
     }
-    CGFloat r = cfg.topbarCornerRadius;
-    UIView *target = bg ?: bar;
-    target.tag = 0x574E42;
-    target.layer.cornerRadius = r;
-    target.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
-    if (@available(iOS 13.0, *)) target.layer.cornerCurve = kCACornerCurveContinuous;
-    target.clipsToBounds = YES;
-    for (UIView *sv in target.subviews) {
-        if (sv.bounds.size.height <= 1.0) sv.hidden = YES;   // 去掉底部分割线
-    }
+    if (!mine) { mine = [UIView new]; mine.tag = 0x574E43; mine.userInteractionEnabled = NO; }
+    if (mine.superview != bar) [bar insertSubview:mine atIndex:0];
+    else [bar sendSubviewToBack:mine];
+    CGFloat top = 0;
+    if (@available(iOS 13.0, *)) top = bar.window.windowScene.statusBarManager.statusBarFrame.size.height;
+    if (top <= 0) top = 50;
+    CGRect fr = [bar convertRect:bar.bounds toView:nil];
+    CGFloat y0 = -fr.origin.y;
+    mine.hidden = NO;
+    mine.frame = CGRectMake(0, y0, bar.bounds.size.width, bar.bounds.size.height - y0);
+    mine.backgroundColor = WCRBarFill();
+    mine.layer.cornerRadius = cfg.topbarCornerRadius;
+    mine.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    if (@available(iOS 13.0, *)) mine.layer.cornerCurve = kCACornerCurveContinuous;
+    if (bg) { bg.tag = 0x574E42; bg.alpha = 0; }
+    (void)top;
 }
 %end
 

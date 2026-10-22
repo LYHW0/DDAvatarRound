@@ -9,6 +9,10 @@
 
 static NSString * const kCellID = @"WCRPluginCell";
 
+static NSDictionary *WCRPage(NSString *title, NSArray *items) {
+    return @{ @"title": title, @"kind": @"page", @"items": items };
+}
+
 static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
                              double minValue, double maxValue) {
     return @{ @"title": title, @"key": key, @"kind": kind,
@@ -17,6 +21,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 
 @interface WCRPluginSettingsViewController ()
 @property (nonatomic, strong) NSArray<NSDictionary *> *sections;
+@property (nonatomic, copy) NSString *pageTitle;
 @end
 
 @implementation WCRPluginSettingsViewController
@@ -34,62 +39,53 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.title = @"微信美化";
-    self.tableView.rowHeight = 48.0;
+    self.title = self.pageTitle ?: @"微信美化";
+    self.tableView.rowHeight = 52.0;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
 
-    self.sections = @[
-        @{ @"header": @"页面卡片圆角", @"items": @[
-               WCRItem(@"微信页（消息列表）", @"mainFrameCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"通讯录页", @"homepageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"发现页", @"discoverPageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"我的页", @"myPageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"设置页", @"settingPageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"好友资料页", @"profilePageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"转发选择器", @"forwardPickerCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"转发选择器圆角", @"forwardPickerCornerRadius", @"num", 2, 40),
-        ] },
-        @{ @"header": @"全局阴影", @"items": @[
-               WCRItem(@"卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
-               WCRItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1),
-        ] },
-        @{ @"header": @"朋友圈", @"items": @[
-               WCRItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
-               WCRItem(@"图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
-               WCRItem(@"评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30),
-        ] },
-        @{ @"header": @"发现页卡片参数", @"items": @[
-               WCRItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
-               WCRItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30),
-        ] },
-        @{ @"header": @"我的页卡片参数", @"items": @[
-               WCRItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
-               WCRItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
-        ] },
-        @{ @"header": @"搜索框 / 输入框", @"items": @[
-               WCRItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
-               WCRItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30),
-        ] },
-        @{ @"header": @"顶栏 / 底栏", @"items": @[
-               WCRItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 40),
-               WCRItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40),
-               WCRItem(@"悬浮胶囊 TabBar", @"floatingTabBarEnabled", @"bool", 0, 1),
-        ] },
-        @{ @"header": @"头像", @"items": @[
-               WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
-        ] },
+    if (self.sections) return;
+    #define P(t, ...) WCRPage(t, @[__VA_ARGS__])
+    NSArray *pages = @[
+        P(@"微信主页", WCRItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1)),
+        P(@"通讯录页", WCRItem(@"卡片圆角", @"homepageCornerEnabled", @"bool", 0, 1)),
+        P(@"发现页", WCRItem(@"卡片圆角", @"discoverPageCornerEnabled", @"bool", 0, 1),
+                     WCRItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
+                     WCRItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30)),
+        P(@"我的页面", WCRItem(@"卡片圆角", @"myPageCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
+                      WCRItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40)),
+        P(@"服务页", WCRItem(@"服务页圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
+                    WCRItem(@"圆角半径", @"servicePageCornerRadius", @"num", 2, 40)),
+        P(@"转发页面", WCRItem(@"转发选择器圆角", @"forwardPickerCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"圆角半径", @"forwardPickerCornerRadius", @"num", 2, 40)),
+        P(@"微信设置页", WCRItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
+        P(@"好友资料页", WCRItem(@"卡片圆角", @"profilePageCornerEnabled", @"bool", 0, 1)),
+        P(@"群聊资料页", WCRItem(@"卡片圆角", @"groupInfoCornerEnabled", @"bool", 0, 1)),
+        P(@"朋友圈圆角", WCRItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
+                       WCRItem(@"卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
+                       WCRItem(@"图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
+                       WCRItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
+                       WCRItem(@"评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
+                       WCRItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
+        P(@"顶栏 / 底栏", WCRItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
+                        WCRItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 40),
+                        WCRItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
+                        WCRItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40),
+                        WCRItem(@"悬浮胶囊 TabBar", @"floatingTabBarEnabled", @"bool", 0, 1)),
+        P(@"搜索框 / 输入框", WCRItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
+                          WCRItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
+                          WCRItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
+                          WCRItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30)),
+        P(@"卡片阴影", WCRItem(@"全局卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
+                      WCRItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1)),
+        P(@"头像圆角", WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100)),
     ];
+    #undef P
+    self.sections = @[ @{ @"header": @"微信美化", @"items": pages } ];
 
     self.navigationItem.rightBarButtonItem =
         [[UIBarButtonItem alloc] initWithTitle:@"完成"
@@ -151,7 +147,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == (NSInteger)self.sections.count - 1) {
+    if (!self.pageTitle && section == (NSInteger)self.sections.count - 1) {
         return @"改动即时生效；个别项目需重新进入页面才会体现。";
     }
     return nil;
@@ -162,7 +158,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     cell.backgroundView = nil;
     cell.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
-    cell.layer.cornerRadius = 24;
+    cell.layer.cornerRadius = 14;
     if (@available(iOS 13.0, *)) cell.layer.cornerCurve = kCACornerCurveContinuous;
     CACornerMask m = 0;
     if (ip.row == 0) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
@@ -184,7 +180,11 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     NSDictionary *item = [self itemAtIndexPath:indexPath];
     cell.textLabel.text = item[@"title"];
 
-    if ([item[@"kind"] isEqualToString:@"bool"]) {
+    if ([item[@"kind"] isEqualToString:@"page"]) {
+        cell.detailTextLabel.text = nil;
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    } else if ([item[@"kind"] isEqualToString:@"bool"]) {
         UISwitch *toggle = [[UISwitch alloc] init];
         toggle.on = [self boolValueForKey:item[@"key"]];
         objc_setAssociatedObject(toggle, @selector(commitValue:forKey:),
@@ -205,6 +205,13 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
     NSDictionary *item = [self itemAtIndexPath:indexPath];
+    if ([item[@"kind"] isEqualToString:@"page"]) {
+        WCRPluginSettingsViewController *sub = [[WCRPluginSettingsViewController alloc] init];
+        sub.pageTitle = item[@"title"];
+        sub.sections = @[ @{ @"header": item[@"title"], @"items": item[@"items"] } ];
+        [self.navigationController pushViewController:sub animated:YES];
+        return;
+    }
     if (![item[@"kind"] isEqualToString:@"num"]) return;
 
     double current = [self numberValueForKey:item[@"key"] item:item];

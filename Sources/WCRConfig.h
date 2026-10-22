@@ -315,6 +315,9 @@ extern NSString * const WCRSettingsChangedNotification;
 @property (nonatomic, assign) BOOL forwardPickerCornerEnabled;
 @property (nonatomic, assign) double forwardPickerCornerRadius;
 @property (nonatomic, assign) BOOL profilePageCornerEnabled;
+@property (nonatomic, assign) BOOL groupInfoCornerEnabled;
+@property (nonatomic, assign) BOOL servicePageCornerEnabled;
+@property (nonatomic, assign) double servicePageCornerRadius;
 
 @end
 
