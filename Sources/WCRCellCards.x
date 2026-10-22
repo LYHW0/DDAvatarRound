@@ -75,18 +75,12 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     WCRConfig *c = WCRCCfg();
     NSInteger kind = WCRPageKind(tv);
     if (kind == 0) return;
-    if (kind == 5) {
-        tv.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-            return t.userInterfaceStyle == UIUserInterfaceStyleDark
-                ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
-        tv.separatorStyle = UITableViewCellSeparatorStyleNone;
-        WCRHideLines(cell);
-        return;
-    }
+    BOOL timeline = (kind == 5);
+    if (timeline) kind = 1;  // 朋友圈改为和主页一样，每行独立卡片
     if ((kind == 1 && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
         (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !c.discoverPageCornerEnabled)) return;
     BOOL fancy = (kind != 4);
-    CGFloat radius = fancy ? 22.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 24.0);
+    CGFloat radius = fancy ? 22.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0);
     CGFloat margin = fancy ? 9.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0);
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
 
@@ -120,7 +114,10 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.layer.maskedCorners = m;
     BOOL single = (kind == 1);
     if (single) {
-        card.frame = CGRectInset(card.frame, 0, 3);
+        CGRect f = card.frame;
+        f.origin.y += 3;
+        f.size.height -= 6;
+        card.frame = f;
         card.layer.cornerRadius = radius;
         card.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner |
                                    kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
