@@ -345,17 +345,13 @@ static void WCRClearBg(UIView *v, UIView *stop) {
     for (UIView *sv in v.subviews) {
         if (sv == stop || sv.tag == 0x574354 || sv.tag == 0x574355) continue;
         CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
-        BOOL wideContainer = sw >= stopW * 0.82 && sh >= 40;
-        if (wideContainer) {
-            // 资料页原生头部有一层整宽白色容器，会盖住卡片两侧圆角。
-            // 这里只清除容器本身，不处理头像、文字和按钮。
+        if (sw >= stopW * 0.82 && sh >= 48) {
             sv.backgroundColor = [UIColor clearColor];
-            sv.layer.backgroundColor = nil;
-            sv.layer.cornerRadius = 0;
-            sv.layer.mask = nil;
+            sv.layer.backgroundColor = nil; sv.layer.cornerRadius = 0;
+            if (([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]]) && sv.subviews.count == 0) { sv.hidden = YES; continue; }
         }
         if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
-        if (sv.subviews.count > 0 && (sv.bounds.size.height > 40 || wideContainer)) sv.backgroundColor = [UIColor clearColor];
+        if (sv.subviews.count > 0 && sv.bounds.size.height > 40) sv.backgroundColor = [UIColor clearColor];
         WCRClearBg(sv, stop);
     }
 }
@@ -384,10 +380,7 @@ static void WCRStyleInfoHeader(UITableView *tv) {
     card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
     card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
     card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
-    h.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.94 alpha:1];
-    }];
-    tv.backgroundColor = h.backgroundColor;
+    h.backgroundColor = [UIColor clearColor];
     stopW = W;
     WCRClearBg(h, card);
 }
