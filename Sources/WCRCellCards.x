@@ -87,7 +87,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !c.discoverPageCornerEnabled)) return;
     BOOL fancy = (kind != 4);
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
-    CGFloat margin = kind == 1 ? 9.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0));
+    CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
     NSInteger secFirst = ip.section, secLast = ip.section;
@@ -99,8 +99,11 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         while (secLast < total - 1 && [tv rectForHeaderInSection:secLast + 1].size.height <= 1.0 &&
                [tv numberOfRowsInSection:secLast + 1] > 0) secLast++;
     }
-    BOOL isFirstRow = (ip.section == secFirst && ip.row == 0);
-    BOOL isLastRow = (ip.section == secLast && ip.row == rows - 1);
+    NSInteger fr = 0, lr = rows - 1;
+    while (fr < lr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:fr inSection:ip.section]].size.height <= 1.0) fr++;
+    while (lr > fr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:lr inSection:ip.section]].size.height <= 1.0) lr--;
+    BOOL isFirstRow = (ip.section == secFirst && ip.row <= fr);
+    BOOL isLastRow = (ip.section == secLast && ip.row >= lr);
 
     // 列表底色：浅灰，卡片为白
     UIColor *bg = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
@@ -142,6 +145,23 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         f.size.height = cell.bounds.size.height - 6;
         card.frame = f;
     } else if (m == 0) card.layer.cornerRadius = 0;
+    {
+        UIView *sel = cell.selectedBackgroundView;
+        if (!sel || sel.tag != 0x574353) {
+            sel = [UIView new]; sel.tag = 0x574353; sel.userInteractionEnabled = NO;
+            cell.selectedBackgroundView = sel;
+        }
+        sel.frame = card.frame;
+        sel.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+            return (t.userInterfaceStyle == UIUserInterfaceStyleDark
+                ? [UIColor colorWithWhite:0.22 alpha:1] : [UIColor colorWithWhite:0.88 alpha:1]);
+        }];
+        sel.layer.cornerRadius = card.layer.cornerRadius;
+        sel.layer.maskedCorners = card.layer.maskedCorners;
+        sel.layer.masksToBounds = YES;
+        if (@available(iOS 13.0, *)) sel.layer.cornerCurve = kCACornerCurveContinuous;
+        cell.multipleSelectionBackgroundView = nil;
+    }
     WCRHideLines(cell);
     if (fancy) {
         card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
@@ -175,5 +195,13 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     cell.contentView.layer.cornerRadius = radius;
     cell.contentView.layer.masksToBounds = YES;
     if (@available(iOS 13.0, *)) cell.contentView.layer.cornerCurve = kCACornerCurveContinuous;
+}
+%end
+
+%hook UITableView
+- (void)layoutSubviews {
+    %orig;
+    if (!WCRAnyCardOn()) return;
+    for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
 }
 %end
