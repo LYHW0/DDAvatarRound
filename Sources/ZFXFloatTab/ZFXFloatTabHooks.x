@@ -27,11 +27,16 @@
 
 - (void)layoutSubviews {
     %orig;
+    static BOOL wasOn = NO;
+    BOOL on = [[ZFXFloatTabManager shared] enabled];
+    if (!on && !wasOn) return;
+    wasOn = on;
     [[ZFXFloatTabManager shared] layoutTabBar:self];
 }
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *result = %orig;
+    if (![[ZFXFloatTabManager shared] enabled]) return result;
     UIView *extended = [[ZFXFloatTabManager shared] hitTestExtensionForTabBar:self
                                                                         point:point
                                                                         event:event];
@@ -97,6 +102,7 @@
 
 - (void)setSelected:(BOOL)selected {
     %orig;
+    if (![[ZFXFloatTabManager shared] enabled]) return;
     [[ZFXFloatTabManager shared] reloadConfig];
 }
 

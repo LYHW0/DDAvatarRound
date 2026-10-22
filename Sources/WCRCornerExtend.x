@@ -292,7 +292,7 @@ static UIColor *WCRBarFill(void) {
     if (!cfg.toolbarCornerEnabled) return;
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"wkkFloatTab"]) return;
     UIView *bg = WCRBarBackground((UIView *)self);
-    WCRTopRound(bg ?: (UIView *)self, cfg.toolbarCornerRadius);
+    if (bg) WCRTopRound(bg, cfg.toolbarCornerRadius);
 }
 %end
 
@@ -306,7 +306,7 @@ static UIColor *WCRBarFill(void) {
     UIView *bg = nil;
     if ([me respondsToSelector:@selector(backgroundView)]) bg = [me valueForKey:@"backgroundView"];
     if (![bg isKindOfClass:[UIView class]]) bg = WCRBarBackground(me);
-    WCRTopRound(bg ?: me, cfg.toolbarCornerRadius);
+    if (bg) { WCRTopRound(bg, cfg.toolbarCornerRadius); bg.userInteractionEnabled = NO; }
 }
 %end
 

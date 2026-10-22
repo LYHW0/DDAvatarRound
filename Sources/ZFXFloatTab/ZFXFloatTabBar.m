@@ -5,6 +5,7 @@
 #import "ZFXFloatTabBar.h"
 #import "ZFXFloatTabSettings.h"
 #import <objc/message.h>
+#import <objc/runtime.h>
 #import <string.h>
 #import <QuartzCore/QuartzCore.h>
 
@@ -760,11 +761,13 @@ static UIColor *bgTintForConfig(ZFXConfig cfg) {
             [floating removeFromSuperview];
             [self.bars removeObject:floating];
         }
-        // 恢复原生
+        // 恢复原生：只恢复被悬浮底栏隐藏过的视图，不碰微信自己隐藏的视图
         for (UIView *v in bar.subviews) {
-            v.alpha = 1.0;
-            v.hidden = NO;
-            v.userInteractionEnabled = YES;
+            NSArray *saved = objc_getAssociatedObject(v, "zfx.saved");
+            if (!saved) continue;
+            v.alpha = [saved[0] doubleValue];
+            v.userInteractionEnabled = [saved[1] boolValue];
+            objc_setAssociatedObject(v, "zfx.saved", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
         [self hideMask];
         return;
@@ -773,6 +776,8 @@ static UIColor *bgTintForConfig(ZFXConfig cfg) {
     // 原生内容隐藏
     for (UIView *v in bar.subviews) {
         if ([v isKindOfClass:[ZFXFloatingBarView class]]) continue;
+        if (!objc_getAssociatedObject(v, "zfx.saved"))
+            objc_setAssociatedObject(v, "zfx.saved", @[@(v.alpha), @(v.userInteractionEnabled)], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         v.alpha = 0.0;
         v.userInteractionEnabled = NO;
     }
