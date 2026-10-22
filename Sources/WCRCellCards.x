@@ -210,7 +210,23 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         cell.multipleSelectionBackgroundView = nil;
     }
     WCRHideLines(cell);
-    if (timeline) WCRRoundMedia(cell, cell);
+    if (timeline) {
+        WCRRoundMedia(cell, cell);
+        CGFloat cw = cell.bounds.size.width;
+        NSMutableArray *st = [NSMutableArray arrayWithObject:cell.contentView];
+        while (st.count) {
+            UIView *v = st.lastObject; [st removeLastObject];
+            for (UIView *sv in v.subviews) {
+                if (sv.bounds.size.width >= cw * 0.8 && sv.backgroundColor) {
+                    CGFloat w = 0, a = 0;
+                    if ([sv.backgroundColor getWhite:&w alpha:&a] && w > 0.97 && a > 0.5) sv.backgroundColor = [UIColor clearColor];
+                }
+                if (sv.bounds.size.width >= cw * 0.8) [st addObject:sv];
+            }
+        }
+        cell.contentView.layer.cornerRadius = 0;
+        cell.clipsToBounds = NO;
+    }
     if (fancy) {
         card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
         BOOL last = single || isLastRow;
