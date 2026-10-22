@@ -79,8 +79,8 @@ static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
 #pragma mark - WCRefine 界面圆角板块完整还原（162 个配置键）
 
 WCR_BOOL(globalCornerEnabled, globalCornerEnabled, YES)
-WCR_DOUBLE(globalCornerRadius, globalCornerRadius, 15.0)
-WCR_DOUBLE(globalCornerMargin, globalCornerMargin, 10.0)
+WCR_DOUBLE(globalCornerRadius, globalCornerRadius, 24.0)
+WCR_DOUBLE(globalCornerMargin, globalCornerMargin, 18.0)
 WCR_DOUBLE(globalCornerSpacing, globalCornerSpacing, 6.0)
 WCR_DOUBLE(globalCornerStroke, globalCornerStroke, 0.0)
 WCR_STRING(globalCornerStrokeStyle, globalCornerStrokeStyle, @"continuous")

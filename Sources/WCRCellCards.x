@@ -26,39 +26,62 @@ static UIColor *WCRCardFill(void) {
     return u;
 }
 
+static BOOL WCRInChatPage(UIView *v) {
+    UIResponder *r = v;
+    while (r) {
+        if ([r isKindOfClass:[UIViewController class]]) {
+            NSString *n = NSStringFromClass([r class]);
+            if ([n containsString:@"BaseMsgContent"] || [n containsString:@"ChatRoom"] ||
+                [n containsString:@"MessageList"]) return YES;
+        }
+        r = r.nextResponder;
+    }
+    return NO;
+}
+
 static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
-    NSString *cls = NSStringFromClass([cell class]);
-    if (WCRClassExcluded(cls)) return;
+    if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
+    UITableView *tv = nil;
+    for (UIView *v = cell.superview; v; v = v.superview)
+        if ([v isKindOfClass:[UITableView class]]) { tv = (UITableView *)v; break; }
+    if (!tv || WCRInChatPage(tv)) return;
+    NSIndexPath *ip = [tv indexPathForCell:cell];
+    if (!ip) return;
 
     WCRConfig *c = WCRCCfg();
-    CGFloat radius = c.globalCornerRadius > 0 ? c.globalCornerRadius : 12.0;
-    CGFloat margin = c.globalCornerMargin > 0 ? c.globalCornerMargin : 8.0;
+    CGFloat radius = c.globalCornerRadius > 0 ? c.globalCornerRadius : 24.0;
+    CGFloat margin = c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0;
+    NSInteger rows = [tv numberOfRowsInSection:ip.section];
+
+    // 列表底色：浅灰，卡片为白
+    UIColor *bg = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark
+            ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1];
+    }];
+    tv.backgroundColor = bg;
+    tv.separatorStyle = UITableViewCellSeparatorStyleNone;
 
     cell.backgroundColor = [UIColor clearColor];
     cell.contentView.backgroundColor = [UIColor clearColor];
-
-    // 卡片背景穿在 cell 自己的 backgroundView 上，不改 contentView 的 frame，
-    // 避免和微信内部的 Auto Layout 打架。
     UIView *card = cell.backgroundView;
     if (!card || card.tag != 0x574352) {
-        card = [[UIView alloc] initWithFrame:cell.bounds];
+        card = [UIView new];
         card.tag = 0x574352;
         card.userInteractionEnabled = NO;
         cell.backgroundView = card;
     }
-    CGRect b = cell.bounds;
-    card.frame = CGRectInset(b, margin, margin * 0.5);
+    // 同组整块：上下不留缝，只有首尾行有圆角
+    card.frame = CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height);
     card.backgroundColor = WCRCardFill();
     card.layer.cornerRadius = radius;
     card.layer.masksToBounds = YES;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-
-    // 列表底色留出对比，否则白卡片贴白底看不出圆角。
-    UIView *parent = cell.superview;
-    if ([parent isKindOfClass:[UITableView class]]) {
-        parent.backgroundColor = [UIColor systemGroupedBackgroundColor];
-    }
+    CACornerMask m = 0;
+    if (ip.row == 0) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (ip.row == rows - 1) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    card.layer.maskedCorners = m;
+    if (m == 0) card.layer.cornerRadius = 0;
 }
 
 %hook UITableViewCell
