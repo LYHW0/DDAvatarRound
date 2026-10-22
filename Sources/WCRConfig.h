@@ -244,6 +244,62 @@ extern NSString * const WCRSettingsChangedNotification;
 @property (nonatomic, assign) BOOL chatLocationCornerEnabled;
 @property (nonatomic, assign) BOOL chatFileCornerEnabled;
 
+// ---- legacy (menu/banner/profile card) ----
+@property (nonatomic, assign) BOOL profileCardBeautifyEnabled;
+@property (nonatomic, assign) double profileCardCardAlpha;
+@property (nonatomic, assign) double profileCardBackgroundImageAlpha;
+@property (nonatomic, copy)   NSString *profileCardBackgroundImagePath;
+@property (nonatomic, copy)   NSString *profileCardBackgroundLightColor;
+@property (nonatomic, copy)   NSString *profileCardBackgroundDarkColor;
+@property (nonatomic, copy)   NSString *profileCardNameLightColor;
+@property (nonatomic, copy)   NSString *profileCardNameDarkColor;
+@property (nonatomic, copy)   NSString *profileCardSignatureLightColor;
+@property (nonatomic, copy)   NSString *profileCardSignatureDarkColor;
+@property (nonatomic, assign) BOOL profileCardWechatIDHiddenByDefault;
+@property (nonatomic, assign) BOOL msgBannerBeautifyEnabled;
+@property (nonatomic, assign) double msgBannerHeight;
+@property (nonatomic, assign) double msgBannerWidth;
+@property (nonatomic, assign) double msgBannerExtraMargin;
+@property (nonatomic, assign) double msgBannerStaySeconds;
+@property (nonatomic, assign) double msgBannerMaxTextLength;
+@property (nonatomic, copy)   NSString *msgBannerMaxTextOverflowSuffix;
+@property (nonatomic, assign) BOOL msgBannerBgUseImageBackground;
+@property (nonatomic, copy)   NSString *msgBannerBgImageFolder;
+@property (nonatomic, assign) double msgBannerBgImageAlpha;
+@property (nonatomic, assign) double msgBannerBgImageOffsetX;
+@property (nonatomic, assign) double msgBannerBgImageOffsetY;
+@property (nonatomic, assign) BOOL msgBannerBgColorEnabled;
+@property (nonatomic, copy)   NSString *msgBannerBgColorLight;
+@property (nonatomic, copy)   NSString *msgBannerBgColorDark;
+@property (nonatomic, assign) BOOL msgBannerFrostColorEnabled;
+@property (nonatomic, copy)   NSString *msgBannerFrostColorLight;
+@property (nonatomic, copy)   NSString *msgBannerFrostColorDark;
+@property (nonatomic, assign) BOOL msgBannerNicknameColorEnabled;
+@property (nonatomic, copy)   NSString *msgBannerNicknameColorLight;
+@property (nonatomic, copy)   NSString *msgBannerNicknameColorDark;
+@property (nonatomic, assign) BOOL msgBannerContentColorEnabled;
+@property (nonatomic, copy)   NSString *msgBannerContentColorLight;
+@property (nonatomic, copy)   NSString *msgBannerContentColorDark;
+@property (nonatomic, assign) double plusMenuBorderSize;
+@property (nonatomic, copy)   NSString *plusMenuBorderColorLight;
+@property (nonatomic, copy)   NSString *plusMenuBorderColorDark;
+@property (nonatomic, assign) BOOL menuUseImageBackground;
+@property (nonatomic, copy)   NSString *menuBackgroundImageFolder;
+@property (nonatomic, assign) double menuBackgroundViewAlpha;
+@property (nonatomic, assign) BOOL menuSizeEnabled;
+@property (nonatomic, assign) double menuWidth;
+@property (nonatomic, assign) double menuMaxCountPerLine;
+@property (nonatomic, assign) BOOL menuColorEnabled;
+@property (nonatomic, copy)   NSString *menuColorLight;
+@property (nonatomic, copy)   NSString *menuColorDark;
+@property (nonatomic, assign) BOOL menuTextColorEnabled;
+@property (nonatomic, copy)   NSString *menuTextColorLight;
+@property (nonatomic, copy)   NSString *menuTextColorDark;
+@property (nonatomic, assign) BOOL menuIconColorEnabled;
+@property (nonatomic, copy)   NSString *menuIconColorLight;
+@property (nonatomic, copy)   NSString *menuIconColorDark;
+@property (nonatomic, assign) BOOL menuTextCenterEnabled;
+
 @end
 
 NS_ASSUME_NONNULL_END
