@@ -11,7 +11,7 @@ static BOOL WCRAnyCardOn(void) {
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
            c.discoverPageCornerEnabled || c.myPageCornerEnabled || c.settingPageCornerEnabled ||
            c.timelineCornerEnabled || c.forwardPickerCornerEnabled || c.profilePageCornerEnabled ||
-           c.groupInfoCornerEnabled || c.servicePageCornerEnabled;
+           c.servicePageCornerEnabled;
 }
 
 static BOOL WCRClassExcluded(NSString *cls) {
@@ -95,7 +95,6 @@ static void WCRRoundMedia(UIView *root, UIView *v) {
 }
 static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
-    objc_setAssociatedObject(cell, @selector(WCRShadowKey), nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
     UITableView *tv = nil;
     for (UIView *v = cell.superview; v; v = v.superview)
@@ -108,7 +107,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     NSInteger kind = WCRPageKind(tv);
     if (kind == 0) return;
     BOOL profileLike = (kind == 7 || kind == 9);
-    if (kind == 9) { if (!c.groupInfoCornerEnabled) return; kind = 6; }
+    if (kind == 9) { if (!c.profilePageCornerEnabled) return; kind = 6; }
     if (kind == 7) { if (!c.profilePageCornerEnabled) return; kind = 6; }
     else if (kind == 6 && !c.settingPageCornerEnabled) return;
     BOOL picker = (kind == 8);
@@ -124,7 +123,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
     if (picker) { radius = c.forwardPickerCornerRadius; margin = 14.0; fancy = YES; }
-    if (profileLike) { radius = 24.0; margin = (WCRPageKind(tv) == 9) ? 18.0 : 10.0; }
+    if (profileLike) { radius = 24.0; margin = 10.0; }
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
     NSInteger secFirst = ip.section, secLast = ip.section;
@@ -254,58 +253,42 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }
     card.layer.shadowOpacity = 0;
     card.layer.shadowPath = NULL;
-    objc_setAssociatedObject(cell, @selector(WCRShadowKey), picker ? nil : @(secFirst * 10000 + (timeline ? ip.section : 0)), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-
-static void WCRUpdateShadows(UITableView *tv) {
-    WCRConfig *c = WCRCCfg();
-    NSMutableDictionary *pool = objc_getAssociatedObject(tv, @selector(WCRShadowPool));
-    double strength = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
-    NSMutableDictionary *rects = [NSMutableDictionary dictionary];
-    NSMutableDictionary *radii = [NSMutableDictionary dictionary];
-    if (strength > 0 && !WCRInChatPage(tv)) {
-        for (UITableViewCell *cell in tv.visibleCells) {
-            NSNumber *k = objc_getAssociatedObject(cell, @selector(WCRShadowKey));
-            UIView *card = cell.backgroundView;
-            if (!k || !card || card.tag != 0x574352 || card.hidden) continue;
-            if (cell.hidden || cell.alpha < 0.05 || cell.bounds.size.height <= 2) continue;
-            CGRect r = [card convertRect:card.bounds toView:tv];
-            if (r.size.height <= 2) continue;
-            NSValue *old = rects[k];
-            rects[k] = [NSValue valueWithCGRect:old ? CGRectUnion(old.CGRectValue, r) : r];
-            radii[k] = @(MAX([radii[k] doubleValue], card.layer.cornerRadius));
+    {
+        CALayer *sl = nil;
+        for (CALayer *l in card.layer.sublayers) if ([l.name isEqualToString:@"WCRShadow"]) { sl = l; break; }
+        double strength = (c.cardShadowEnabled && !picker) ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
+        if (strength <= 0 || !isLastRow) { sl.hidden = YES; }
+        else {
+            NSInteger frow = (secFirst == ip.section) ? fr : 0;
+            CGRect firstR = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:frow inSection:secFirst]];
+            CGFloat topInset = timeline ? 6 : 0;
+            CGFloat groupTop = firstR.origin.y + topInset - cell.frame.origin.y - card.frame.origin.y;
+            CGRect g = CGRectMake(0, groupTop, card.bounds.size.width, card.bounds.size.height - groupTop);
+            CGFloat rr = card.layer.cornerRadius > 0 ? card.layer.cornerRadius : radius;
+            if (!sl) { sl = [CALayer layer]; sl.name = @"WCRShadow"; [card.layer insertSublayer:sl atIndex:0]; }
+            sl.hidden = NO;
+            [CATransaction begin]; [CATransaction setDisableActions:YES];
+            CGFloat pad = 40;
+            sl.frame = CGRectInset(g, -pad, -pad);
+            CGRect inner = CGRectMake(pad, pad, g.size.width, g.size.height);
+            sl.shadowColor = [UIColor blackColor].CGColor;
+            sl.shadowOpacity = (float)strength;
+            sl.shadowRadius = 7;
+            sl.shadowOffset = CGSizeMake(0, 4);
+            sl.shadowPath = [UIBezierPath bezierPathWithRoundedRect:inner cornerRadius:rr].CGPath;
+            CAShapeLayer *mask = (CAShapeLayer *)sl.mask;
+            if (![mask isKindOfClass:[CAShapeLayer class]]) { mask = [CAShapeLayer layer]; mask.fillRule = kCAFillRuleEvenOdd; sl.mask = mask; }
+            UIBezierPath *mp = [UIBezierPath bezierPathWithRect:sl.bounds];
+            [mp appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectInset(inner, 0.5, 0.5) cornerRadius:rr]];
+            mask.frame = sl.bounds; mask.path = mp.CGPath;
+            [CATransaction commit];
+            card.layer.masksToBounds = NO;
+            cell.clipsToBounds = NO;
         }
     }
-    if (!pool && rects.count == 0) return;
-    if (!pool) { pool = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(WCRShadowPool), pool, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
-    for (NSNumber *k in pool) if (!rects[k]) ((UIView *)pool[k]).hidden = YES;
-    for (NSNumber *k in rects) {
-        CGRect gr = [rects[k] CGRectValue];
-        CGFloat rr = [radii[k] doubleValue];
-        UIView *sh = pool[k];
-        if (!sh) { sh = [UIView new]; sh.userInteractionEnabled = NO; sh.backgroundColor = [UIColor clearColor]; pool[k] = sh; }
-        if (sh.superview != tv) { [sh removeFromSuperview]; [tv insertSubview:sh atIndex:0]; }
-        else [tv sendSubviewToBack:sh];
-        sh.layer.zPosition = -1;
-        sh.hidden = NO;
-        CGFloat pad = 30;
-        sh.frame = CGRectInset(gr, -pad, -pad);
-        CGRect inner = CGRectMake(pad, pad, gr.size.width, gr.size.height);
-        UIBezierPath *shape = [UIBezierPath bezierPathWithRoundedRect:inner cornerRadius:rr];
-        sh.layer.shadowColor = [UIColor blackColor].CGColor;
-        sh.layer.shadowOpacity = (float)strength;
-        sh.layer.shadowRadius = 9;
-        sh.layer.shadowOffset = CGSizeMake(0, 5);
-        sh.layer.shadowPath = shape.CGPath;
-        CAShapeLayer *mask = (CAShapeLayer *)sh.layer.mask;
-        if (![mask isKindOfClass:[CAShapeLayer class]]) { mask = [CAShapeLayer layer]; mask.fillRule = kCAFillRuleEvenOdd; sh.layer.mask = mask; }
-        UIBezierPath *m = [UIBezierPath bezierPathWithRect:sh.bounds];
-        [m appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectInset(inner, 0.5, 0.5) cornerRadius:rr]];
-        mask.frame = sh.bounds;
-        mask.path = m.CGPath;
-    }
 }
+
+
 
 %hook UITableViewCell
 - (void)layoutSubviews {
@@ -374,7 +357,7 @@ static void WCRStyleInfoHeader(UITableView *tv) {
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     double st = WCRCCfg().cardShadowEnabled ? WCRCCfg().cardShadowStrength : 0;
     card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
-    card.layer.shadowRadius = 9; card.layer.shadowOffset = CGSizeMake(0, 5);
+    card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
     card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
@@ -411,6 +394,12 @@ static void WCRStyleMyHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    {
+        double st = WCRCCfg().cardShadowEnabled ? WCRCCfg().cardShadowStrength : 0;
+        card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
+        card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
+        card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
+    }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     WCRClearBg(h, nil);
@@ -442,9 +431,31 @@ static void WCRStyleMyHeader(UITableView *tv) {
     }
 }
 
+static void WCRRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
+    if (depth > 8) return;
+    for (UIView *sv in v.subviews) {
+        CGSize z = sv.bounds.size;
+        if (!sv.hidden && z.width >= W * 0.7 && z.height >= 28 && z.height <= 52 && ![sv isKindOfClass:[UILabel class]]) {
+            BOOL filled = [sv isKindOfClass:[UITextField class]] || [sv isKindOfClass:[UIImageView class]] ||
+                (sv.backgroundColor && CGColorGetAlpha(sv.backgroundColor.CGColor) > 0.05);
+            if (filled) {
+                sv.layer.cornerRadius = MIN(r, z.height / 2.0);
+                if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
+                sv.clipsToBounds = YES;
+            }
+        }
+        WCRRoundHeaderSearch(sv, W, r, depth + 1);
+    }
+}
+
 %hook UITableView
 - (void)layoutSubviews {
     %orig;
+    if (WCRCCfg().searchCornerEnabled) {
+        NSInteger pk = WCRPageKind(self);
+        UIView *th = [(UITableView *)self tableHeaderView];
+        if ((pk == 1 || pk == 2) && th) WCRRoundHeaderSearch(th, ((UIView *)self).bounds.size.width, WCRCCfg().searchCornerRadius, 0);
+    }
     if (!WCRAnyCardOn()) return;
     if (WCRCCfg().myPageCornerEnabled && WCRPageKind(self) == 3) {
         WCRStyleMyHeader((UITableView *)self);
@@ -466,9 +477,8 @@ static void WCRStyleMyHeader(UITableView *tv) {
         }
         if (mtv.tableFooterView && mtv.tableFooterView.bounds.size.height > 1) { UIView *f = [UIView new]; f.frame = CGRectMake(0, 0, 1, 0.01); mtv.tableFooterView = f; }
     }
-    else if ((WCRCCfg().profilePageCornerEnabled && WCRPageKind(self) == 7) || (WCRCCfg().groupInfoCornerEnabled && WCRPageKind(self) == 9)) WCRStyleInfoHeader((UITableView *)self);
+    else if ((WCRCCfg().profilePageCornerEnabled && WCRPageKind(self) == 7) || (WCRCCfg().profilePageCornerEnabled && WCRPageKind(self) == 9)) WCRStyleInfoHeader((UITableView *)self);
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
-    WCRUpdateShadows((UITableView *)self);
 }
 %end
 

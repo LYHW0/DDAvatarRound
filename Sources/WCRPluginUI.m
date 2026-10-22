@@ -49,49 +49,54 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     if (self.sections) return;
     #define P(t, ...) WCRPage(t, @[__VA_ARGS__])
     NSArray *pages = @[
-        P(@"微信主页", WCRItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1)),
+        P(@"微信主页", WCRItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
+                      WCRItem(@"全局卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
+                      WCRItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1),
+                      WCRItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
+                      WCRItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30),
+                      WCRItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 40),
+                      WCRItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40)),
         P(@"通讯录页", WCRItem(@"卡片圆角", @"homepageCornerEnabled", @"bool", 0, 1)),
         P(@"发现页", WCRItem(@"卡片圆角", @"discoverPageCornerEnabled", @"bool", 0, 1),
                      WCRItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
-                     WCRItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30)),
+                     WCRItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30),
+                     WCRItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
+                     WCRItem(@"朋友圈卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
+                     WCRItem(@"朋友圈图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
+                     WCRItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
+                     WCRItem(@"朋友圈评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
+                     WCRItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
         P(@"我的页面", WCRItem(@"卡片圆角", @"myPageCornerEnabled", @"bool", 0, 1),
                       WCRItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
-                      WCRItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40)),
-        P(@"服务页", WCRItem(@"服务页圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
-                    WCRItem(@"圆角半径", @"servicePageCornerRadius", @"num", 2, 40)),
+                      WCRItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
+                      WCRItem(@"服务页圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
+                      WCRItem(@"服务页圆角半径", @"servicePageCornerRadius", @"num", 2, 40)),
         P(@"转发页面", WCRItem(@"转发选择器圆角", @"forwardPickerCornerEnabled", @"bool", 0, 1),
                       WCRItem(@"圆角半径", @"forwardPickerCornerRadius", @"num", 2, 40)),
         P(@"微信设置页", WCRItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
-        P(@"好友资料页", WCRItem(@"卡片圆角", @"profilePageCornerEnabled", @"bool", 0, 1)),
-        P(@"群聊资料页", WCRItem(@"卡片圆角", @"groupInfoCornerEnabled", @"bool", 0, 1)),
-        P(@"朋友圈圆角", WCRItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
-                       WCRItem(@"卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
-                       WCRItem(@"图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
-                       WCRItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
-                       WCRItem(@"评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
-                       WCRItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
-        P(@"顶栏 / 底栏", WCRItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
-                        WCRItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 40),
-                        WCRItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
-                        WCRItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40),
-                        WCRItem(@"悬浮胶囊 TabBar", @"floatingTabBarEnabled", @"bool", 0, 1)),
-        P(@"搜索框 / 输入框", WCRItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
-                          WCRItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
-                          WCRItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
-                          WCRItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30)),
-        P(@"卡片阴影", WCRItem(@"全局卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
-                      WCRItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1)),
-        P(@"头像圆角", WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100)),
+        P(@"资料页圆角", WCRItem(@"好友 / 群聊资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1)),
     ];
     #undef P
-    self.sections = @[ @{ @"header": @"微信美化", @"items": pages } ];
+    self.sections = @[ @{ @"header": @"微信美化", @"items": pages },
+                       @{ @"header": @"配置管理", @"items": @[
+                           @{ @"title": @"导出配置", @"kind": @"action", @"action": @"export" },
+                           @{ @"title": @"导入配置", @"kind": @"action", @"action": @"import" } ] } ];
 
-    self.navigationItem.rightBarButtonItem =
-        [[UIBarButtonItem alloc] initWithTitle:@"完成"
-                                         style:UIBarButtonItemStyleDone
-                                        target:self
-                                        action:@selector(closeTapped)];
+    if (!self.pageTitle) {
+        UILabel *by = [UILabel new];
+        by.text = @"by懒小王";
+        by.textAlignment = NSTextAlignmentCenter;
+        by.font = [UIFont systemFontOfSize:13];
+        by.textColor = [UIColor colorWithWhite:0.6 alpha:1];
+        by.frame = CGRectMake(0, 0, 320, 56);
+        self.tableView.tableFooterView = by;
+    }
 }
 
 - (void)closeTapped {
@@ -147,9 +152,6 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (!self.pageTitle && section == (NSInteger)self.sections.count - 1) {
-        return @"改动即时生效；个别项目需重新进入页面才会体现。";
-    }
     return nil;
 }
 
@@ -180,7 +182,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     NSDictionary *item = [self itemAtIndexPath:indexPath];
     cell.textLabel.text = item[@"title"];
 
-    if ([item[@"kind"] isEqualToString:@"page"]) {
+    if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"]) {
         cell.detailTextLabel.text = nil;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -212,6 +214,11 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         [self.navigationController pushViewController:sub animated:YES];
         return;
     }
+    if ([item[@"kind"] isEqualToString:@"action"]) {
+        if ([item[@"action"] isEqualToString:@"export"]) [self exportConfig];
+        else [self importConfig];
+        return;
+    }
     if (![item[@"kind"] isEqualToString:@"num"]) return;
 
     double current = [self numberValueForKey:item[@"key"] item:item];
@@ -236,6 +243,48 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         [weakSelf.tableView reloadData];
     }]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)toast:(NSString *)title msg:(NSString *)msg {
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
+    [a addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:a animated:YES completion:nil];
+}
+
+- (void)exportConfig {
+    NSDictionary *d = [[WCRConfig shared] exportAll];
+    NSData *data = [NSJSONSerialization dataWithJSONObject:d options:NSJSONWritingPrettyPrinted error:nil];
+    if (!data) { [self toast:@"导出失败" msg:@"配置无法序列化"]; return; }
+    NSString *json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    [UIPasteboard generalPasteboard].string = json;
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"WCRefine-config.json"];
+    [data writeToFile:path atomically:YES];
+    UIActivityViewController *vc = [[UIActivityViewController alloc] initWithActivityItems:@[[NSURL fileURLWithPath:path]] applicationActivities:nil];
+    vc.popoverPresentationController.sourceView = self.view;
+    vc.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 1, 1);
+    [self presentViewController:vc animated:YES completion:nil];
+}
+
+- (void)importConfig {
+    NSString *json = [UIPasteboard generalPasteboard].string;
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    id obj = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    if (![obj isKindOfClass:[NSDictionary class]]) {
+        [self toast:@"导入失败" msg:@"请先复制导出的配置 JSON 到剪贴板，再点导入配置。"];
+        return;
+    }
+    __weak typeof(self) ws = self;
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:@"导入配置"
+        message:[NSString stringWithFormat:@"检测到剪贴板中有 %lu 项配置，导入将覆盖同名设置。", (unsigned long)[obj count]]
+        preferredStyle:UIAlertControllerStyleAlert];
+    [a addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [a addAction:[UIAlertAction actionWithTitle:@"导入" style:UIAlertActionStyleDefault handler:^(UIAlertAction *x) {
+        NSInteger n = [[WCRConfig shared] importAll:obj];
+        [[NSNotificationCenter defaultCenter] postNotificationName:WCRSettingsChangedNotification object:nil];
+        [ws.tableView reloadData];
+        [ws toast:@"导入完成" msg:[NSString stringWithFormat:@"已导入 %ld 项，重新进入页面后生效。", (long)n]];
+    }]];
+    [self presentViewController:a animated:YES completion:nil];
 }
 
 - (void)toggleChanged:(UISwitch *)sender {

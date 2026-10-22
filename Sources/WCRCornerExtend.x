@@ -48,13 +48,36 @@ static UIImage *WCRSearchFieldImage(CGFloat r, UITraitCollection *tc) {
 }
 static void WCRApplySearchBarImage(UISearchBar *sb, CGFloat r) {
     NSString *sig = [NSString stringWithFormat:@"%.1f-%ld", r, (long)sb.traitCollection.userInterfaceStyle];
-    if ([objc_getAssociatedObject(sb, @selector(WCRApplySearchBarImage)) isEqual:sig]) return;
+    UIImage *mine = objc_getAssociatedObject(sb, @selector(WCRSearchFieldImage));
+    if ([objc_getAssociatedObject(sb, @selector(WCRApplySearchBarImage)) isEqual:sig] && mine &&
+        [sb searchFieldBackgroundImageForState:UIControlStateNormal] == mine) return;
     objc_setAssociatedObject(sb, @selector(WCRApplySearchBarImage), sig, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    [sb setSearchFieldBackgroundImage:WCRSearchFieldImage(r, sb.traitCollection) forState:UIControlStateNormal];
+    mine = WCRSearchFieldImage(r, sb.traitCollection);
+    objc_setAssociatedObject(sb, @selector(WCRSearchFieldImage), mine, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [sb setSearchFieldBackgroundImage:mine forState:UIControlStateNormal];
     [sb setBackgroundImage:[UIImage new]];
     if (@available(iOS 13.0, *)) sb.searchTextField.backgroundColor = [UIColor clearColor];
 }
+static void WCRRoundSearchBoxes(UIView *bar, UIView *v, CGFloat r, int depth) {
+    if (depth > 7) return;
+    CGFloat W = bar.bounds.size.width;
+    for (UIView *sv in v.subviews) {
+        CGSize z = sv.bounds.size;
+        BOOL boxy = z.width >= W * 0.6 && z.height >= 24 && z.height <= 52 && !sv.hidden &&
+            ([sv isKindOfClass:[UITextField class]] || [sv isKindOfClass:[UIImageView class]] ||
+             [NSStringFromClass([sv class]) containsString:@"Background"] ||
+             (sv.backgroundColor && CGColorGetAlpha(sv.backgroundColor.CGColor) > 0.05));
+        if (boxy) {
+            CGFloat rr = MIN(r, z.height / 2.0);
+            sv.layer.cornerRadius = rr;
+            if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
+            sv.clipsToBounds = YES;
+        }
+        WCRRoundSearchBoxes(bar, sv, r, depth + 1);
+    }
+}
 static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
+    if (depth == 0) WCRRoundSearchBoxes(v, v, r, 0);
     if (depth > 6) return;
     for (UIView *sv in v.subviews) {
         if ([sv isKindOfClass:[UITextField class]]) {
@@ -120,6 +143,7 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
     if (!cfg.searchCornerEnabled) return;
+    if ([(id)self isKindOfClass:[UISearchBar class]]) WCRApplySearchBarImage((UISearchBar *)self, cfg.searchCornerRadius);
     WCRRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
 }
 %end
@@ -265,7 +289,7 @@ static UIColor *WCRBarFill(void) {
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.toolbarCornerEnabled || cfg.floatingTabBarEnabled) return;
+    if (!cfg.toolbarCornerEnabled) return;
     UIView *bg = WCRBarBackground((UIView *)self);
     WCRTopRound(bg ?: (UIView *)self, cfg.toolbarCornerRadius);
 }
@@ -275,7 +299,7 @@ static UIColor *WCRBarFill(void) {
 - (void)layoutSubviews {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
-    if (!cfg.toolbarCornerEnabled || cfg.floatingTabBarEnabled) return;
+    if (!cfg.toolbarCornerEnabled) return;
     UIView *me = (UIView *)self;
     UIView *bg = nil;
     if ([me respondsToSelector:@selector(backgroundView)]) bg = [me valueForKey:@"backgroundView"];

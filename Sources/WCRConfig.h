@@ -19,6 +19,8 @@ extern NSString * const WCRSettingsChangedNotification;
 - (void)reload;
 - (id _Nullable)objectForKey:(NSString *)key def:(id _Nullable)def;
 - (void)setObject:(id _Nullable)value forKey:(NSString *)key;
+- (NSDictionary *)exportAll;
+- (NSInteger)importAll:(NSDictionary *)dict;
 
 #pragma mark - 全局圆角配置（Global Corner）
 

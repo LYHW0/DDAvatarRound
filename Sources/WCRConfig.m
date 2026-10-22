@@ -62,6 +62,23 @@ static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
     }
 }
 
+- (NSDictionary *)exportAll {
+    NSDictionary *d = [self.defaults persistentDomainForName:kWRCSuiteName];
+    return d ?: @{};
+}
+
+- (NSInteger)importAll:(NSDictionary *)dict {
+    if (![dict isKindOfClass:[NSDictionary class]]) return -1;
+    NSInteger n = 0;
+    for (NSString *k in dict) {
+        id v = dict[k];
+        if (![k isKindOfClass:[NSString class]]) continue;
+        if ([v isKindOfClass:[NSNumber class]] || [v isKindOfClass:[NSString class]]) { [self.defaults setObject:v forKey:k]; n++; }
+    }
+    [self.defaults synchronize];
+    return n;
+}
+
 #pragma mark - 取值便捷宏
 
 #define WCR_BOOL(prop, key, defv) \
@@ -306,11 +323,11 @@ WCR_STRING(menuIconColorLight, menuIconColorLight, @"#111111")
 WCR_STRING(menuIconColorDark, menuIconColorDark, @"#F2F2F7")
 WCR_BOOL(menuTextCenterEnabled, menuTextCenterEnabled, NO)
 
-WCR_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, YES)
+WCR_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, NO)
 WCR_BOOL(cardShadowEnabled, cardShadowEnabled, YES)
 WCR_DOUBLE(myPageCornerRadius, myPageCornerRadius, 24.0)
 WCR_DOUBLE(myPageCornerMargin, myPageCornerMargin, 20.0)
-WCR_DOUBLE(cardShadowStrength, cardShadowStrength, 0.10)
+WCR_DOUBLE(cardShadowStrength, cardShadowStrength, 0.12)
 WCR_BOOL(timelineCornerEnabled, timelineCornerEnabled, YES)
 WCR_DOUBLE(timelineCornerRadius, timelineCornerRadius, 24.0)
 WCR_BOOL(timelineMediaCornerEnabled, timelineMediaCornerEnabled, YES)
