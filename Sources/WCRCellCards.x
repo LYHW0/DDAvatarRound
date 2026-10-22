@@ -253,50 +253,63 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }
     card.layer.shadowOpacity = 0;
     card.layer.shadowPath = NULL;
+    for (CALayer *l in [card.layer.sublayers copy]) if ([l.name isEqualToString:@"WCRShadow"]) [l removeFromSuperlayer];
     {
-        CALayer *sl = nil;
-        for (CALayer *l in card.layer.sublayers) if ([l.name isEqualToString:@"WCRShadow"]) { sl = l; break; }
         double strength = (c.cardShadowEnabled && !picker) ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
-        [CATransaction begin]; [CATransaction setDisableActions:YES];
-        if (strength <= 0) { sl.hidden = YES; }
-        else {
+        if (strength > 0) {
+            NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(WCRGroupInfo));
+            if (!gi) { gi = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(WCRGroupInfo), gi, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
             NSInteger frow = (secFirst == ip.section) ? fr : 0;
-            NSInteger lastRows = [tv numberOfRowsInSection:secLast];
-            NSInteger lrow = (secLast == ip.section) ? lr : MAX(0, lastRows - 1);
-            CGRect firstR = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:frow inSection:secFirst]];
-            CGRect lastR = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:lrow inSection:secLast]];
-            CGFloat inset = timeline ? 6 : 0;
-            CGFloat off = cell.frame.origin.y + card.frame.origin.y;
-            CGFloat gTop = firstR.origin.y + inset - off;
-            CGFloat gBot = CGRectGetMaxY(lastR) - inset - off;
-            CGFloat W = card.bounds.size.width, H = card.bounds.size.height;
-            CGFloat rr = radius;
-            CGFloat pad = 30;
-            if (!sl) { sl = [CALayer layer]; sl.name = @"WCRShadow"; [card.layer insertSublayer:sl atIndex:0]; }
-            sl.hidden = NO;
-            CGFloat bandTop = isFirstRow ? -pad : 0, bandBot = isLastRow ? H + pad : H;
-            CGRect band = CGRectMake(-pad, bandTop, W + pad * 2, bandBot - bandTop);
-            sl.frame = band;
-            CGRect group = CGRectMake(pad, gTop - bandTop, W, MAX(1, gBot - gTop));
-            UIBezierPath *gp = [UIBezierPath bezierPathWithRoundedRect:group cornerRadius:rr];
-            sl.shadowColor = [UIColor blackColor].CGColor;
-            sl.shadowOpacity = (float)strength;
-            sl.shadowRadius = 7;
-            sl.shadowOffset = CGSizeMake(0, 4);
-            sl.shadowPath = gp.CGPath;
-            CAShapeLayer *mask = (CAShapeLayer *)sl.mask;
-            if (![mask isKindOfClass:[CAShapeLayer class]]) { mask = [CAShapeLayer layer]; mask.fillRule = kCAFillRuleEvenOdd; sl.mask = mask; }
-            UIBezierPath *mp = [UIBezierPath bezierPathWithRect:sl.bounds];
-            [mp appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectInset(group, 0.5, 0.5) cornerRadius:rr]];
-            mask.frame = sl.bounds; mask.path = mp.CGPath;
-            card.layer.masksToBounds = NO;
-            cell.clipsToBounds = NO;
+            NSInteger lrow = (secLast == ip.section) ? lr : MAX(0, [tv numberOfRowsInSection:secLast] - 1);
+            gi[@(secFirst)] = @[@(secFirst), @(frow), @(secLast), @(lrow), @(margin), @(radius), @(timeline ? 6.0 : 0.0), @(strength)];
         }
-        [CATransaction commit];
     }
 }
 
 
+
+static void WCRUpdateGroupShadows(UITableView *tv) {
+    NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(WCRGroupInfo));
+    NSMutableDictionary *pool = objc_getAssociatedObject(tv, @selector(WCRShadowPool));
+    if (!gi.count && !pool.count) return;
+    if (!pool) { pool = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(WCRShadowPool), pool, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+    NSInteger ns = tv.numberOfSections;
+    NSMutableSet *used = [NSMutableSet set];
+    [CATransaction begin]; [CATransaction setDisableActions:YES];
+    for (NSNumber *k in gi) {
+        NSArray *v = gi[k];
+        NSInteger s0 = [v[0] integerValue], r0 = [v[1] integerValue], s1 = [v[2] integerValue], r1 = [v[3] integerValue];
+        if (s0 >= ns || s1 >= ns || r0 >= [tv numberOfRowsInSection:s0] || r1 >= [tv numberOfRowsInSection:s1]) continue;
+        CGFloat m = [v[4] doubleValue], rr = [v[5] doubleValue], inset = [v[6] doubleValue];
+        CGRect a = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:r0 inSection:s0]];
+        CGRect b = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:r1 inSection:s1]];
+        CGFloat top = a.origin.y + inset, bot = CGRectGetMaxY(b) - inset;
+        if (bot - top < 4) continue;
+        CGRect g = CGRectMake(m, top, tv.bounds.size.width - m * 2, bot - top);
+        UIView *sh = pool[k];
+        if (!sh) {
+            sh = [UIView new]; sh.userInteractionEnabled = NO; sh.backgroundColor = [UIColor clearColor];
+            sh.layer.shadowColor = [UIColor blackColor].CGColor;
+            sh.layer.shadowRadius = 7; sh.layer.shadowOffset = CGSizeMake(0, 4);
+            pool[k] = sh;
+        }
+        UIView *bgv = tv.backgroundView;
+        if (sh.superview != tv) {
+            [sh removeFromSuperview];
+            if (bgv && bgv.superview == tv) [tv insertSubview:sh aboveSubview:bgv]; else [tv insertSubview:sh atIndex:0];
+        }
+        sh.layer.zPosition = -1;
+        sh.hidden = NO;
+        if (!CGRectEqualToRect(sh.frame, g)) {
+            sh.frame = g;
+            sh.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:sh.bounds cornerRadius:rr].CGPath;
+        }
+        sh.layer.shadowOpacity = (float)[v[7] doubleValue];
+        [used addObject:k];
+    }
+    for (NSNumber *k in pool) if (![used containsObject:k]) ((UIView *)pool[k]).hidden = YES;
+    [CATransaction commit];
+}
 
 %hook UITableViewCell
 - (void)layoutSubviews {
@@ -486,7 +499,9 @@ static void WCRRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
         if (mtv.tableFooterView && mtv.tableFooterView.bounds.size.height > 1) { UIView *f = [UIView new]; f.frame = CGRectMake(0, 0, 1, 0.01); mtv.tableFooterView = f; }
     }
     else if ((WCRCCfg().profilePageCornerEnabled && WCRPageKind(self) == 7) || (WCRCCfg().groupInfoCornerEnabled && WCRPageKind(self) == 9)) WCRStyleInfoHeader((UITableView *)self);
+    [objc_getAssociatedObject(self, @selector(WCRGroupInfo)) removeAllObjects];
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
+    WCRUpdateGroupShadows((UITableView *)self);
 }
 %end
 
