@@ -7,8 +7,8 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = LYHW
 
-LYHW_FILES = Tweak.x $(wildcard Sources/*.x) $(wildcard Sources/*.m) $(wildcard Sources/WPGroup/*.m) $(wildcard Sources/ZFXFloatTab/*.m) $(wildcard Sources/ZFXFloatTab/*.x)
-LYHW_CFLAGS = -fobjc-arc -ISources -ISources/WPGroup -ISources/ZFXFloatTab -Wno-error -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-property-ivar
+LYHW_FILES = Tweak.x $(wildcard Sources/*.x) $(wildcard Sources/*.m)
+LYHW_CFLAGS = -fobjc-arc -ISources -Wno-error -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-property-ivar
 LYHW_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics CoreFoundation
 LYHW_LIBRARIES =
 

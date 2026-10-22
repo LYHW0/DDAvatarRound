@@ -5,8 +5,6 @@
 
 #import "WCRPluginUI.h"
 #import "WCRConfig.h"
-#import "WPGroupManager.h"
-#import "ZFXFloatTabSettings.h"
 #import <objc/runtime.h>
 
 static NSString * const kCellID = @"WCRPluginCell";
@@ -51,8 +49,6 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     if (self.sections) return;
     #define P(t, ...) WCRPage(t, @[__VA_ARGS__])
     NSArray *pages = @[
-        @{ @"title": @"悬浮底栏", @"kind": @"vc", @"vc": @"float" },
-        @{ @"title": @"分组功能", @"kind": @"vc", @"vc": @"group" },
         P(@"微信主页", WCRItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
                       WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
                       WCRItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
@@ -188,7 +184,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     NSDictionary *item = [self itemAtIndexPath:indexPath];
     cell.textLabel.text = item[@"title"];
 
-    if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"] || [item[@"kind"] isEqualToString:@"vc"]) {
+    if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"]) {
         cell.detailTextLabel.text = nil;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -218,14 +214,6 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         sub.pageTitle = item[@"title"];
         sub.sections = @[ @{ @"header": item[@"title"], @"items": item[@"items"] } ];
         [self.navigationController pushViewController:sub animated:YES];
-        return;
-    }
-    if ([item[@"kind"] isEqualToString:@"vc"]) {
-        UIViewController *vc = nil;
-        if ([item[@"vc"] isEqualToString:@"float"]) vc = [[ZFXFloatTabSettingsViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-        else vc = [[WPGroupManager shared] makeSettingsViewController];
-        vc.title = item[@"title"];
-        if (vc) [self.navigationController pushViewController:vc animated:YES];
         return;
     }
     if ([item[@"kind"] isEqualToString:@"action"]) {
