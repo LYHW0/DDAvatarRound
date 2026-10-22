@@ -206,7 +206,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (isFirstRow) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     if (isLastRow) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     card.layer.maskedCorners = m;
-    BOOL single = NO;
+    BOOL single = NO; (void)single;
     if (timeline) {
         card.layer.cornerRadius = c.timelineCornerRadius;
         CGRect f = card.frame;
