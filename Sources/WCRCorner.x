@@ -72,6 +72,7 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
+    return; // 已由 WCRCellCards.x 统一处理
     UIView *view = (UIView *)self;
     if (!WCRCornerEnabledForView(view)) return;
 
@@ -122,6 +123,7 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
+    return; // 已由 WCRCellCards.x 统一处理
     if (!WCRCfg().mainFrameCornerEnabled) return;
 
     WCRConfig *cfg = WCRCfg();

@@ -39,10 +39,21 @@ static BOOL WCRInChatPage(UIView *v) {
     return NO;
 }
 
+static void WCRHideLines(UITableViewCell *cell) {
+    NSMutableArray *all = [NSMutableArray arrayWithObject:cell];
+    [all addObject:cell.contentView];
+    for (UIView *host in all)
+        for (UIView *v in host.subviews) {
+            if (v.tag == 0x574352) continue;
+            if (v.bounds.size.height <= 1.5 && v.bounds.size.width >= cell.bounds.size.width * 0.4) v.hidden = YES;
+        }
+}
+
 static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 0其他
     for (UIResponder *r = v; r; r = r.nextResponder) {
         if (![r isKindOfClass:[UIViewController class]]) continue;
         NSString *n = NSStringFromClass([r class]);
+        if ([n containsString:@"WCTimeLineViewController"]) return 5;
         if ([n containsString:@"FindFriend"]) return 4;
         if ([n containsString:@"NewMainFrame"]) return 1;
         if ([n containsString:@"ContactsViewController"]) return 2;
@@ -64,6 +75,14 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     WCRConfig *c = WCRCCfg();
     NSInteger kind = WCRPageKind(tv);
     if (kind == 0) return;
+    if (kind == 5) {
+        tv.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark
+                ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
+        tv.separatorStyle = UITableViewCellSeparatorStyleNone;
+        WCRHideLines(cell);
+        return;
+    }
     if ((kind == 1 && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
         (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !c.discoverPageCornerEnabled)) return;
     BOOL fancy = (kind != 4);
@@ -99,10 +118,17 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (ip.row == 0) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     if (ip.row == rows - 1) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     card.layer.maskedCorners = m;
-    if (m == 0) card.layer.cornerRadius = 0;
+    BOOL single = (kind == 1);
+    if (single) {
+        card.frame = CGRectInset(card.frame, 0, 3);
+        card.layer.cornerRadius = radius;
+        card.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner |
+                                   kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    } else if (m == 0) card.layer.cornerRadius = 0;
+    WCRHideLines(cell);
     if (fancy) {
         card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
-        BOOL last = (ip.row == rows - 1);
+        BOOL last = single || (ip.row == rows - 1);
         card.layer.shadowOpacity = (c.cardShadowEnabled && last) ? 0.14 : 0;
         card.layer.shadowRadius = 5;
         card.layer.shadowOffset = CGSizeMake(0, 3);
