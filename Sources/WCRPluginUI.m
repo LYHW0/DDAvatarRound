@@ -22,12 +22,12 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 @implementation WCRPluginSettingsViewController
 
 - (instancetype)init {
-    self = [super initWithStyle:UITableViewStyleInsetGrouped];
+    self = [super initWithStyle:UITableViewStyleGrouped];
     return self;
 }
 
 - (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
-    self = [super initWithStyle:UITableViewStyleInsetGrouped];
+    self = [super initWithStyle:UITableViewStyleGrouped];
     return self;
 }
 
@@ -36,6 +36,9 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 
     self.title = @"微信美化";
     self.tableView.rowHeight = 48.0;
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    self.tableView.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
 
     self.sections = @[
@@ -139,6 +142,25 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         return @"改动即时生效；个别项目需重新进入页面才会体现。";
     }
     return nil;
+}
+
+- (void)tableView:(UITableView *)tv willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)ip {
+    NSInteger n = [tv numberOfRowsInSection:ip.section];
+    cell.backgroundColor = [UIColor clearColor];
+    UIView *card = [UIView new];
+    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
+    card.layer.cornerRadius = 26;
+    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    CACornerMask m = 0;
+    if (ip.row == 0) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (ip.row == n - 1) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    card.layer.maskedCorners = m;
+    UIView *host = [UIView new];
+    [host addSubview:card];
+    card.frame = CGRectMake(16, 0, tv.bounds.size.width - 32, cell.bounds.size.height);
+    card.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    cell.backgroundView = host;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {

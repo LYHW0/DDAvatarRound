@@ -133,10 +133,20 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.backgroundColor = WCRCardFill();
     if (kind == 1 && !timeline) {
         card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.955 alpha:1];
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.975 alpha:1];
         }];
         tv.backgroundView = nil;
-        if (tv.superview) tv.superview.backgroundColor = bg;
+        if (tv.superview) {
+            tv.superview.backgroundColor = bg;
+            NSMutableArray *cands = [NSMutableArray arrayWithArray:tv.superview.subviews];
+            [cands addObjectsFromArray:tv.subviews];
+            for (UIView *u in cands) {
+                if (u == tv || [u isKindOfClass:[UITableViewCell class]] || [u isKindOfClass:[UILabel class]]) continue;
+                if (u.bounds.size.width >= tv.bounds.size.width * 0.9 && u.bounds.size.height > 200 && u.subviews.count < 3) {
+                    u.backgroundColor = bg; u.layer.backgroundColor = bg.CGColor;
+                }
+            }
+        }
     }
     card.layer.cornerRadius = radius;
     card.layer.masksToBounds = !fancy;
@@ -230,19 +240,22 @@ static void WCRClearBg(UIView *v, UIView *stop) {
     }
 }
 
+static void WCRFlatWhite(UIView *v, UIColor *c, CGFloat W) {
+    for (UIView *sv in v.subviews) {
+        if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIButton class]]) continue;
+        if (sv.bounds.size.width >= W * 0.85 && sv.bounds.size.height >= 60) {
+            sv.backgroundColor = c; sv.layer.cornerRadius = 0; sv.layer.backgroundColor = c.CGColor;
+        }
+        WCRFlatWhite(sv, c, W);
+    }
+}
 static void WCRStyleInfoHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100) return;
-    CGFloat W = h.bounds.size.width, mx = 10;
-    UIView *card = [h viewWithTag:0x574355];
-    if (!card) { card = [UIView new]; card.tag = 0x574355; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
-    card.frame = CGRectMake(mx, 0, W - mx * 2, h.bounds.size.height);
-    card.backgroundColor = WCRCardFill();
-    card.layer.cornerRadius = 24;
-    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-    h.backgroundColor = [UIColor clearColor];
-    stopW = W;
-    WCRClearBg(h, nil);
+    UIColor *w = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
+    h.backgroundColor = w; h.layer.cornerRadius = 0;
+    WCRFlatWhite(h, w, h.bounds.size.width);
 }
 
 static void WCRStyleMyHeader(UITableView *tv) {
