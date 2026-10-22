@@ -110,7 +110,7 @@
 
     self.hexField = [[UITextField alloc] initWithFrame:CGRectMake(24, y, w - 48, 40)];
     self.hexField.placeholder = @"手动输入 #RRGGBB";
-    self.hexField.borderStyle = UITextFieldBorderStyleRoundedRect;
+    self.hexField.borderStyle = UITextBorderStyleRoundedRect;
     self.hexField.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
     self.hexField.autocorrectionType = UITextAutocorrectionTypeNo;
     self.hexField.returnKeyType = UIReturnKeyDone;
