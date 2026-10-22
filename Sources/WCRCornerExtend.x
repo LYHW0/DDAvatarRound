@@ -41,12 +41,13 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
     // 边距调整（如果 layout 支持）
     if (cfg.searchCornerMargin > 0.01) {
         @try {
+            UIView *view = (UIView *)self;
             CGFloat margin = cfg.searchCornerMargin;
-            for (UIView *sub in ((UIView *)self).subviews) {
+            for (UIView *sub in view.subviews) {
                 if ([sub isKindOfClass:NSClassFromString(@"UISearchBarTextField")]) {
                     CGRect f = sub.frame;
                     f.origin.x = margin;
-                    f.size.width = MAX(0, self.bounds.size.width - margin * 2);
+                    f.size.width = MAX(0, view.bounds.size.width - margin * 2);
                     sub.frame = f;
                 }
             }
@@ -107,7 +108,7 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
     
     for (UIView *sub in ((UIView *)self).subviews) {
         if ([sub isKindOfClass:NSClassFromString(@"MMGrowTextView")] ||
-            [sub.class.description containsString:@"TextInput"]) {
+            [[NSStringFromClass([sub class]) lowercaseString] containsString:@"textinput"]) {
             WCRApplyCorner(sub, cfg.inputCornerRadius, cfg.inputCornerBorderSize,
                           WCRColorForAppearance(cfg.inputCornerBorderColorLight,
                                                 cfg.inputCornerBorderColorDark), YES);
@@ -229,7 +230,8 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
     
     // 找到气泡容器（通常是 MessageNodeView）
     for (UIView *sub in ((UIView *)self).subviews) {
-        if ([sub.class.description containsString:@"MessageNode"]) {
+        NSString *className = NSStringFromClass([sub class]);
+        if ([className containsString:@"MessageNode"]) {
             WCRApplyCorner(sub, cfg.chatBubbleCornerRadius, cfg.chatBubbleCornerBorderSize,
                           WCRColorForAppearance(cfg.chatBubbleCornerBorderColorLight,
                                                 cfg.chatBubbleCornerBorderColorDark), YES);
@@ -290,8 +292,10 @@ static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
     if (!cfg.chatTimeRoundCornerEnabled) return;
     
     // 找到时间标签
-    for (UIView *sub in ((UIView *)self).contentView.subviews) {
-        if ([sub.class.description containsString:@"TimeLabel"]) {
+    UITableViewCell *cell = (UITableViewCell *)self;
+    for (UIView *sub in cell.contentView.subviews) {
+        NSString *className = NSStringFromClass([sub class]);
+        if ([className containsString:@"TimeLabel"]) {
             WCRApplyCorner(sub, cfg.chatTimeRoundCornerRadius, cfg.chatTimeRoundCornerBorderSize,
                           WCRColorForAppearance(cfg.chatTimeRoundCornerBorderColorLight,
                                                 cfg.chatTimeRoundCornerBorderColorDark), YES);
