@@ -39,6 +39,7 @@ extern NSString * const WCRSettingsChangedNotification;
 
 @property (nonatomic, assign) BOOL homepageCornerEnabled;
 @property (nonatomic, assign) BOOL mainFrameCornerEnabled;
+@property (nonatomic, assign) BOOL settingPageCornerEnabled;
 @property (nonatomic, assign) BOOL discoverPageCornerEnabled;
 @property (nonatomic, assign) BOOL myPageCornerEnabled;
 @property (nonatomic, assign) BOOL friendProfileCornerEnabled;

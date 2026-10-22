@@ -61,6 +61,7 @@ static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 
         NSString *n = NSStringFromClass([r class]);
         if ([n containsString:@"WCTimeLineViewController"]) return 5;
         if ([n containsString:@"FindFriend"]) return 4;
+        if ([n isEqualToString:@"NewSettingViewController"]) return 6;
         if ([n containsString:@"NewMainFrame"]) return 1;
         if ([n containsString:@"ContactsViewController"]) return 2;
         if ([n hasPrefix:@"MoreViewController"]) return 3;
@@ -81,10 +82,12 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     WCRConfig *c = WCRCCfg();
     NSInteger kind = WCRPageKind(tv);
     if (kind == 0) return;
+    BOOL settingPage = (kind == 6);
+    if (settingPage) { if (!c.settingPageCornerEnabled) return; kind = 4; }
     BOOL timeline = (kind == 5);
     if (timeline) kind = 1;  // 朋友圈改为和主页一样，每行独立卡片
     if ((kind == 1 && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
-        (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !c.discoverPageCornerEnabled)) return;
+        (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !settingPage && !c.discoverPageCornerEnabled)) return;
     BOOL fancy = (kind != 4);
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
@@ -128,6 +131,13 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     // 同组整块：上下不留缝，只有首尾行有圆角
     card.frame = CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height);
     card.backgroundColor = WCRCardFill();
+    if (kind == 1 && !timeline) {
+        card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.985 alpha:1];
+        }];
+        tv.backgroundView = nil;
+        if (tv.superview) tv.superview.backgroundColor = bg;
+    }
     card.layer.cornerRadius = radius;
     card.layer.masksToBounds = !fancy;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
@@ -198,10 +208,70 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
 }
 %end
 
+static void WCRStyleMyHeader(UITableView *tv) {
+    UIView *h = tv.tableHeaderView;
+    if (!h || h.bounds.size.width < 100) return;
+    CGFloat W = h.bounds.size.width;
+    UIView *avatar = nil; NSMutableArray *labels = [NSMutableArray array];
+    NSMutableArray *stack = [NSMutableArray arrayWithObject:h];
+    while (stack.count) {
+        UIView *v = stack.lastObject; [stack removeLastObject];
+        for (UIView *sv in v.subviews) {
+            NSString *cn = NSStringFromClass([sv class]);
+            if (!avatar && ([cn containsString:@"HeadImage"] || [cn containsString:@"Avatar"])) { avatar = sv; continue; }
+            if ([sv isKindOfClass:[UILabel class]] && ((UILabel *)sv).text.length) [labels addObject:sv];
+            else [stack addObject:sv];
+        }
+    }
+    if (!avatar || labels.count < 2) return;
+    UIView *box = avatar.superview;
+    [labels sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+        CGFloat ya = [a convertPoint:CGPointZero toView:h].y, yb = [b convertPoint:CGPointZero toView:h].y;
+        return ya < yb ? NSOrderedAscending : NSOrderedDescending; }];
+    UILabel *name = labels[0], *wid = labels[1];
+    CGFloat cardTop = 98, mx = 8, cardH = 219;
+    UIView *card = [h viewWithTag:0x574354];
+    if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
+    card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
+    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
+    card.layer.cornerRadius = 24;
+    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    h.backgroundColor = [UIColor clearColor]; box.backgroundColor = [UIColor clearColor];
+    for (UIView *a = box; a && a != tv; a = a.superview) if (a != h) a.backgroundColor = [UIColor clearColor];
+    CGFloat boxW = box.bounds.size.width;
+    CGPoint o = [box convertPoint:CGPointZero toView:h];
+    CGFloat sz = avatar.bounds.size.width > 0 ? avatar.bounds.size.width : 59;
+    avatar.center = CGPointMake(W / 2 - o.x, cardTop + 20 + sz / 2 - o.y);
+    UILabel *ls[2] = { name, wid }; CGFloat cy[2] = { cardTop + 115, cardTop + 151 };
+    for (int i = 0; i < 2; i++) {
+        UILabel *l = ls[i]; l.textAlignment = NSTextAlignmentCenter;
+        CGPoint lo = [l.superview convertPoint:CGPointZero toView:h];
+        l.frame = CGRectMake(-lo.x + 30, cy[i] - l.bounds.size.height / 2 - lo.y, W - 60, l.bounds.size.height);
+    }
+    // 状态按钮：位于微信号下方、非右侧图标
+    NSMutableArray *st = [NSMutableArray array];
+    for (UIView *sv in box.subviews) {
+        if (sv == avatar || sv == name || sv == wid) continue;
+        CGRect f = [sv convertRect:sv.bounds toView:h];
+        if (f.origin.x < W * 0.7 && f.size.width < 200 && f.size.height < 60 && f.origin.y > cardTop + 100 && f.size.height > 20) [st addObject:sv];
+    }
+    if (st.count) {
+        [st sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) { return a.frame.origin.x < b.frame.origin.x ? NSOrderedAscending : NSOrderedDescending; }];
+        CGFloat tot = 0; for (UIView *v in st) tot += v.frame.size.width; tot += 8 * (st.count - 1);
+        CGFloat x = (W - tot) / 2 - o.x;
+        for (UIView *v in st) { CGRect f = v.frame; f.origin.x = x; f.origin.y = cardTop + 187 - f.size.height / 2 - o.y; v.frame = f; x += f.size.width + 8; }
+    }
+    if (h.bounds.size.height < cardTop + cardH + 12) {
+        CGRect hf = h.frame; hf.size.height = cardTop + cardH + 12; h.frame = hf; tv.tableHeaderView = h;
+    }
+}
+
 %hook UITableView
 - (void)layoutSubviews {
     %orig;
     if (!WCRAnyCardOn()) return;
+    if (WCRCCfg().myPageCornerEnabled && WCRPageKind(self) == 3) WCRStyleMyHeader((UITableView *)self);
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
 }
 %end

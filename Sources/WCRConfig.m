@@ -91,6 +91,7 @@ WCR_STRING(globalCornerBackgroundColorDark, globalCornerBackgroundColorDark, @"#
 WCR_BOOL(globalCornerPinButtonV2, globalCornerPinButtonV2, NO)
 WCR_BOOL(homepageCornerEnabled, homepageCornerEnabled, YES)
 WCR_BOOL(mainFrameCornerEnabled, mainFrameCornerEnabled, YES)
+WCR_BOOL(settingPageCornerEnabled, settingPageCornerEnabled, YES)
 WCR_BOOL(discoverPageCornerEnabled, discoverPageCornerEnabled, YES)
 WCR_BOOL(myPageCornerEnabled, myPageCornerEnabled, NO)
 WCR_BOOL(friendProfileCornerEnabled, friendProfileCornerEnabled, NO)
