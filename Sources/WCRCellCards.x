@@ -278,8 +278,8 @@ static void WCRClearTree(UIView *v) {
     for (UIView *sv in v.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) WCRClearTree(sv);
 }
 %hook ChatFoldCellView
-- (void)layoutSubviews { %orig; if (WCRCCfg().mainFrameCornerEnabled) WCRClearTree((UIView *)self); }
-%end
-%hook MainFrameSectionFoldView
-- (void)layoutSubviews { %orig; if (WCRCCfg().mainFrameCornerEnabled) WCRClearTree((UIView *)self); }
+- (void)layoutSubviews {
+    %orig;
+    if (WCRCCfg().mainFrameCornerEnabled) WCRClearTree((UIView *)self);
+}
 %end

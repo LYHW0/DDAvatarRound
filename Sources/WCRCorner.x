@@ -152,7 +152,9 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 - (void)layoutSubviews {
     %orig;
     if (!WCRCfg().mainFrameCornerEnabled) return;
-    ((UIView *)self).backgroundColor = [UIColor clearColor];
+    UIView *fv = (UIView *)self;
+    fv.backgroundColor = [UIColor clearColor];
+    for (UIView *sv in fv.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) sv.backgroundColor = [UIColor clearColor];
 }
 
 - (void)setBackgroundColor:(UIColor *)color {
