@@ -10,6 +10,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import "WCRConfig.h"
+#import "HBSpeedHook.h"
 
 static void WCRSettingsChangedCallback(CFNotificationCenterRef center,
                                        void *observer,
@@ -26,6 +27,7 @@ static void WCRSettingsChangedCallback(CFNotificationCenterRef center,
     @autoreleasepool {
         // 先把配置初始化好，避免首个界面加载时读不到
         [WCRConfig shared];
+        HBInstallUISpeedHook();
 
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
                                         NULL,

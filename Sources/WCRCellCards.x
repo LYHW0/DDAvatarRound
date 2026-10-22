@@ -423,7 +423,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
-    WCRClearBg(h, nil);
+    WCRClearBg(h, card);
     name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
     WCRPlace(avatar, h, W / 2, cardTop + 62);
     WCRPlace(name, h, W / 2, cardTop + 128);

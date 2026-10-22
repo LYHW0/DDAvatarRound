@@ -5,6 +5,9 @@
 
 #import "WCRPluginUI.h"
 #import "WCRConfig.h"
+#import "HBSpeedMenuItem.h"
+#import "HBSpeedCellFactory.h"
+#import "HBSpeedAlert.h"
 #import <objc/runtime.h>
 
 static NSString * const kCellID = @"WCRPluginCell";
@@ -82,6 +85,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         P(@"微信设置页", WCRItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
         P(@"资料页圆角", WCRItem(@"好友资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1),
                        WCRItem(@"群聊资料页圆角", @"groupInfoCornerEnabled", @"bool", 0, 1)),
+        P(@"自定义界面速度", @{ @"title": @"自定义界面速度:", @"kind": @"speed", @"key": @"editUiWindowsSpeed" }),
     ];
     #undef P
     self.sections = @[ @{ @"header": @"兰因后悟", @"items": pages },
@@ -184,6 +188,12 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     NSDictionary *item = [self itemAtIndexPath:indexPath];
     cell.textLabel.text = item[@"title"];
 
+    if ([item[@"kind"] isEqualToString:@"speed"]) {
+        HBSpeedMenuItem *speedItem = [HBSpeedMenuItem uiSpeedItem];
+        UITableViewCell *speedCell = [HBSpeedCellFactory cellForItem:speedItem target:self action:@selector(hb_speedCellTapped)];
+        speedCell.textLabel.textColor = [UIColor labelColor];
+        return speedCell;
+    }
     if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"]) {
         cell.detailTextLabel.text = nil;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -216,6 +226,11 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         [self.navigationController pushViewController:sub animated:YES];
         return;
     }
+    if ([item[@"kind"] isEqualToString:@"speed"]) {
+        HBSpeedMenuItem *speedItem = [HBSpeedMenuItem uiSpeedItem];
+        [HBSpeedAlert showEditorFrom:self item:speedItem onChanged:^(__unused float v) { [self.tableView reloadData]; }];
+        return;
+    }
     if ([item[@"kind"] isEqualToString:@"action"]) {
         if ([item[@"action"] isEqualToString:@"export"]) [self exportConfig];
         else [self importConfig];
@@ -245,6 +260,18 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         [weakSelf.tableView reloadData];
     }]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)hb_speedCellTapped {
+    __weak typeof(self) ws = self;
+    [HBSpeedAlert showEditorFrom:self item:[HBSpeedMenuItem uiSpeedItem] onChanged:^(__unused float v) { [ws.tableView reloadData]; }];
+}
+
+- (void)hb_speedAlertConfirm:(id)sender {
+    NSString *t = nil;
+    @try { t = [sender valueForKey:@"textFieldText"]; } @catch (__unused id e) {}
+    HBSetUISpeed((float)t.floatValue);
+    [HBSpeedAlert showRestartPromptFrom:self item:[HBSpeedMenuItem uiSpeedItem]];
 }
 
 - (void)toast:(NSString *)title msg:(NSString *)msg {
