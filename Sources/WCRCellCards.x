@@ -307,7 +307,8 @@ static void WCRStyleMyHeader(UITableView *tv) {
     [labels sortUsingComparator:^NSComparisonResult(UILabel *a, UILabel *b) {
         return a.font.pointSize > b.font.pointSize ? NSOrderedAscending : NSOrderedDescending; }];
     UILabel *name = labels[0], *wid = labels[1];
-    CGFloat cardTop = -24, cardH = 257, mx = 8;
+    CGFloat cardTop = -10, cardH = 257, mx = 8;
+    h.clipsToBounds = NO;
     UIView *card = [h viewWithTag:0x574354];
     if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
