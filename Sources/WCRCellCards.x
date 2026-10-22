@@ -114,13 +114,13 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.layer.maskedCorners = m;
     BOOL single = (kind == 1);
     if (single) {
-        CGRect f = card.frame;
-        f.origin.y += 3;
-        f.size.height -= 6;
-        card.frame = f;
         card.layer.cornerRadius = radius;
         card.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner |
                                    kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+        CGRect f = card.frame;
+        f.origin.y = 3;
+        f.size.height = cell.bounds.size.height - 6;
+        card.frame = f;
     } else if (m == 0) card.layer.cornerRadius = 0;
     WCRHideLines(cell);
     if (fancy) {
