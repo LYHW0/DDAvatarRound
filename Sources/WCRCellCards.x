@@ -133,7 +133,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.backgroundColor = WCRCardFill();
     if (kind == 1 && !timeline) {
         card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.985 alpha:1];
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.955 alpha:1];
         }];
         tv.backgroundView = nil;
         if (tv.superview) tv.superview.backgroundColor = bg;
@@ -217,11 +217,11 @@ static void WCRPlace(UIView *v, UIView *h, CGFloat tx, CGFloat ty) {
 static CGFloat stopW = 0;
 static void WCRClearBg(UIView *v, UIView *stop) {
     for (UIView *sv in v.subviews) {
-        if (sv == stop || sv.tag == 0x574354) continue;
+        if (sv == stop || sv.tag == 0x574354 || sv.tag == 0x574355) continue;
         CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
         if (sw >= stopW * 0.85 && sh >= 100) {
             sv.backgroundColor = [UIColor clearColor];
-            sv.layer.backgroundColor = nil;
+            sv.layer.backgroundColor = nil; sv.layer.cornerRadius = 0;
             if (([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]]) && sv.subviews.count == 0) { sv.hidden = YES; continue; }
         }
         if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
@@ -236,11 +236,13 @@ static void WCRStyleInfoHeader(UITableView *tv) {
     CGFloat W = h.bounds.size.width, mx = 10;
     UIView *card = [h viewWithTag:0x574355];
     if (!card) { card = [UIView new]; card.tag = 0x574355; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
-    card.frame = CGRectMake(mx, 0, W - mx * 2, h.bounds.size.height + 8);
+    card.frame = CGRectMake(mx, 0, W - mx * 2, h.bounds.size.height);
     card.backgroundColor = WCRCardFill();
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     h.backgroundColor = [UIColor clearColor];
+    stopW = W;
+    WCRClearBg(h, nil);
 }
 
 static void WCRStyleMyHeader(UITableView *tv) {
@@ -264,7 +266,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     [labels sortUsingComparator:^NSComparisonResult(UILabel *a, UILabel *b) {
         return a.font.pointSize > b.font.pointSize ? NSOrderedAscending : NSOrderedDescending; }];
     UILabel *name = labels[0], *wid = labels[1];
-    CGFloat cardTop = 97, cardH = 217, mx = 8;
+    CGFloat cardTop = 0, cardH = 217, mx = 8;
     UIView *card = [h viewWithTag:0x574354];
     if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
@@ -281,17 +283,24 @@ static void WCRStyleMyHeader(UITableView *tv) {
     WCRPlace(wid, h, W / 2, cardTop + 150);
     if (status) {
         UIView *circle = nil;
-        for (UIView *sib in status.superview.subviews) {
-            if (sib == status || sib == avatar || [sib isKindOfClass:[UILabel class]] || sib.tag == 0x574354) continue;
-            CGSize z = sib.bounds.size;
-            if (z.width > 8 && z.width <= 44 && fabs(z.width - z.height) < 4) { circle = sib; break; }
+        NSMutableArray *st2 = [NSMutableArray arrayWithObject:h];
+        while (st2.count && !circle) {
+            UIView *v = st2.lastObject; [st2 removeLastObject];
+            for (UIView *sib in v.subviews) {
+                if (sib == status || sib == avatar || sib.tag == 0x574354) continue;
+                CGSize z = sib.bounds.size;
+                if (z.width >= 20 && z.width <= 44 && fabs(z.width - z.height) < 3 && sib.layer.cornerRadius >= z.width / 2 - 1.5 && ![sib isDescendantOfView:avatar]) { circle = sib; break; }
+                [st2 addObject:sib];
+            }
         }
         CGFloat pw = status.bounds.size.width, cw = circle ? circle.bounds.size.width : 0, gap = 8;
         CGFloat total = pw + (circle ? gap + cw : 0);
-        WCRPlace(status, h, W / 2 - total / 2 + pw / 2, cardTop + 188);
-        if (circle) WCRPlace(circle, h, W / 2 + total / 2 - cw / 2, cardTop + 188);
+        if (circle) {
+            WCRPlace(circle, h, W / 2 - total / 2 + cw / 2, cardTop + 188);
+            WCRPlace(status, h, W / 2 + total / 2 - pw / 2, cardTop + 188);
+        } else WCRPlace(status, h, W / 2, cardTop + 188);
     }
-    if (h.bounds.size.height < cardTop + cardH + 12 - 0.5) {
+    if (fabs(h.bounds.size.height - (cardTop + cardH + 12)) > 0.5) {
         CGRect hf = h.frame; hf.size.height = cardTop + cardH + 12; h.frame = hf; tv.tableHeaderView = h;
     }
 }
