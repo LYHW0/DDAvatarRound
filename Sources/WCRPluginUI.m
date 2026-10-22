@@ -46,9 +46,23 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
                WCRItem(@"微信页（消息列表）", @"mainFrameCornerEnabled", @"bool", 0, 1),
                WCRItem(@"通讯录页", @"homepageCornerEnabled", @"bool", 0, 1),
                WCRItem(@"发现页", @"discoverPageCornerEnabled", @"bool", 0, 1),
-               WCRItem(@"设置页", @"settingPageCornerEnabled", @"bool", 0, 1),
                WCRItem(@"我的页", @"myPageCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"设置页", @"settingPageCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"好友资料页", @"profilePageCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"转发选择器", @"forwardPickerCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"转发选择器圆角", @"forwardPickerCornerRadius", @"num", 2, 40),
+        ] },
+        @{ @"header": @"全局阴影", @"items": @[
                WCRItem(@"卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
+               WCRItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1),
+        ] },
+        @{ @"header": @"朋友圈", @"items": @[
+               WCRItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
+               WCRItem(@"图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
+               WCRItem(@"评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30),
         ] },
         @{ @"header": @"发现页卡片参数", @"items": @[
                WCRItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
@@ -58,8 +72,33 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
                WCRItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
                WCRItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
         ] },
-        @{ @"header": @"底部栏", @"items": @[
+        @{ @"header": @"搜索框 / 输入框", @"items": @[
+               WCRItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
+               WCRItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30),
+        ] },
+        @{ @"header": @"顶栏 / 底栏", @"items": @[
+               WCRItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 40),
+               WCRItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40),
                WCRItem(@"悬浮胶囊 TabBar", @"floatingTabBarEnabled", @"bool", 0, 1),
+        ] },
+        @{ @"header": @"聊天页", @"items": @[
+               WCRItem(@"气泡圆角", @"chatBubbleCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"气泡圆角半径", @"chatBubbleCornerRadius", @"num", 0, 30),
+               WCRItem(@"隐藏气泡箭头", @"chatBubbleArrowHidden", @"bool", 0, 1),
+               WCRItem(@"图片消息圆角", @"chatImageCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"图片消息圆角半径", @"chatImageCornerRadius", @"num", 0, 30),
+               WCRItem(@"时间标签圆角", @"chatTimeRoundCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"时间标签圆角半径", @"chatTimeRoundCornerRadius", @"num", 0, 20),
+        ] },
+        @{ @"header": @"弹窗 / 表情", @"items": @[
+               WCRItem(@"系统弹窗圆角", @"systemPopupCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"系统弹窗圆角半径", @"systemPopupCornerRadius", @"num", 0, 30),
+               WCRItem(@"表情圆角", @"emojiCornerEnabled", @"bool", 0, 1),
+               WCRItem(@"表情圆角半径", @"emojiCornerRadius", @"num", 0, 20),
         ] },
         @{ @"header": @"头像", @"items": @[
                WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
@@ -91,13 +130,16 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 }
 
 - (BOOL)boolValueForKey:(NSString *)key {
-    id value = [[WCRConfig shared] objectForKey:key def:nil];
-    if (!value) return NO;
+    id value = nil;
+    @try { value = [[WCRConfig shared] valueForKey:key]; } @catch (__unused id e) {}
+    if (!value) value = [[WCRConfig shared] objectForKey:key def:nil];
     return [value boolValue];
 }
 
 - (double)numberValueForKey:(NSString *)key item:(NSDictionary *)item {
-    id value = [[WCRConfig shared] objectForKey:key def:nil];
+    id value = nil;
+    @try { value = [[WCRConfig shared] valueForKey:key]; } @catch (__unused id e) {}
+    if (!value) value = [[WCRConfig shared] objectForKey:key def:nil];
     if (!value) return 0.0;
     double v = [value doubleValue];
     return MAX([item[@"min"] doubleValue], MIN([item[@"max"] doubleValue], v));

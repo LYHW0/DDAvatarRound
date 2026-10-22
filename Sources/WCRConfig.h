@@ -305,6 +305,16 @@ extern NSString * const WCRSettingsChangedNotification;
 @property (nonatomic, assign) BOOL cardShadowEnabled;
 @property (nonatomic, assign) double myPageCornerRadius;
 @property (nonatomic, assign) double myPageCornerMargin;
+@property (nonatomic, assign) double cardShadowStrength;
+@property (nonatomic, assign) BOOL timelineCornerEnabled;
+@property (nonatomic, assign) double timelineCornerRadius;
+@property (nonatomic, assign) BOOL timelineMediaCornerEnabled;
+@property (nonatomic, assign) double timelineMediaCornerRadius;
+@property (nonatomic, assign) BOOL timelineCommentCornerEnabled;
+@property (nonatomic, assign) double timelineCommentCornerRadius;
+@property (nonatomic, assign) BOOL forwardPickerCornerEnabled;
+@property (nonatomic, assign) double forwardPickerCornerRadius;
+@property (nonatomic, assign) BOOL profilePageCornerEnabled;
 
 @end
 

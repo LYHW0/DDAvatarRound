@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import <objc/message.h>
 #import "WCRConfig.h"
 #import "WCRCommon.h"
 
@@ -7,7 +8,8 @@ static inline WCRConfig *WCRCCfg(void) { return [WCRConfig shared]; }
 static BOOL WCRAnyCardOn(void) {
     WCRConfig *c = WCRCCfg();
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
-           c.discoverPageCornerEnabled || c.myPageCornerEnabled;
+           c.discoverPageCornerEnabled || c.myPageCornerEnabled || c.settingPageCornerEnabled ||
+           c.timelineCornerEnabled || c.forwardPickerCornerEnabled || c.profilePageCornerEnabled;
 }
 
 static BOOL WCRClassExcluded(NSString *cls) {
@@ -61,7 +63,10 @@ static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 
         NSString *n = NSStringFromClass([r class]);
         if ([n containsString:@"WCTimeLineViewController"]) return 5;
         if ([n containsString:@"FindFriend"]) return 4;
-        if ([n isEqualToString:@"NewSettingViewController"] || [n isEqualToString:@"ContactInfoViewController"]) return 6;
+        if ([n isEqualToString:@"NewSettingViewController"]) return 6;
+        if ([n isEqualToString:@"ContactInfoViewController"]) return 7;
+        if ([n isEqualToString:@"SessionSelectController"] || [n isEqualToString:@"ContactSelectorViewController"] ||
+            [n isEqualToString:@"MultiSelectContactsViewController"]) return 8;
         if ([n containsString:@"NewMainFrame"]) return 1;
         if ([n containsString:@"ContactsViewController"]) return 2;
         if ([n hasPrefix:@"MoreViewController"]) return 3;
@@ -76,7 +81,7 @@ static void WCRRoundMedia(UIView *root, UIView *v) {
         BOOL media = [cn rangeOfString:@"WebImageView"].location != NSNotFound || [cn rangeOfString:@"SightView"].location != NSNotFound ||
                      [cn rangeOfString:@"MediaItem"].location != NSNotFound || [cn rangeOfString:@"ImageView"].location != NSNotFound || [sv isKindOfClass:[UIImageView class]];
         if (media && z.width >= 60 && z.height >= 60 && z.width < root.bounds.size.width - 40 && sv.layer.cornerRadius < 1) {
-            sv.layer.cornerRadius = 16; sv.layer.masksToBounds = YES; sv.clipsToBounds = YES;
+            sv.layer.cornerRadius = WCRCCfg().timelineMediaCornerRadius; sv.layer.masksToBounds = YES; sv.clipsToBounds = YES;
             if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
             continue;
         }
@@ -97,15 +102,21 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     WCRConfig *c = WCRCCfg();
     NSInteger kind = WCRPageKind(tv);
     if (kind == 0) return;
+    if (kind == 7) { if (!c.profilePageCornerEnabled) return; kind = 6; }
+    else if (kind == 6 && !c.settingPageCornerEnabled) return;
+    BOOL picker = (kind == 8);
+    if (picker) { if (!c.forwardPickerCornerEnabled) return; kind = 6; }
     BOOL settingPage = (kind == 6);
-    if (settingPage) { if (!c.settingPageCornerEnabled) return; kind = 4; }
+    if (settingPage) kind = 4;
     BOOL timeline = (kind == 5);
+    if (timeline && !c.timelineCornerEnabled) return;
     if (timeline) kind = 1;  // 朋友圈改为和主页一样，每行独立卡片
-    if ((kind == 1 && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
+    if ((kind == 1 && !timeline && !c.mainFrameCornerEnabled) || (kind == 2 && !c.homepageCornerEnabled) ||
         (kind == 3 && !c.myPageCornerEnabled) || (kind == 4 && !settingPage && !c.discoverPageCornerEnabled)) return;
     BOOL fancy = (kind != 4);
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
+    if (picker) { radius = c.forwardPickerCornerRadius; margin = 14.0; }
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
     NSInteger secFirst = ip.section, secLast = ip.section;
@@ -185,7 +196,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.layer.maskedCorners = m;
     BOOL single = NO;
     if (timeline) {
-        card.layer.cornerRadius = 24;
+        card.layer.cornerRadius = c.timelineCornerRadius;
         CGRect f = card.frame;
         CGFloat top = isFirstRow ? 6 : 0, bot = isLastRow ? 6 : 0;
         f.origin.y = top; f.size.height = cell.bounds.size.height - top - bot;
@@ -211,7 +222,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }
     WCRHideLines(cell);
     if (timeline) {
-        WCRRoundMedia(cell, cell);
+        if (c.timelineMediaCornerEnabled) WCRRoundMedia(cell, cell);
         CGFloat cw = cell.bounds.size.width;
         NSMutableArray *st = [NSMutableArray arrayWithObject:cell.contentView];
         while (st.count) {
@@ -227,15 +238,17 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         cell.contentView.layer.cornerRadius = 0;
         cell.clipsToBounds = NO;
     }
-    if (fancy) {
-        card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
+    {
+        double strength = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
         BOOL last = single || isLastRow;
-        card.layer.shadowOpacity = (c.cardShadowEnabled && last && kind == 1 && !timeline) ? 0.12 : 0;
-        card.layer.shadowRadius = 5;
+        CGFloat rr = card.layer.cornerRadius;
+        card.layer.masksToBounds = NO;
+        card.layer.shadowOpacity = (strength > 0 && last) ? (float)strength : 0;
+        card.layer.shadowRadius = 6;
         card.layer.shadowOffset = CGSizeMake(0, 3);
         card.layer.shadowColor = [UIColor blackColor].CGColor;
         card.layer.shadowPath = last ? [UIBezierPath bezierPathWithRoundedRect:card.bounds
-            byRoundingCorners:(single ? UIRectCornerAllCorners : (UIRectCornerBottomLeft | UIRectCornerBottomRight)) cornerRadii:CGSizeMake(radius, radius)].CGPath : NULL;
+            byRoundingCorners:(isFirstRow ? UIRectCornerAllCorners : (UIRectCornerBottomLeft | UIRectCornerBottomRight)) cornerRadii:CGSizeMake(rr, rr)].CGPath : NULL;
     }
 }
 
@@ -387,7 +400,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
         }
         if (mtv.tableFooterView && mtv.tableFooterView.bounds.size.height > 1) { UIView *f = [UIView new]; f.frame = CGRectMake(0, 0, 1, 0.01); mtv.tableFooterView = f; }
     }
-    else if (WCRPageKind(self) == 6 && [NSStringFromClass([[(UITableView *)self nextResponder] class]) length] && ^BOOL{ for (UIResponder *r = (UIView *)self; r; r = r.nextResponder) if ([NSStringFromClass([r class]) isEqualToString:@"ContactInfoViewController"]) return YES; return NO; }()) WCRStyleInfoHeader((UITableView *)self);
+    else if (WCRCCfg().profilePageCornerEnabled && WCRPageKind(self) == 7 && [NSStringFromClass([[(UITableView *)self nextResponder] class]) length] && ^BOOL{ for (UIResponder *r = (UIView *)self; r; r = r.nextResponder) if ([NSStringFromClass([r class]) isEqualToString:@"ContactInfoViewController"]) return YES; return NO; }()) WCRStyleInfoHeader((UITableView *)self);
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
 }
 %end
@@ -400,5 +413,44 @@ static void WCRClearTree(UIView *v) {
 - (void)layoutSubviews {
     %orig;
     if (WCRCCfg().mainFrameCornerEnabled) WCRClearTree((UIView *)self);
+}
+%end
+
+
+static BOOL WCRIsWhiteish(UIColor *c) {
+    CGFloat w = 0, a = 0;
+    if (!c) return YES;
+    if ([c getWhite:&w alpha:&a]) return a < 0.05 || w > 0.985;
+    CGFloat r, g, b;
+    if ([c getRed:&r green:&g blue:&b alpha:&a]) return a < 0.05 || (r > 0.985 && g > 0.985 && b > 0.985);
+    return NO;
+}
+%hook WCTimeLineCommentCellView
+- (void)layoutSubviews {
+    %orig;
+    WCRConfig *c = WCRCCfg();
+    if (!c.timelineCommentCornerEnabled) return;
+    UIView *me = (UIView *)self;
+    UIView *box = nil;
+    if (!WCRIsWhiteish(me.backgroundColor)) box = me;
+    else {
+        CGFloat best = 0;
+        for (UIView *sv in me.subviews) {
+            if ([sv isKindOfClass:[UILabel class]]) continue;
+            CGFloat area = sv.bounds.size.width * sv.bounds.size.height;
+            if (!WCRIsWhiteish(sv.backgroundColor) && area > best) { best = area; box = sv; }
+        }
+    }
+    if (!box) return;
+    BOOL top = YES, bot = YES;
+    if ([me respondsToSelector:@selector(needTopRoundCorner)]) top = ((BOOL (*)(id, SEL))objc_msgSend)(me, @selector(needTopRoundCorner));
+    if ([me respondsToSelector:@selector(needBottomRoundCorner)]) bot = ((BOOL (*)(id, SEL))objc_msgSend)(me, @selector(needBottomRoundCorner));
+    CACornerMask m = 0;
+    if (top) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (bot) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    box.layer.cornerRadius = m ? c.timelineCommentCornerRadius : 0;
+    box.layer.maskedCorners = m;
+    box.layer.masksToBounds = YES;
+    if (@available(iOS 13.0, *)) box.layer.cornerCurve = kCACornerCurveContinuous;
 }
 %end
