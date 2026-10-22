@@ -69,6 +69,21 @@ static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 
     return 0;
 }
 
+static void WCRRoundMedia(UIView *root, UIView *v) {
+    for (UIView *sv in v.subviews) {
+        NSString *cn = NSStringFromClass([sv class]);
+        CGSize z = sv.bounds.size;
+        BOOL media = [cn rangeOfString:@"WebImageView"].location != NSNotFound || [cn rangeOfString:@"SightView"].location != NSNotFound ||
+                     [cn rangeOfString:@"MediaItem"].location != NSNotFound || [cn rangeOfString:@"ImageView"].location != NSNotFound || [sv isKindOfClass:[UIImageView class]];
+        if (media && z.width >= 60 && z.height >= 60 && z.width < root.bounds.size.width - 40 && sv.layer.cornerRadius < 1) {
+            sv.layer.cornerRadius = 16; sv.layer.masksToBounds = YES; sv.clipsToBounds = YES;
+            if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
+            continue;
+        }
+        if (media) continue;
+        WCRRoundMedia(root, sv);
+    }
+}
 static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
     if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
@@ -139,7 +154,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.backgroundColor = WCRCardFill();
     if (kind == 1 && !timeline) {
         card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor colorWithWhite:0.975 alpha:1];
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
         }];
         tv.backgroundView = nil;
         if (tv.superview) {
@@ -161,15 +176,14 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (isFirstRow) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     if (isLastRow) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     card.layer.maskedCorners = m;
-    BOOL single = timeline;
-    if (single) {
-        card.layer.cornerRadius = radius;
-        card.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner |
-                                   kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    BOOL single = NO;
+    if (timeline) {
+        card.layer.cornerRadius = 24;
         CGRect f = card.frame;
-        f.origin.y = 3;
-        f.size.height = cell.bounds.size.height - 6;
+        CGFloat top = isFirstRow ? 6 : 0, bot = isLastRow ? 6 : 0;
+        f.origin.y = top; f.size.height = cell.bounds.size.height - top - bot;
         card.frame = f;
+        if (m == 0) card.layer.cornerRadius = 0;
     } else if (m == 0) card.layer.cornerRadius = 0;
     {
         UIView *sel = cell.selectedBackgroundView;
@@ -189,6 +203,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         cell.multipleSelectionBackgroundView = nil;
     }
     WCRHideLines(cell);
+    if (timeline) WCRRoundMedia(cell, cell);
     if (fancy) {
         card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
         BOOL last = single || isLastRow;
@@ -285,7 +300,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     [labels sortUsingComparator:^NSComparisonResult(UILabel *a, UILabel *b) {
         return a.font.pointSize > b.font.pointSize ? NSOrderedAscending : NSOrderedDescending; }];
     UILabel *name = labels[0], *wid = labels[1];
-    CGFloat cardTop = 0, cardH = 237, mx = 8;
+    CGFloat cardTop = 0, cardH = 257, mx = 8;
     UIView *card = [h viewWithTag:0x574354];
     if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
@@ -319,8 +334,8 @@ static void WCRStyleMyHeader(UITableView *tv) {
             WCRPlace(status, h, W / 2 + total / 2 - pw / 2, cardTop + 188);
         } else WCRPlace(status, h, W / 2, cardTop + 188);
     }
-    if (fabs(h.bounds.size.height - (cardTop + cardH + 12)) > 0.5) {
-        CGRect hf = h.frame; hf.size.height = cardTop + cardH + 12; h.frame = hf; tv.tableHeaderView = h;
+    if (fabs(h.bounds.size.height - (cardTop + cardH)) > 0.5) {
+        CGRect hf = h.frame; hf.size.height = cardTop + cardH; h.frame = hf; tv.tableHeaderView = h;
     }
 }
 
@@ -332,7 +347,20 @@ static void WCRStyleMyHeader(UITableView *tv) {
         WCRStyleMyHeader((UITableView *)self);
         UITableView *mtv = (UITableView *)self;
         mtv.alwaysBounceVertical = NO;
-        if (mtv.contentInset.bottom != 0) { UIEdgeInsets ei = mtv.contentInset; ei.bottom = 0; mtv.contentInset = ei; }
+        {
+            UIEdgeInsets ai = mtv.adjustedContentInset, ci = mtv.contentInset;
+            CGFloat want = ci.bottom - ai.bottom;
+            if (fabs(ci.bottom - want) > 0.5) { ci.bottom = want; mtv.contentInset = ci; }
+        }
+        {
+            CGFloat hh = mtv.tableHeaderView.bounds.size.height + 20;
+            for (UIView *sv in mtv.subviews) {
+                if (sv.bounds.size.height <= 1.5 && sv.bounds.size.width >= mtv.bounds.size.width * 0.9 && sv.frame.origin.y < hh) sv.hidden = YES;
+            }
+            for (UIView *sv in mtv.tableHeaderView.subviews) {
+                if (sv.bounds.size.height <= 1.5 && sv.bounds.size.width >= mtv.bounds.size.width * 0.9) sv.hidden = YES;
+            }
+        }
         if (mtv.tableFooterView && mtv.tableFooterView.bounds.size.height > 1) { UIView *f = [UIView new]; f.frame = CGRectMake(0, 0, 1, 0.01); mtv.tableFooterView = f; }
     }
     else if (WCRPageKind(self) == 6 && [NSStringFromClass([[(UITableView *)self nextResponder] class]) length] && ^BOOL{ for (UIResponder *r = (UIView *)self; r; r = r.nextResponder) if ([NSStringFromClass([r class]) isEqualToString:@"ContactInfoViewController"]) return YES; return NO; }()) WCRStyleInfoHeader((UITableView *)self);
