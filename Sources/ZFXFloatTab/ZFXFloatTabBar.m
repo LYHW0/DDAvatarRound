@@ -733,8 +733,8 @@ static UIColor *bgTintForConfig(ZFXConfig cfg) {
         v.userInteractionEnabled = NO;
     }
     bar.backgroundColor = [UIColor clearColor];
-    if ([bar respondsToSelector:@selector(setBackgroundImage:forBarMetrics:)]) {
-        [(UITabBar *)bar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
+    if ([bar respondsToSelector:@selector(setBackgroundImage:)]) {
+        [(UITabBar *)bar setBackgroundImage:[UIImage new]];
     }
 
     if (!floating) {
