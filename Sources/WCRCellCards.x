@@ -239,7 +239,6 @@ static void WCRStyleMyHeader(UITableView *tv) {
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     h.backgroundColor = [UIColor clearColor]; box.backgroundColor = [UIColor clearColor];
     for (UIView *a = box; a && a != tv; a = a.superview) if (a != h) a.backgroundColor = [UIColor clearColor];
-    CGFloat boxW = box.bounds.size.width;
     CGPoint o = [box convertPoint:CGPointZero toView:h];
     CGFloat sz = avatar.bounds.size.width > 0 ? avatar.bounds.size.width : 59;
     avatar.center = CGPointMake(W / 2 - o.x, cardTop + 20 + sz / 2 - o.y);
