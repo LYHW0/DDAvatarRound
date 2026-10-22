@@ -345,7 +345,7 @@ static void WCRClearBg(UIView *v, UIView *stop) {
     for (UIView *sv in v.subviews) {
         if (sv == stop || sv.tag == 0x574354 || sv.tag == 0x574355) continue;
         CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
-        if (sw >= stopW * 0.85 && sh >= 100) {
+        if (sw >= stopW * 0.82 && sh >= 48) {
             sv.backgroundColor = [UIColor clearColor];
             sv.layer.backgroundColor = nil; sv.layer.cornerRadius = 0;
             if (([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]]) && sv.subviews.count == 0) { sv.hidden = YES; continue; }
