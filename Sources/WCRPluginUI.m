@@ -64,12 +64,6 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
                WCRItem(@"头像描边", @"avatarCornerBorderEnabled", @"bool", 0, 1),
                WCRItem(@"描边宽度", @"avatarCornerBorderSize", @"num", 0, 10),
         ] },
-        @{ @"header": @"消息横幅", @"items": @[
-               WCRItem(@"横幅美化", @"msgBannerBeautifyEnabled", @"bool", 0, 1),
-               WCRItem(@"横幅宽度", @"msgBannerWidth", @"num", 0, 400),
-               WCRItem(@"横幅高度", @"msgBannerHeight", @"num", 40, 120),
-               WCRItem(@"横幅停留秒数", @"msgBannerStaySeconds", @"num", 1, 10),
-        ] },
         @{ @"header": @"菜单", @"items": @[
                WCRItem(@"菜单圆角", @"menuCornerEnabled", @"bool", 0, 1),
                WCRItem(@"菜单圆角半径", @"menuCornerRadius", @"num", 0, 30),

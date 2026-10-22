@@ -61,7 +61,7 @@ static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 
         NSString *n = NSStringFromClass([r class]);
         if ([n containsString:@"WCTimeLineViewController"]) return 5;
         if ([n containsString:@"FindFriend"]) return 4;
-        if ([n isEqualToString:@"NewSettingViewController"]) return 6;
+        if ([n isEqualToString:@"NewSettingViewController"] || [n isEqualToString:@"ContactInfoViewController"]) return 6;
         if ([n containsString:@"NewMainFrame"]) return 1;
         if ([n containsString:@"ContactsViewController"]) return 2;
         if ([n hasPrefix:@"MoreViewController"]) return 3;
@@ -208,6 +208,85 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
 }
 %end
 
+static void WCRPlace(UIView *v, UIView *h, CGFloat tx, CGFloat ty) {
+    v.transform = CGAffineTransformIdentity;
+    CGRect f = [v.superview convertRect:v.frame toView:h];
+    v.transform = CGAffineTransformMakeTranslation(tx - CGRectGetMidX(f), ty - CGRectGetMidY(f));
+}
+
+static void WCRClearBg(UIView *v, UIView *stop) {
+    for (UIView *sv in v.subviews) {
+        if (sv == stop || sv.tag == 0x574354) continue;
+        if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
+        if (sv.subviews.count > 0 && sv.bounds.size.height > 40) sv.backgroundColor = [UIColor clearColor];
+        WCRClearBg(sv, stop);
+    }
+}
+
+static void WCRStyleMyHeader(UITableView *tv) {
+    UIView *h = tv.tableHeaderView;
+    if (!h || h.bounds.size.width < 100) return;
+    CGFloat W = h.bounds.size.width;
+    UIView *avatar = nil, *status = nil; NSMutableArray *labels = [NSMutableArray array];
+    NSMutableArray *stack = [NSMutableArray arrayWithObject:h];
+    while (stack.count) {
+        UIView *v = stack.lastObject; [stack removeLastObject];
+        for (UIView *sv in v.subviews) {
+            NSString *cn = NSStringFromClass([sv class]);
+            if (sv.tag == 0x574354) continue;
+            if (!avatar && ([cn containsString:@"HeadImage"] || [cn containsString:@"Avatar"])) { avatar = sv; continue; }
+            if (!status && ([cn containsString:@"Status"] || [cn containsString:@"TextState"])) { status = sv; continue; }
+            if ([sv isKindOfClass:[UILabel class]] && ((UILabel *)sv).text.length) [labels addObject:sv];
+            else [stack addObject:sv];
+        }
+    }
+    if (!avatar || labels.count < 2) return;
+    [labels sortUsingComparator:^NSComparisonResult(UILabel *a, UILabel *b) {
+        return a.font.pointSize > b.font.pointSize ? NSOrderedAscending : NSOrderedDescending; }];
+    UILabel *name = labels[0], *wid = labels[1];
+    CGFloat cardTop = 97, cardH = 217, mx = 8;
+    UIView *card = [h viewWithTag:0x574354];
+    if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
+    card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
+    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
+    card.layer.cornerRadius = 24;
+    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    h.backgroundColor = [UIColor clearColor];
+    WCRClearBg(h, nil);
+    name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
+    WCRPlace(avatar, h, W / 2, cardTop + 49);
+    WCRPlace(name, h, W / 2, cardTop + 114);
+    WCRPlace(wid, h, W / 2, cardTop + 150);
+    if (status) WCRPlace(status, h, W / 2, cardTop + 188);
+    if (h.bounds.size.height < cardTop + cardH + 12 - 0.5) {
+        CGRect hf = h.frame; hf.size.height = cardTop + cardH + 12; h.frame = hf; tv.tableHeaderView = h;
+    }
+}
+
+%hook UITableViewCell
+- (void)layoutSubviews {
+    %orig;
+    if (!WCRAnyCardOn()) return;
+    WCRStyleCellCard((UITableViewCell *)self);
+}
+%end
+
+%hook UICollectionViewCell
+- (void)layoutSubviews {
+    %orig;
+    if (!WCRAnyCardOn()) return;
+    UICollectionViewCell *cell = (UICollectionViewCell *)self;
+    NSString *cls = NSStringFromClass([cell class]);
+    if (WCRClassExcluded(cls)) return;
+    WCRConfig *c = WCRCCfg();
+    CGFloat radius = c.globalCornerRadius > 0 ? c.globalCornerRadius : 12.0;
+    cell.contentView.layer.cornerRadius = radius;
+    cell.contentView.layer.masksToBounds = YES;
+    if (@available(iOS 13.0, *)) cell.contentView.layer.cornerCurve = kCACornerCurveContinuous;
+}
+%end
+
 static void WCRStyleMyHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100) return;
@@ -273,4 +352,15 @@ static void WCRStyleMyHeader(UITableView *tv) {
     if (WCRCCfg().myPageCornerEnabled && WCRPageKind(self) == 3) WCRStyleMyHeader((UITableView *)self);
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
 }
+%end
+
+static void WCRClearTree(UIView *v) {
+    v.backgroundColor = [UIColor clearColor];
+    for (UIView *sv in v.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) WCRClearTree(sv);
+}
+%hook ChatFoldCellView
+- (void)layoutSubviews { %orig; if (WCRCCfg().mainFrameCornerEnabled) WCRClearTree((UIView *)self); }
+%end
+%hook MainFrameSectionFoldView
+- (void)layoutSubviews { %orig; if (WCRCCfg().mainFrameCornerEnabled) WCRClearTree((UIView *)self); }
 %end

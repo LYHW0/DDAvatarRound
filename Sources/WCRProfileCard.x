@@ -61,7 +61,7 @@ static void WCRApplyProfileBackground(UIViewController *vc) {
 static void WCRApplyProfileCardCorner(UIViewController *vc) {
     if (!vc || !vc.isViewLoaded) return;
     WCRConfig *cfg = WCRPCfg();
-    if (!cfg.profileCornerEnabled) return;
+    if (!cfg.profileCornerEnabled || YES) return;
 
     CGFloat radius = WCRProfileCornerRadius();
     UIView *root = vc.view;
