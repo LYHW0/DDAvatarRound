@@ -8,6 +8,7 @@
 #import "HBSpeedMenuItem.h"
 #import "HBSpeedCellFactory.h"
 #import "HBSpeedAlert.h"
+#import "HBSpeedConfig.h"
 #import <objc/runtime.h>
 
 static NSString * const kCellID = @"WCRPluginCell";
