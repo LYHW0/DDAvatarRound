@@ -89,6 +89,18 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0));
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
+    // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
+    NSInteger secFirst = ip.section, secLast = ip.section;
+    if (kind == 2 && [tv rectForHeaderInSection:ip.section].size.height <= 1.0) {
+        NSInteger total = tv.numberOfSections;
+        while (secFirst > 0 && [tv rectForHeaderInSection:secFirst].size.height <= 1.0 &&
+               [tv numberOfRowsInSection:secFirst - 1] > 0 &&
+               [tv rectForHeaderInSection:secFirst - 1].size.height <= 1.0) secFirst--;
+        while (secLast < total - 1 && [tv rectForHeaderInSection:secLast + 1].size.height <= 1.0 &&
+               [tv numberOfRowsInSection:secLast + 1] > 0) secLast++;
+    }
+    BOOL isFirstRow = (ip.section == secFirst && ip.row == 0);
+    BOOL isLastRow = (ip.section == secLast && ip.row == rows - 1);
 
     // 列表底色：浅灰，卡片为白
     UIColor *bg = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
@@ -97,6 +109,8 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }];
     tv.backgroundColor = bg;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
+    tv.sectionIndexBackgroundColor = [UIColor clearColor];
+    tv.sectionIndexTrackingBackgroundColor = [UIColor clearColor];
     if (fancy) tv.clipsToBounds = NO;
 
     cell.backgroundColor = [UIColor clearColor];
@@ -115,10 +129,10 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     card.layer.masksToBounds = !fancy;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     CACornerMask m = 0;
-    if (ip.row == 0) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    if (ip.row == rows - 1) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+    if (isFirstRow) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (isLastRow) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     card.layer.maskedCorners = m;
-    BOOL single = (kind == 1);
+    BOOL single = timeline;
     if (single) {
         card.layer.cornerRadius = radius;
         card.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner |
@@ -131,13 +145,13 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     WCRHideLines(cell);
     if (fancy) {
         card.layer.masksToBounds = NO;   // 允许阴影；圆角由背景填充自带
-        BOOL last = single || (ip.row == rows - 1);
-        card.layer.shadowOpacity = (c.cardShadowEnabled && last && kind == 1 && !timeline) ? 0.14 : 0;
+        BOOL last = single || isLastRow;
+        card.layer.shadowOpacity = (c.cardShadowEnabled && last && kind == 1 && !timeline) ? 0.12 : 0;
         card.layer.shadowRadius = 5;
         card.layer.shadowOffset = CGSizeMake(0, 3);
         card.layer.shadowColor = [UIColor blackColor].CGColor;
         card.layer.shadowPath = last ? [UIBezierPath bezierPathWithRoundedRect:card.bounds
-            byRoundingCorners:UIRectCornerAllCorners cornerRadii:CGSizeMake(radius, radius)].CGPath : NULL;
+            byRoundingCorners:(single ? UIRectCornerAllCorners : (UIRectCornerBottomLeft | UIRectCornerBottomRight)) cornerRadii:CGSizeMake(radius, radius)].CGPath : NULL;
     }
 }
 

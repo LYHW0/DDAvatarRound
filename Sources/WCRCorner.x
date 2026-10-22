@@ -255,7 +255,18 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 - (void)layoutSubviews {
     %orig;
     if (!WCRCfg().homepageCornerEnabled) return;
-    ((UIView *)self).backgroundColor = [UIColor clearColor];
+    UIView *me = (UIView *)self;
+    me.backgroundColor = [UIColor clearColor];
+    @try {
+        UIView *bi = [me valueForKey:@"backgroundImageView"];
+        bi.hidden = YES; bi.alpha = 0;
+        for (NSString *k in @[@"topLineView", @"bottomLineView"]) {
+            UIView *l = [me valueForKey:k]; l.hidden = YES;
+        }
+    } @catch (NSException *e) {}
+    if ([me respondsToSelector:@selector(backgroundView)]) {
+        ((UITableViewHeaderFooterView *)me).backgroundView = nil;
+    }
 }
 
 %end
