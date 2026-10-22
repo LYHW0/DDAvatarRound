@@ -306,6 +306,11 @@ static void ZFXHaptic(void) {
         pan.cancelsTouchesInView = NO;
         [_itemsContainer addGestureRecognizer:pan];
 
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(zfx_handleTap:)];
+        tap.delegate = self;
+        tap.cancelsTouchesInView = NO;
+        [self addGestureRecognizer:tap];
+
         UILongPressGestureRecognizer *lp = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
         lp.minimumPressDuration = 0.45;
         lp.delegate = self;
@@ -528,68 +533,68 @@ static void ZFXHaptic(void) {
 
 #pragma mark 交互
 
-static UITabBarController *ZFXFindTabBarController(UIView *bar) {
-    for (UIResponder *r = bar; r; r = r.nextResponder) {
-        if ([r isKindOfClass:[UITabBarController class]]) return (UITabBarController *)r;
-        if ([r isKindOfClass:[UIViewController class]] && ((UIViewController *)r).tabBarController)
-            return ((UIViewController *)r).tabBarController;
-    }
-    UIWindow *win = bar.window;
-    UIViewController *root = win.rootViewController;
-    if ([root isKindOfClass:[UITabBarController class]]) return (UITabBarController *)root;
-    for (UIViewController *c in root.childViewControllers)
-        if ([c isKindOfClass:[UITabBarController class]]) return (UITabBarController *)c;
+static id ZFXFindSelector(UIViewController *vc, SEL sel, int depth) {
+    if (!vc || depth > 6) return nil;
+    if ([vc respondsToSelector:sel]) return vc;
+    for (UIViewController *c in vc.childViewControllers) { id r = ZFXFindSelector(c, sel, depth + 1); if (r) return r; }
     return nil;
 }
 
-- (void)tapItem:(ZFXFloatingItemButton *)sender {
-    ZFXHaptic();
-    NSInteger idx = sender.index;
-    id bar = self.hostTabBar;
-    BOOL switched = NO;
+static id ZFXTabOwner(UIView *bar, SEL sel) {
+    for (UIResponder *r = bar; r; r = r.nextResponder)
+        if ([r isKindOfClass:[UIViewController class]] && [r respondsToSelector:sel]) return r;
+    return ZFXFindSelector(bar.window.rootViewController, sel, 0);
+}
 
-    UITabBarController *tbc = ZFXFindTabBarController((UIView *)bar);
-    if (tbc && idx < (NSInteger)tbc.viewControllers.count) {
-        UIViewController *target = tbc.viewControllers[idx];
-        id<UITabBarControllerDelegate> del = tbc.delegate;
-        BOOL should = YES;
-        if ([del respondsToSelector:@selector(tabBarController:shouldSelectViewController:)])
-            should = [del tabBarController:tbc shouldSelectViewController:target];
-        if (should) {
-            if (tbc.selectedIndex == (NSUInteger)idx) {
-                // 再次点击当前 tab：交给微信处理（如双击回顶）
-                if ([del respondsToSelector:@selector(tabBarController:didSelectViewController:)])
-                    [del tabBarController:tbc didSelectViewController:target];
-            } else {
-                tbc.selectedIndex = (NSUInteger)idx;
-                if ([del respondsToSelector:@selector(tabBarController:didSelectViewController:)])
-                    [del tabBarController:tbc didSelectViewController:target];
-            }
-            switched = YES;
-        }
+static void ZFXSelectTab(UIView *bar, NSInteger idx) {
+    SEL s1 = NSSelectorFromString(@"didSingleTapTabBarItemAtIndex:wasSelected:");
+    SEL s2 = NSSelectorFromString(@"handleUserSelectionAtIndex:");
+    SEL s3 = @selector(setSelectedIndex:);
+    id owner = ZFXTabOwner(bar, s1);
+    if (owner) {
+        BOOL was = NO;
+        @try { was = [[owner valueForKey:@"selectedIndex"] integerValue] == idx; } @catch (__unused id e) {}
+        ((void (*)(id, SEL, unsigned long long, BOOL))objc_msgSend)(owner, s1, (unsigned long long)idx, was);
+        return;
     }
-
+    owner = ZFXTabOwner(bar, s2);
+    if (owner) { ((void (*)(id, SEL, unsigned long long))objc_msgSend)(owner, s2, (unsigned long long)idx); return; }
+    owner = ZFXTabOwner(bar, s3);
+    if (owner) {
+        ((void (*)(id, SEL, unsigned long long))objc_msgSend)(owner, s3, (unsigned long long)idx);
+        if ([owner isKindOfClass:[UITabBarController class]]) {
+            UITabBarController *t = owner;
+            if ([t.delegate respondsToSelector:@selector(tabBarController:didSelectViewController:)] && t.selectedViewController)
+                [t.delegate tabBarController:t didSelectViewController:t.selectedViewController];
+        }
+        return;
+    }
     SEL sel = NSSelectorFromString(@"selectIndex:");
-    if ([bar respondsToSelector:sel]) {
-        void (*fn)(id, SEL, long long) = (void *)objc_msgSend;
-        fn(bar, sel, (long long)idx);
-    }
+    if ([bar respondsToSelector:sel]) ((void (*)(id, SEL, long long))objc_msgSend)(bar, sel, (long long)idx);
+}
 
-    if (!switched) {
-        // 兜底：把点击转发给原生条目视图
-        NSArray *native = ZFXTabBarItemViews(bar);
-        if (idx < (NSInteger)native.count) {
-            UIView *nv = native[idx];
-            for (UIGestureRecognizer *g in nv.gestureRecognizers) {
-                if ([g isKindOfClass:[UITapGestureRecognizer class]]) {
-                    @try { [g setValue:@(UIGestureRecognizerStateEnded) forKey:@"state"]; } @catch (__unused id e) {}
-                }
-            }
-            if ([nv isKindOfClass:[UIControl class]]) [(UIControl *)nv sendActionsForControlEvents:UIControlEventTouchUpInside];
-        }
-    }
-
+- (void)zfx_performSelectIndex:(NSInteger)idx {
+    CFTimeInterval now = CACurrentMediaTime();
+    static CFTimeInterval last = 0; static NSInteger lastIdx = -1;
+    if (idx == lastIdx && now - last < 0.25) return;
+    last = now; lastIdx = idx;
+    ZFXHaptic();
+    @try { ZFXSelectTab((UIView *)self.hostTabBar, idx); } @catch (__unused id e) {}
     [self syncSelectedIndex:idx animated:YES];
+}
+
+- (void)tapItem:(ZFXFloatingItemButton *)sender {
+    [self zfx_performSelectIndex:sender.index];
+}
+
+- (void)zfx_handleTap:(UITapGestureRecognizer *)g {
+    if (g.state != UIGestureRecognizerStateEnded) return;
+    NSUInteger n = self.itemButtons.count;
+    if (!n) return;
+    CGPoint p = [g locationInView:self];
+    NSInteger idx = (NSInteger)floor(p.x / (self.bounds.size.width / (CGFloat)n));
+    idx = MAX(0, MIN((NSInteger)n - 1, idx));
+    [self zfx_performSelectIndex:idx];
 }
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)g {
@@ -772,6 +777,9 @@ static UIColor *bgTintForConfig(ZFXConfig cfg) {
         v.userInteractionEnabled = NO;
     }
     bar.backgroundColor = [UIColor clearColor];
+    bar.clipsToBounds = NO;
+    bar.layer.mask = nil;
+    for (UIGestureRecognizer *g in bar.gestureRecognizers) g.cancelsTouchesInView = NO;
     if ([bar respondsToSelector:@selector(setBackgroundImage:)]) {
         [(UITabBar *)bar setBackgroundImage:[UIImage new]];
     }
