@@ -101,6 +101,11 @@ NSString * const ZFXSettingsChangedNotification = @"CSFloatingTabBarSettingsChan
 static UIColor *sBtnColor;
 static UIColor *sMaskLight, *sMaskDark, *sBgLight, *sBgDark;
 
+static UIColor *ZFXSafeColor(id value, UIColor *fallback) {
+    if ([value isKindOfClass:[UIColor class]]) return (UIColor *)value;
+    return fallback;
+}
+
 + (ZFXConfig)config {
     ZFXConfig c;
     memset(&c, 0, sizeof(c));
@@ -136,24 +141,22 @@ static UIColor *sMaskLight, *sMaskDark, *sBgLight, *sBgDark;
         dark = ([UITraitCollection currentTraitCollection].userInterfaceStyle == UIUserInterfaceStyleDark);
     }
 
-    UIColor *defBtn  = [UIColor labelColor];
-    UIColor *defMask = dark ? [UIColor blackColor] : [UIColor whiteColor];
-    UIColor *defBg   = dark ? [UIColor colorWithWhite:0.11 alpha:1.0]
-                            : [UIColor colorWithWhite:0.97 alpha:1.0];
+    // 不使用 labelColor 等动态 UIColor：iOS 26 的 UITraitChangeRegistry
+    // 在这里会被错误桥接进 C 结构体，随后收到 UIColor 消息而崩溃。
+    UIColor *defBtn = dark ? [UIColor colorWithWhite:0.95 alpha:1.0]
+                           : [UIColor colorWithWhite:0.18 alpha:1.0];
 
-    sBtnColor  = [self colorFromHex:[self stringForKey:ZFXKeyBtnColor]  fallback:defBtn];
-    sMaskLight = [self colorFromHex:[self stringForKey:ZFXKeyMaskLight] fallback:[UIColor whiteColor]];
-    sMaskDark  = [self colorFromHex:[self stringForKey:ZFXKeyMaskDark]  fallback:[UIColor blackColor]];
-    sBgLight   = [self colorFromHex:[self stringForKey:ZFXKeyBgLight]   fallback:[UIColor colorWithWhite:0.97 alpha:1.0]];
-    sBgDark    = [self colorFromHex:[self stringForKey:ZFXKeyBgDark]    fallback:[UIColor colorWithWhite:0.11 alpha:1.0]];
+    sBtnColor  = ZFXSafeColor([self colorFromHex:[self stringForKey:ZFXKeyBtnColor] fallback:defBtn], defBtn);
+    sMaskLight = ZFXSafeColor([self colorFromHex:[self stringForKey:ZFXKeyMaskLight] fallback:[UIColor whiteColor]], [UIColor whiteColor]);
+    sMaskDark  = ZFXSafeColor([self colorFromHex:[self stringForKey:ZFXKeyMaskDark] fallback:[UIColor blackColor]], [UIColor blackColor]);
+    sBgLight   = ZFXSafeColor([self colorFromHex:[self stringForKey:ZFXKeyBgLight] fallback:[UIColor colorWithWhite:0.97 alpha:1.0]], [UIColor colorWithWhite:0.97 alpha:1.0]);
+    sBgDark    = ZFXSafeColor([self colorFromHex:[self stringForKey:ZFXKeyBgDark] fallback:[UIColor colorWithWhite:0.11 alpha:1.0]], [UIColor colorWithWhite:0.11 alpha:1.0]);
 
     c.btnColor  = sBtnColor;
     c.maskLight = sMaskLight;
     c.maskDark  = sMaskDark;
     c.bgLight   = sBgLight;
     c.bgDark    = sBgDark;
-    (void)defMask;
-    (void)defBg;
 
     return c;
 }

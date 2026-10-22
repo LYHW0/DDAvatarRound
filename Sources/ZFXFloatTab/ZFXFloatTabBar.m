@@ -128,10 +128,11 @@ static void ZFXHaptic(void) {
 
     CGFloat fontSize = 10.0;
     self.titleLabel.font = [UIFont systemFontOfSize:fontSize weight:UIFontWeightMedium];
-    self.titleLabel.textColor = cfg.btnColor;
-    self.iconView.tintColor = cfg.btnColor;
+    UIColor *buttonColor = [cfg.btnColor isKindOfClass:[UIColor class]] ? cfg.btnColor : [UIColor colorWithWhite:0.18 alpha:1.0];
+    self.titleLabel.textColor = buttonColor;
+    self.iconView.tintColor = buttonColor;
 
-    self.selectionPill.backgroundColor = [cfg.btnColor colorWithAlphaComponent:0.12];
+    self.selectionPill.backgroundColor = [buttonColor colorWithAlphaComponent:0.12];
     [self setNeedsLayout];
 }
 
@@ -432,6 +433,7 @@ static void ZFXHaptic(void) {
     self.layer.cornerRadius = radius;
     if (@available(iOS 13.0, *)) self.layer.cornerCurve = kCACornerCurveContinuous;
 
+    UIColor *buttonColor = [cfg.btnColor isKindOfClass:[UIColor class]] ? cfg.btnColor : [UIColor colorWithWhite:0.18 alpha:1.0];
     UIColor *bgTint = nil;
     CGFloat bgAlpha = 0.0;
     UIColor *border = [UIColor colorWithWhite:1.0 alpha:0.22];
@@ -457,15 +459,15 @@ static void ZFXHaptic(void) {
         case ZFXStyleCombined:
             bgTint = bgTintForConfig(cfg);
             bgAlpha = 0.42;
-            border = [cfg.btnColor colorWithAlphaComponent:0.20];
+            border = [buttonColor colorWithAlphaComponent:0.20];
             highlightAlpha = 0.55;
             glowOpacity = 0.22;
-            glowColor = cfg.btnColor;
+            glowColor = buttonColor;
             break;
         case ZFXStyleCustom:
             bgTint = bgTintForConfig(cfg);
             bgAlpha = 0.96;
-            border = [cfg.btnColor colorWithAlphaComponent:0.28];
+            border = [buttonColor colorWithAlphaComponent:0.28];
             highlightAlpha = 0.0;
             break;
     }
@@ -676,7 +678,8 @@ static UIColor *bgTintForConfig(ZFXConfig cfg) {
     if (@available(iOS 13.0, *)) {
         dark = ([UITraitCollection currentTraitCollection].userInterfaceStyle == UIUserInterfaceStyleDark);
     }
-    return dark ? cfg.bgDark : cfg.bgLight;
+    UIColor *candidate = dark ? cfg.bgDark : cfg.bgLight;
+    return [candidate isKindOfClass:[UIColor class]] ? candidate : (dark ? [UIColor colorWithWhite:0.11 alpha:1.0] : [UIColor colorWithWhite:0.97 alpha:1.0]);
 }
 
 #pragma mark - 调度
@@ -876,7 +879,8 @@ static UIColor *bgTintForConfig(ZFXConfig cfg) {
     if (@available(iOS 13.0, *)) {
         dark = ([UITraitCollection currentTraitCollection].userInterfaceStyle == UIUserInterfaceStyleDark);
     }
-    UIColor *maskColor = dark ? cfg.maskDark : cfg.maskLight;
+    UIColor *candidate = dark ? cfg.maskDark : cfg.maskLight;
+    UIColor *maskColor = [candidate isKindOfClass:[UIColor class]] ? candidate : (dark ? [UIColor blackColor] : [UIColor whiteColor]);
 
     self.maskBlur.frame = self.maskView.bounds;
     self.maskGradient.frame = self.maskView.bounds;
