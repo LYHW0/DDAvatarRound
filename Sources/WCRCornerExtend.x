@@ -16,6 +16,7 @@
 //
 
 #import <objc/message.h>
+#import <objc/runtime.h>
 #import "WCRConfig.h"
 #import "WCRCommon.h"
 
@@ -35,6 +36,24 @@ static void WCRTopRound(UIView *v, CGFloat r) {
 
 #pragma mark - MMSearchBar / UISearchBar (搜索框圆角)
 
+static UIImage *WCRSearchFieldImage(CGFloat r, UITraitCollection *tc) {
+    BOOL dark = tc.userInterfaceStyle == UIUserInterfaceStyleDark;
+    CGFloat h = 38, w = r * 2 + 2;
+    UIGraphicsImageRenderer *rd = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(w, h)];
+    UIImage *img = [rd imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [(dark ? [UIColor colorWithWhite:0.17 alpha:1] : [UIColor whiteColor]) setFill];
+        [[UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, w, h) cornerRadius:MIN(r, h / 2)] fill];
+    }];
+    return [img resizableImageWithCapInsets:UIEdgeInsetsMake(h / 2 - 1, r, h / 2 - 1, r)];
+}
+static void WCRApplySearchBarImage(UISearchBar *sb, CGFloat r) {
+    NSString *sig = [NSString stringWithFormat:@"%.1f-%ld", r, (long)sb.traitCollection.userInterfaceStyle];
+    if ([objc_getAssociatedObject(sb, @selector(WCRApplySearchBarImage)) isEqual:sig]) return;
+    objc_setAssociatedObject(sb, @selector(WCRApplySearchBarImage), sig, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [sb setSearchFieldBackgroundImage:WCRSearchFieldImage(r, sb.traitCollection) forState:UIControlStateNormal];
+    [sb setBackgroundImage:[UIImage new]];
+    if (@available(iOS 13.0, *)) sb.searchTextField.backgroundColor = [UIColor clearColor];
+}
 static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
     if (depth > 6) return;
     for (UIView *sv in v.subviews) {
@@ -91,6 +110,7 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
     if (!cfg.searchCornerEnabled) return;
+    WCRApplySearchBarImage((UISearchBar *)self, cfg.searchCornerRadius);
     WCRRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
 }
 %end
@@ -133,23 +153,34 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
     %orig;
     WCRConfig *cfg = WCRCfgEx();
     UIView *me = (UIView *)self;
-    UIView *mine = [me viewWithTag:0x574954];
-    if (!cfg.toolbarCornerEnabled) { mine.hidden = YES; return; }
-    if (!mine) { mine = [UIView new]; mine.tag = 0x574954; mine.userInteractionEnabled = NO; }
-    if (mine.superview != me) [me insertSubview:mine atIndex:0]; else [me sendSubviewToBack:mine];
-    me.clipsToBounds = NO;
-    me.backgroundColor = [UIColor clearColor];
-    CGFloat W = me.bounds.size.width;
-    for (UIView *sv in me.subviews) {
-        if (sv == mine) continue;
-        if (sv.bounds.size.width >= W * 0.95 && sv.bounds.size.height >= me.bounds.size.height * 0.6) {
-            if ([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]] || [NSStringFromClass([sv class]) containsString:@"Background"]) sv.alpha = 0;
-            else sv.backgroundColor = [UIColor clearColor];
+    UIView *tool = nil;
+    @try { id t = [me valueForKey:@"toolView"]; if ([t isKindOfClass:[UIView class]]) tool = t; } @catch (__unused id e) {}
+    if (!tool) return;
+    UIView *mine = [tool viewWithTag:0x574954];
+    if (!cfg.toolbarCornerEnabled) {
+        if (mine) {
+            mine.hidden = YES;
+            for (UIView *sv in tool.subviews) if (sv.tag == 0x574955) { sv.alpha = 1; sv.tag = 0; }
         }
-        if (sv.bounds.size.height <= 1.0 && sv.bounds.size.width >= W * 0.9) sv.hidden = YES;
+        return;
     }
+    if (!mine) { mine = [UIView new]; mine.tag = 0x574954; mine.userInteractionEnabled = NO; }
+    if (mine.superview != tool) [tool insertSubview:mine atIndex:0]; else [tool sendSubviewToBack:mine];
+    CGFloat W = tool.bounds.size.width, H = tool.bounds.size.height;
+    for (UIView *sv in tool.subviews) {
+        if (sv == mine) continue;
+        BOOL wide = sv.bounds.size.width >= W * 0.95;
+        if (wide && sv.bounds.size.height <= 1.0) { sv.hidden = YES; continue; }
+        if (wide && sv.bounds.size.height >= H * 0.6 && sv.subviews.count == 0 &&
+            ([sv isKindOfClass:[UIImageView class]] || [NSStringFromClass([sv class]) isEqualToString:@"UIView"])) {
+            sv.tag = 0x574955; sv.alpha = 0;
+        }
+        if ([sv isKindOfClass:[UIVisualEffectView class]] && wide) { sv.tag = 0x574955; sv.alpha = 0; }
+    }
+    tool.backgroundColor = [UIColor clearColor];
+    tool.clipsToBounds = NO;
     mine.hidden = NO;
-    mine.frame = CGRectMake(0, 0, W, me.bounds.size.height + 60);
+    mine.frame = CGRectMake(0, 0, W, H + 80);
     mine.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.965 alpha:1]; }];
     mine.layer.cornerRadius = cfg.toolbarCornerRadius;
@@ -201,7 +232,8 @@ static UIColor *WCRBarFill(void) {
     BOOL transparent = NO;
     if ([bar respondsToSelector:@selector(isTransparentNavBar)]) transparent = ((BOOL (*)(id, SEL))objc_msgSend)(bar, @selector(isTransparentNavBar));
     UIView *bg = WCRBarBackground(bar);
-    if (!cfg.topbarCornerEnabled || transparent || (bg && (bg.hidden || bg.alpha < 0.05))) {
+    BOOL bgOff = bg && bg.tag != 0x574E42 && (bg.hidden || bg.alpha < 0.05);
+    if (!cfg.topbarCornerEnabled || transparent || bgOff) {
         mine.hidden = YES;
         if (bg && bg.tag == 0x574E42) { bg.alpha = 1; bg.tag = 0; }
         return;
@@ -221,6 +253,8 @@ static UIColor *WCRBarFill(void) {
     mine.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     if (@available(iOS 13.0, *)) mine.layer.cornerCurve = kCACornerCurveContinuous;
     if (bg) { bg.tag = 0x574E42; bg.alpha = 0; }
+    @try { id fx = [bar valueForKey:@"effectSubview"]; if ([fx isKindOfClass:[UIView class]]) ((UIView *)fx).alpha = 0; } @catch (__unused id e) {}
+    bar.clipsToBounds = NO;
     (void)top;
 }
 %end

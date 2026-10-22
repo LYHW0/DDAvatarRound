@@ -35,8 +35,9 @@ static BOOL WCRInChatPage(UIView *v) {
     while (r) {
         if ([r isKindOfClass:[UIViewController class]]) {
             NSString *n = NSStringFromClass([r class]);
-            if ([n containsString:@"BaseMsgContent"] || [n containsString:@"ChatRoom"] ||
+            if ([n hasPrefix:@"BaseMsgContent"] || [n hasSuffix:@"MsgContentViewController"] ||
                 [n containsString:@"MessageList"]) return YES;
+            return NO;
         }
         r = r.nextResponder;
     }
@@ -94,6 +95,7 @@ static void WCRRoundMedia(UIView *root, UIView *v) {
 }
 static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
+    objc_setAssociatedObject(cell, @selector(WCRShadowKey), nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
     UITableView *tv = nil;
     for (UIView *v = cell.superview; v; v = v.superview)
@@ -122,7 +124,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
     if (picker) { radius = c.forwardPickerCornerRadius; margin = 14.0; fancy = YES; }
-    if (profileLike) { radius = 24.0; margin = 10.0; }
+    if (profileLike) { radius = 24.0; margin = (WCRPageKind(tv) == 9) ? 18.0 : 10.0; }
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
     NSInteger secFirst = ip.section, secLast = ip.section;
@@ -252,39 +254,56 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }
     card.layer.shadowOpacity = 0;
     card.layer.shadowPath = NULL;
-    {
-        double strength = (c.cardShadowEnabled && !picker) ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
-        NSMutableDictionary *pool = objc_getAssociatedObject(tv, @selector(WCRShadowPool));
-        if (!pool) { pool = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(WCRShadowPool), pool, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
-        if (strength <= 0) {
-            for (UIView *v in pool.allValues) v.hidden = YES;
-        } else if (isLastRow) {
-            NSInteger fs = secFirst, frow = (secFirst == ip.section) ? fr : 0;
-            CGRect firstR = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:frow inSection:fs]];
-            CGFloat topInset = timeline ? 6 : 0;
-            CGFloat x = cell.frame.origin.x + card.frame.origin.x;
-            CGFloat top = firstR.origin.y + topInset;
-            CGFloat bottom = cell.frame.origin.y + CGRectGetMaxY(card.frame);
-            CGRect gr = CGRectMake(x, top, card.frame.size.width, MAX(1, bottom - top));
-            UIView *sh = pool[@(secFirst)];
-            if (!sh) {
-                sh = [UIView new]; sh.userInteractionEnabled = NO; sh.backgroundColor = [UIColor clearColor];
-                pool[@(secFirst)] = sh;
-            }
-            if (sh.superview != tv) {
-                [sh removeFromSuperview];
-                if (tv.backgroundView && tv.backgroundView.superview == tv) [tv insertSubview:sh aboveSubview:tv.backgroundView];
-                else [tv insertSubview:sh atIndex:0];
-            }
-            sh.hidden = NO;
-            sh.frame = gr;
-            CGFloat rr = card.layer.cornerRadius > 0 ? card.layer.cornerRadius : radius;
-            sh.layer.shadowColor = [UIColor blackColor].CGColor;
-            sh.layer.shadowOpacity = (float)strength;
-            sh.layer.shadowRadius = 9;
-            sh.layer.shadowOffset = CGSizeMake(0, 5);
-            sh.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:sh.bounds cornerRadius:rr].CGPath;
+    objc_setAssociatedObject(cell, @selector(WCRShadowKey), picker ? nil : @(secFirst * 10000 + (timeline ? ip.section : 0)), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+
+static void WCRUpdateShadows(UITableView *tv) {
+    WCRConfig *c = WCRCCfg();
+    NSMutableDictionary *pool = objc_getAssociatedObject(tv, @selector(WCRShadowPool));
+    double strength = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
+    NSMutableDictionary *rects = [NSMutableDictionary dictionary];
+    NSMutableDictionary *radii = [NSMutableDictionary dictionary];
+    if (strength > 0 && !WCRInChatPage(tv)) {
+        for (UITableViewCell *cell in tv.visibleCells) {
+            NSNumber *k = objc_getAssociatedObject(cell, @selector(WCRShadowKey));
+            UIView *card = cell.backgroundView;
+            if (!k || !card || card.tag != 0x574352 || card.hidden) continue;
+            if (cell.hidden || cell.alpha < 0.05 || cell.bounds.size.height <= 2) continue;
+            CGRect r = [card convertRect:card.bounds toView:tv];
+            if (r.size.height <= 2) continue;
+            NSValue *old = rects[k];
+            rects[k] = [NSValue valueWithCGRect:old ? CGRectUnion(old.CGRectValue, r) : r];
+            radii[k] = @(MAX([radii[k] doubleValue], card.layer.cornerRadius));
         }
+    }
+    if (!pool && rects.count == 0) return;
+    if (!pool) { pool = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(WCRShadowPool), pool, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+    for (NSNumber *k in pool) if (!rects[k]) ((UIView *)pool[k]).hidden = YES;
+    for (NSNumber *k in rects) {
+        CGRect gr = [rects[k] CGRectValue];
+        CGFloat rr = [radii[k] doubleValue];
+        UIView *sh = pool[k];
+        if (!sh) { sh = [UIView new]; sh.userInteractionEnabled = NO; sh.backgroundColor = [UIColor clearColor]; pool[k] = sh; }
+        if (sh.superview != tv) { [sh removeFromSuperview]; [tv insertSubview:sh atIndex:0]; }
+        else [tv sendSubviewToBack:sh];
+        sh.layer.zPosition = -1;
+        sh.hidden = NO;
+        CGFloat pad = 30;
+        sh.frame = CGRectInset(gr, -pad, -pad);
+        CGRect inner = CGRectMake(pad, pad, gr.size.width, gr.size.height);
+        UIBezierPath *shape = [UIBezierPath bezierPathWithRoundedRect:inner cornerRadius:rr];
+        sh.layer.shadowColor = [UIColor blackColor].CGColor;
+        sh.layer.shadowOpacity = (float)strength;
+        sh.layer.shadowRadius = 9;
+        sh.layer.shadowOffset = CGSizeMake(0, 5);
+        sh.layer.shadowPath = shape.CGPath;
+        CAShapeLayer *mask = (CAShapeLayer *)sh.layer.mask;
+        if (![mask isKindOfClass:[CAShapeLayer class]]) { mask = [CAShapeLayer layer]; mask.fillRule = kCAFillRuleEvenOdd; sh.layer.mask = mask; }
+        UIBezierPath *m = [UIBezierPath bezierPathWithRect:sh.bounds];
+        [m appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectInset(inner, 0.5, 0.5) cornerRadius:rr]];
+        mask.frame = sh.bounds;
+        mask.path = m.CGPath;
     }
 }
 
@@ -302,7 +321,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!WCRAnyCardOn()) return;
     UICollectionViewCell *cell = (UICollectionViewCell *)self;
     NSString *cls = NSStringFromClass([cell class]);
-    if (WCRClassExcluded(cls)) return;
+    if (WCRClassExcluded(cls) || WCRInChatPage(cell) || WCRPageKind(cell) != 4) return;
     WCRConfig *c = WCRCCfg();
     CGFloat radius = c.globalCornerRadius > 0 ? c.globalCornerRadius : 12.0;
     cell.contentView.layer.cornerRadius = radius;
@@ -449,6 +468,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     }
     else if ((WCRCCfg().profilePageCornerEnabled && WCRPageKind(self) == 7) || (WCRCCfg().groupInfoCornerEnabled && WCRPageKind(self) == 9)) WCRStyleInfoHeader((UITableView *)self);
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
+    WCRUpdateShadows((UITableView *)self);
 }
 %end
 
@@ -569,6 +589,26 @@ static void WCRRoundCard(UIView *v, CGFloat r) {
         if (sv == card) continue;
         if (sv.bounds.size.height <= 1.5) sv.hidden = YES;
         if ([sv isKindOfClass:[UIScrollView class]]) { sv.backgroundColor = [UIColor clearColor]; sv.layer.cornerRadius = 0; }
+    }
+}
+%end
+
+
+#pragma mark - 朋友圈 赞/评论 浮层胶囊
+%hook WCOperateFloatView
+- (void)layoutSubviews {
+    %orig;
+    if (!WCRCCfg().timelineCommentCornerEnabled) return;
+    UIView *me = (UIView *)self;
+    CGFloat h = me.bounds.size.height;
+    if (h < 10) return;
+    me.layer.cornerRadius = h / 2;
+    if (@available(iOS 13.0, *)) me.layer.cornerCurve = kCACornerCurveContinuous;
+    me.clipsToBounds = YES;
+    for (UIView *sv in me.subviews) {
+        if (sv.bounds.size.height >= h * 0.8 && sv.bounds.size.width >= me.bounds.size.width * 0.8) {
+            sv.layer.cornerRadius = h / 2; sv.clipsToBounds = YES;
+        }
     }
 }
 %end
