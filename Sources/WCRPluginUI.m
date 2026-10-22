@@ -22,12 +22,12 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 @implementation WCRPluginSettingsViewController
 
 - (instancetype)init {
-    self = [super initWithStyle:UITableViewStyleGrouped];
+    self = [super initWithStyle:UITableViewStyleInsetGrouped];
     return self;
 }
 
 - (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
-    self = [super initWithStyle:UITableViewStyleGrouped];
+    self = [super initWithStyle:UITableViewStyleInsetGrouped];
     return self;
 }
 
@@ -146,21 +146,16 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 
 - (void)tableView:(UITableView *)tv willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)ip {
     NSInteger n = [tv numberOfRowsInSection:ip.section];
-    cell.backgroundColor = [UIColor clearColor];
-    UIView *card = [UIView new];
-    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+    cell.backgroundView = nil;
+    cell.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
-    card.layer.cornerRadius = 26;
-    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    cell.layer.cornerRadius = 24;
+    if (@available(iOS 13.0, *)) cell.layer.cornerCurve = kCACornerCurveContinuous;
     CACornerMask m = 0;
     if (ip.row == 0) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     if (ip.row == n - 1) m |= kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
-    card.layer.maskedCorners = m;
-    UIView *host = [UIView new];
-    [host addSubview:card];
-    card.frame = CGRectMake(16, 0, tv.bounds.size.width - 32, cell.bounds.size.height);
-    card.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    cell.backgroundView = host;
+    cell.layer.maskedCorners = m;
+    cell.layer.masksToBounds = YES;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {

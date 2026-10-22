@@ -121,6 +121,12 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
 
     cell.backgroundColor = [UIColor clearColor];
     cell.contentView.backgroundColor = [UIColor clearColor];
+    cell.layer.backgroundColor = [UIColor clearColor].CGColor;
+    for (UIView *sv in cell.subviews) {
+        if (sv == cell.contentView || sv == cell.backgroundView || sv == cell.selectedBackgroundView || sv.tag == 0x574353) continue;
+        if ([NSStringFromClass([sv class]) rangeOfString:@"Separator"].location != NSNotFound) continue;
+        if (sv.bounds.size.height >= cell.bounds.size.height * 0.8) { sv.backgroundColor = [UIColor clearColor]; sv.layer.backgroundColor = [UIColor clearColor].CGColor; }
+    }
     UIView *card = cell.backgroundView;
     if (!card || card.tag != 0x574352) {
         card = [UIView new];
@@ -279,7 +285,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     [labels sortUsingComparator:^NSComparisonResult(UILabel *a, UILabel *b) {
         return a.font.pointSize > b.font.pointSize ? NSOrderedAscending : NSOrderedDescending; }];
     UILabel *name = labels[0], *wid = labels[1];
-    CGFloat cardTop = 0, cardH = 217, mx = 8;
+    CGFloat cardTop = 0, cardH = 237, mx = 8;
     UIView *card = [h viewWithTag:0x574354];
     if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
@@ -322,7 +328,13 @@ static void WCRStyleMyHeader(UITableView *tv) {
 - (void)layoutSubviews {
     %orig;
     if (!WCRAnyCardOn()) return;
-    if (WCRCCfg().myPageCornerEnabled && WCRPageKind(self) == 3) WCRStyleMyHeader((UITableView *)self);
+    if (WCRCCfg().myPageCornerEnabled && WCRPageKind(self) == 3) {
+        WCRStyleMyHeader((UITableView *)self);
+        UITableView *mtv = (UITableView *)self;
+        mtv.alwaysBounceVertical = NO;
+        if (mtv.contentInset.bottom != 0) { UIEdgeInsets ei = mtv.contentInset; ei.bottom = 0; mtv.contentInset = ei; }
+        if (mtv.tableFooterView && mtv.tableFooterView.bounds.size.height > 1) { UIView *f = [UIView new]; f.frame = CGRectMake(0, 0, 1, 0.01); mtv.tableFooterView = f; }
+    }
     else if (WCRPageKind(self) == 6 && [NSStringFromClass([[(UITableView *)self nextResponder] class]) length] && ^BOOL{ for (UIResponder *r = (UIView *)self; r; r = r.nextResponder) if ([NSStringFromClass([r class]) isEqualToString:@"ContactInfoViewController"]) return YES; return NO; }()) WCRStyleInfoHeader((UITableView *)self);
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
 }
