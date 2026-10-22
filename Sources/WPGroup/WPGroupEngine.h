@@ -66,6 +66,7 @@ extern NSString * const WPGroupNameEnterprise; // 企业号
 
 @end
 
+@class WPGroupEngine;
 @protocol WPGroupSessionProvider <NSObject>
 /// 返回当前全部会话（宿主从微信会话服务里取）
 - (NSArray<WPGroupSession *> *)allSessionsForGroupEngine:(WPGroupEngine *)engine;
