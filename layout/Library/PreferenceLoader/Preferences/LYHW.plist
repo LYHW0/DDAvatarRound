@@ -1,8 +1,8 @@
 {
     entry = {
-        bundle = WCRefineRebuildPrefs;
+        bundle = LYHWPrefs;
         cell = PSLinkCell;
         detail = WCRRootListController;
-        label = "WCRefine";
+        label = "LYHW";
     };
 }

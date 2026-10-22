@@ -1,4 +1,4 @@
-# WCRefineRebuild
+# LYHW
 
 微信界面美化的重制版 —— **界面圆角 / 资料卡美化 / 消息横幅美化 / 菜单美化 / 头像框圆角** 五个板块。
 
@@ -68,7 +68,7 @@ MMUILongPressImageView(setImage:)   FakeHeadImageView   WCFinderHeadImageView
 
 1. 新建一个仓库，把本目录所有文件推上去（保持 `Makefile`、`control`、`Tweak.x`、`Sources/`、`prefs/`、`.github/` 的相对位置）。
 2. 仓库 → **Actions** → 选 `Build` → **Run workflow**。
-3. 跑完在 **Artifacts** 里下载 `WCRefineRebuild-deb`，里面是 `com.qimiao.wcrefine.rebuild_1.0.0_iphoneos-arm64.deb`。
+3. 跑完在 **Artifacts** 里下载 `LYHW-deb`，里面是 `com.lyhw.lanyinhouwu_1.0.0_iphoneos-arm64.deb`。
 
 工作流做的事：装 Theos → 把 Xcode 的 iPhoneOS SDK 链到 `$THEOS/sdks` → `make package FINALPACKAGE=1` → 上传 deb。
 
@@ -93,25 +93,25 @@ make clean && make package FINALPACKAGE=1
 
 ```bash
 # rootless（/var/jb）
-dpkg -i com.qimiao.wcrefine.rebuild_1.0.0_iphoneos-arm64.deb
+dpkg -i com.lyhw.lanyinhouwu_1.0.0_iphoneos-arm64.deb
 # 或者用 Sileo / Filza 直接点开 deb 安装
 
 killall -9 WeChat   # 重开微信
 ```
 
-装完在 **设置** 里会多一个 **WCRefine** 入口，五个板块的设置都在里面，改完立刻生效（走 Darwin 通知，不用重启微信）。
+装完在 **设置** 里会多一个 **LYHW** 入口，五个板块的设置都在里面，改完立刻生效（走 Darwin 通知，不用重启微信）。
 
-配置存放位置：`/var/mobile/Library/Preferences/com.qimiao.WCRefine.rebuild.plist`
+配置存放位置：`/var/mobile/Library/Preferences/com.lyhw.LYHW.plist`
 
 ---
 
 ## 五、目录结构
 
 ```
-WCRefineRebuild/
+LYHW/
 ├── Makefile                  # 主工程（arm64 / rootless）
 ├── control                   # deb 元信息
-├── WCRefineRebuild.plist     # 注入过滤（微信各包名）
+├── LYHW.plist     # 注入过滤（微信各包名）
 ├── Tweak.x                   # 入口：配置加载 + 跨进程设置同步
 ├── Sources/
 │   ├── WCRCommon.h/.m        # 颜色解析 / 圆角 / 视图工具
@@ -124,7 +124,7 @@ WCRefineRebuild/
 ├── prefs/                    # 设置面板（PreferenceBundle）
 │   ├── WCRRootListController.m
 │   ├── Resources/Info.plist
-│   └── layout/Library/PreferenceLoader/Preferences/WCRefineRebuild.plist
+│   └── layout/Library/PreferenceLoader/Preferences/LYHW.plist
 └── .github/workflows/build.yml
 ```
 
@@ -135,7 +135,7 @@ WCRefineRebuild/
 这份源码是**按原版 deb 里的 arm64 二进制反编译结果重建的**：
 
 - hook 的类、方法、顺序：从二进制 `__init_offsets` 里的 212 个初始化函数逐个反汇编还原（`MSHookMessageEx` 的目标类名 + 选择器）；
-- 配置键（`homepageCornerEnabled` / `globalCornerRadius` / `avatarCornerRadius` / `msgBanner*` / `menu*` / `profileCard*` 等）：从 `WCRefineConfig` 类的 4861 个方法表里导出；
+- 配置键（`homepageCornerEnabled` / `globalCornerRadius` / `avatarCornerRadius` / `msgBanner*` / `menu*` / `profileCard*` 等）：从 `LYHWConfig` 类的 4861 个方法表里导出；
 - 默认值：从对应 getter 的汇编里读出的立即数（圆角 15、头像圆角 100% 等）。
 
 **必须说清楚的一点**：原始 `.m` 源码没有随 deb 发布，编译器优化后的产物不可能逐字节还原成原始工程。

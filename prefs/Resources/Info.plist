@@ -1,9 +1,9 @@
 {
     CFBundleDevelopmentRegion = "zh_CN";
-    CFBundleExecutable = "WCRefineRebuildPrefs";
-    CFBundleIdentifier = "com.qimiao.wcrefine.rebuild.prefs";
+    CFBundleExecutable = "LYHWPrefs";
+    CFBundleIdentifier = "com.lyhw.lanyinhouwu.prefs";
     CFBundleInfoDictionaryVersion = "6.0";
-    CFBundleName = "WCRefineRebuildPrefs";
+    CFBundleName = "LYHWPrefs";
     CFBundlePackageType = "BNDL";
     CFBundleShortVersionString = "1.0.0";
     CFBundleVersion = "1.0.0";

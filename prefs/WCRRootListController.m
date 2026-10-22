@@ -1,6 +1,6 @@
 //
 //  WCRRootListController.m
-//  WCRefineRebuild 设置面板
+//  LYHW 设置面板
 //
 //  说明：为了不依赖私有框架头文件（不同 SDK 版本差异大），
 //  这里只用运行时声明 + 经典 PSSpecifier API 构建界面，
@@ -38,8 +38,8 @@
 @interface PSViewController : UIViewController
 @end
 
-static NSString * const kWRCPrefsSuite = @"com.qimiao.WCRefine.rebuild";
-static NSString * const kWRCPrefsChanged = @"com.qimiao.wcrefine.settings_changed";
+static NSString * const kWRCPrefsSuite = @"com.lyhw.LYHW";
+static NSString * const kWRCPrefsChanged = @"com.lyhw.settings_changed";
 
 typedef NS_ENUM(NSInteger, WCRCellType) {
     WCRCellSwitch = 0,
@@ -129,7 +129,7 @@ typedef NS_ENUM(NSInteger, WCRCellType) {
                                                        edit:nil];
     [spec setProperty:key forKey:@"key"];
     [spec setProperty:@(def) forKey:@"default"];
-    [spec setProperty:@"com.qimiao.WCRefine.rebuild" forKey:@"defaults"];
+    [spec setProperty:@"com.lyhw.LYHW" forKey:@"defaults"];
     [spec setProperty:@"PSSwitchCell" forKey:@"cellClass"];
     return spec;
 }
@@ -280,7 +280,7 @@ typedef NS_ENUM(NSInteger, WCRCellType) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"WCRefine";
+    self.title = @"LYHW";
 }
 
 @end

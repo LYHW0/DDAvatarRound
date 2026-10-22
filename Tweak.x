@@ -1,5 +1,5 @@
 //
-//  Tweak.x  —  WCRefineRebuild 入口
+//  Tweak.x  —  LYHW 入口
 //
 //  只做三件事：
 //    1. 启动时把配置读进内存
@@ -34,6 +34,6 @@ static void WCRSettingsChangedCallback(CFNotificationCenterRef center,
                                         NULL,
                                         CFNotificationSuspensionBehaviorDeliverImmediately);
 
-        NSLog(@"[WCRefineRebuild] loaded, modules: corner / profileCard / msgBanner / menu / avatarCorner");
+        NSLog(@"[LYHW] loaded, modules: corner / profileCard / msgBanner / menu / avatarCorner");
     }
 }

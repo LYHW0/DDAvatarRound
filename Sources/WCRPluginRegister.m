@@ -1,6 +1,6 @@
 //
 //  WCRPluginRegister.m
-//  WCRefineRebuild
+//  LYHW
 //
 //  把微信内设置页注册进 wcplugins 的"插件收纳"。
 //  wcplugins 提供：
@@ -46,16 +46,16 @@ static void WCRTryRegisterPluginEntry(NSInteger attempt) {
                 [inv invoke];
 
                 WCRDidRegisterPluginEntry = YES;
-                NSLog(@"[WCRefineRebuild] registered into WCPluginsMgr");
+                NSLog(@"[LYHW] registered into WCPluginsMgr");
             } @catch (NSException *e) {
-                NSLog(@"[WCRefineRebuild] register failed: %@", e);
+                NSLog(@"[LYHW] register failed: %@", e);
             }
         }
     }
 
     if (WCRDidRegisterPluginEntry) return;
     if (attempt >= WCRRegisterMaxAttempts) {
-        NSLog(@"[WCRefineRebuild] WCPluginsMgr not available, plugin entry not registered");
+        NSLog(@"[LYHW] WCPluginsMgr not available, plugin entry not registered");
         return;
     }
 

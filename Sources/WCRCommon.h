@@ -1,6 +1,6 @@
 //
 //  WCRCommon.h
-//  WCRefineRebuild
+//  LYHW
 //
 //  公共工具：颜色解析、深浅色适配、视图遍历、安全调用
 //

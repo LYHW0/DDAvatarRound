@@ -37,6 +37,6 @@ jobs:
       - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: WCRefineRebuild-deb
+          name: LYHW-deb
           path: packages/*.deb
           if-no-files-found: error

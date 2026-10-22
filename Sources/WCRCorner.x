@@ -1,7 +1,7 @@
 //
 //  WCRCorner.x  —  模块一：界面圆角（全局卡片化圆角）
 //
-//  hook 点全部来自原版 WCRefine 二进制的初始化函数（__init_offsets → MSHookMessageEx）：
+//  hook 点全部来自原版 LYHW 二进制的初始化函数（__init_offsets → MSHookMessageEx）：
 //    MMTableViewCell(layoutSubviews/setFrame:/setBackgroundColor:)
 //    MainFrameTableView(initWithFrame:style:/layoutSubviews)
 //    NewMainFrameCell(setFrame:/layoutSubviews)

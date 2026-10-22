@@ -1,17 +1,17 @@
 //
 //  WCRConfig.m
-//  WCRefineRebuild
+//  LYHW
 //
-//  基于 WCRefine 2.1-9 逆向分析完整还原的配置实现
+//  基于 LYHW 2.1-9 逆向分析完整还原的配置实现
 //  162 个圆角相关配置键，使用宏简化代码
 //
 
 #import "WCRConfig.h"
 #import <notify.h>
 
-NSString * const WCRSettingsChangedNotification = @"com.qimiao.wcrefine.settings_changed";
+NSString * const WCRSettingsChangedNotification = @"com.lyhw.settings_changed";
 
-static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
+static NSString * const kWRCSuiteName = @"com.lyhw.LYHW";
 
 @interface WCRConfig ()
 @property (nonatomic, strong) NSUserDefaults *defaults;
@@ -32,6 +32,12 @@ static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
     self = [super init];
     if (self) {
         _defaults = [[NSUserDefaults alloc] initWithSuiteName:kWRCSuiteName];
+        // 从旧版配置迁移一次
+        if (![_defaults boolForKey:@"__LYHWMigrated"]) {
+            NSDictionary *old = [[NSUserDefaults standardUserDefaults] persistentDomainForName:[@"com.qimiao.WC" stringByAppendingString:@"Refine.rebuild"]];
+            for (NSString *k in old) if (![_defaults objectForKey:k]) [_defaults setObject:old[k] forKey:k];
+            [_defaults setBool:YES forKey:@"__LYHWMigrated"];
+        }
 
         __weak typeof(self) weakSelf = self;
         [[NSNotificationCenter defaultCenter] addObserverForName:WCRSettingsChangedNotification
@@ -63,8 +69,9 @@ static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
 }
 
 - (NSDictionary *)exportAll {
-    NSDictionary *d = [self.defaults persistentDomainForName:kWRCSuiteName];
-    return d ?: @{};
+    NSMutableDictionary *d = [[self.defaults persistentDomainForName:kWRCSuiteName] mutableCopy] ?: [NSMutableDictionary dictionary];
+    [d removeObjectForKey:@"__LYHWMigrated"];
+    return d;
 }
 
 - (NSInteger)importAll:(NSDictionary *)dict {
@@ -93,7 +100,7 @@ static NSString * const kWRCSuiteName = @"com.qimiao.WCRefine.rebuild";
 - (NSString *)prop { id o = [self objectForKey:@#key def:nil]; return o ?: defv; } \
 - (void)set##prop:(NSString *)v { [self setObject:v forKey:@#key]; }
 
-#pragma mark - WCRefine 界面圆角板块完整还原（162 个配置键）
+#pragma mark - LYHW 界面圆角板块完整还原（162 个配置键）
 
 WCR_BOOL(globalCornerEnabled, globalCornerEnabled, YES)
 WCR_DOUBLE(globalCornerRadius, globalCornerRadius, 24.0)

@@ -528,29 +528,68 @@ static void ZFXHaptic(void) {
 
 #pragma mark 交互
 
+static UITabBarController *ZFXFindTabBarController(UIView *bar) {
+    for (UIResponder *r = bar; r; r = r.nextResponder) {
+        if ([r isKindOfClass:[UITabBarController class]]) return (UITabBarController *)r;
+        if ([r isKindOfClass:[UIViewController class]] && ((UIViewController *)r).tabBarController)
+            return ((UIViewController *)r).tabBarController;
+    }
+    UIWindow *win = bar.window;
+    UIViewController *root = win.rootViewController;
+    if ([root isKindOfClass:[UITabBarController class]]) return (UITabBarController *)root;
+    for (UIViewController *c in root.childViewControllers)
+        if ([c isKindOfClass:[UITabBarController class]]) return (UITabBarController *)c;
+    return nil;
+}
+
 - (void)tapItem:(ZFXFloatingItemButton *)sender {
     ZFXHaptic();
-
+    NSInteger idx = sender.index;
     id bar = self.hostTabBar;
-    SEL sel = NSSelectorFromString(@"selectIndex:");
-    if ([bar respondsToSelector:sel]) {
-        void (*fn)(id, SEL, unsigned long) = (void *)objc_msgSend;
-        fn(bar, sel, (unsigned long)sender.index);
-    } else if ([bar respondsToSelector:@selector(setSelectedItem:)]) {
-        @try {
-            NSArray *items = [bar valueForKey:@"items"];
-            if (sender.index < (NSInteger)items.count) {
-                UITabBarItem *item = items[sender.index];
-                [(UITabBar *)bar setSelectedItem:item];
-                id del = [bar delegate];
-                if ([del respondsToSelector:@selector(tabBar:didSelectItem:)]) {
-                    [del tabBar:bar didSelectItem:item];
-                }
+    BOOL switched = NO;
+
+    UITabBarController *tbc = ZFXFindTabBarController((UIView *)bar);
+    if (tbc && idx < (NSInteger)tbc.viewControllers.count) {
+        UIViewController *target = tbc.viewControllers[idx];
+        id<UITabBarControllerDelegate> del = tbc.delegate;
+        BOOL should = YES;
+        if ([del respondsToSelector:@selector(tabBarController:shouldSelectViewController:)])
+            should = [del tabBarController:tbc shouldSelectViewController:target];
+        if (should) {
+            if (tbc.selectedIndex == (NSUInteger)idx) {
+                // 再次点击当前 tab：交给微信处理（如双击回顶）
+                if ([del respondsToSelector:@selector(tabBarController:didSelectViewController:)])
+                    [del tabBarController:tbc didSelectViewController:target];
+            } else {
+                tbc.selectedIndex = (NSUInteger)idx;
+                if ([del respondsToSelector:@selector(tabBarController:didSelectViewController:)])
+                    [del tabBarController:tbc didSelectViewController:target];
             }
-        } @catch (__unused NSException *e) {}
+            switched = YES;
+        }
     }
 
-    [self syncSelectedIndex:sender.index animated:YES];
+    SEL sel = NSSelectorFromString(@"selectIndex:");
+    if ([bar respondsToSelector:sel]) {
+        void (*fn)(id, SEL, long long) = (void *)objc_msgSend;
+        fn(bar, sel, (long long)idx);
+    }
+
+    if (!switched) {
+        // 兜底：把点击转发给原生条目视图
+        NSArray *native = ZFXTabBarItemViews(bar);
+        if (idx < (NSInteger)native.count) {
+            UIView *nv = native[idx];
+            for (UIGestureRecognizer *g in nv.gestureRecognizers) {
+                if ([g isKindOfClass:[UITapGestureRecognizer class]]) {
+                    @try { [g setValue:@(UIGestureRecognizerStateEnded) forKey:@"state"]; } @catch (__unused id e) {}
+                }
+            }
+            if ([nv isKindOfClass:[UIControl class]]) [(UIControl *)nv sendActionsForControlEvents:UIControlEventTouchUpInside];
+        }
+    }
+
+    [self syncSelectedIndex:idx animated:YES];
 }
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)g {

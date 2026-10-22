@@ -1,5 +1,5 @@
 //
-//  WCRCornerExtend.x  —  圆角模块扩展（基于 WCRefine 2.1-9 逆向分析补全）
+//  WCRCornerExtend.x  —  圆角模块扩展（基于 LYHW 2.1-9 逆向分析补全）
 //
 //  新增 hook：
 //    MMSearchBar / UISearchBar（搜索框圆角）
@@ -12,7 +12,7 @@
 //    MMEmojiView / EmoticonBoardView（表情面板圆角）
 //    UIMenuController（菜单圆角）
 //
-//  补全 WCRefine 原版的 150+ 配置键对应的运行时效果
+//  补全 LYHW 原版的 150+ 配置键对应的运行时效果
 //
 
 #import <objc/message.h>
@@ -356,7 +356,7 @@ static UIColor *WCRBarFill(void) {
 
 %ctor {
     @autoreleasepool {
-        NSLog(@"[WCCornerExtend] 扩展圆角模块已加载（基于 WCRefine 2.1-9 完整规格）");
+        NSLog(@"[WCCornerExtend] 扩展圆角模块已加载（基于 LYHW 2.1-9 完整规格）");
         NSLog(@"[WCCornerExtend] 已启用 hook: MMSearchBar, UISearchBar, MMGrowTextView, InputToolView, UINavigationBar, UITabBar");
         NSLog(@"[WCCornerExtend] 聊天相关: MessageNodeView, MMMessageCellView, MMImageMessageCellView, MMTimeLabelView, MMNewSessionMsgCell");
         NSLog(@"[WCCornerExtend] 系统组件: UIAlertController, MMEmojiView, EmoticonBoardView, UIMenuController, MMActionSheetView");

@@ -5,12 +5,12 @@ THEOS_PACKAGE_SCHEME = rootless
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = WCRefineRebuild
+TWEAK_NAME = LYHW
 
-WCRefineRebuild_FILES = Tweak.x $(wildcard Sources/*.x) $(wildcard Sources/*.m) $(wildcard Sources/WPGroup/*.m) $(wildcard Sources/ZFXFloatTab/*.m) $(wildcard Sources/ZFXFloatTab/*.x)
-WCRefineRebuild_CFLAGS = -fobjc-arc -ISources -ISources/WPGroup -ISources/ZFXFloatTab -Wno-error -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-property-ivar
-WCRefineRebuild_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics CoreFoundation
-WCRefineRebuild_LIBRARIES =
+LYHW_FILES = Tweak.x $(wildcard Sources/*.x) $(wildcard Sources/*.m) $(wildcard Sources/WPGroup/*.m) $(wildcard Sources/ZFXFloatTab/*.m) $(wildcard Sources/ZFXFloatTab/*.x)
+LYHW_CFLAGS = -fobjc-arc -ISources -ISources/WPGroup -ISources/ZFXFloatTab -Wno-error -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-property-ivar
+LYHW_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics CoreFoundation
+LYHW_LIBRARIES =
 
 SUBPROJECTS += prefs
 
