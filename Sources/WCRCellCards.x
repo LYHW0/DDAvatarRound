@@ -214,13 +214,33 @@ static void WCRPlace(UIView *v, UIView *h, CGFloat tx, CGFloat ty) {
     v.transform = CGAffineTransformMakeTranslation(tx - CGRectGetMidX(f), ty - CGRectGetMidY(f));
 }
 
+static CGFloat stopW = 0;
 static void WCRClearBg(UIView *v, UIView *stop) {
     for (UIView *sv in v.subviews) {
         if (sv == stop || sv.tag == 0x574354) continue;
+        CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
+        if (sw >= stopW * 0.85 && sh >= 100) {
+            sv.backgroundColor = [UIColor clearColor];
+            sv.layer.backgroundColor = nil;
+            if (([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]]) && sv.subviews.count == 0) { sv.hidden = YES; continue; }
+        }
         if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
         if (sv.subviews.count > 0 && sv.bounds.size.height > 40) sv.backgroundColor = [UIColor clearColor];
         WCRClearBg(sv, stop);
     }
+}
+
+static void WCRStyleInfoHeader(UITableView *tv) {
+    UIView *h = tv.tableHeaderView;
+    if (!h || h.bounds.size.width < 100) return;
+    CGFloat W = h.bounds.size.width, mx = 10;
+    UIView *card = [h viewWithTag:0x574355];
+    if (!card) { card = [UIView new]; card.tag = 0x574355; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
+    card.frame = CGRectMake(mx, 0, W - mx * 2, h.bounds.size.height + 8);
+    card.backgroundColor = WCRCardFill();
+    card.layer.cornerRadius = 24;
+    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    h.backgroundColor = [UIColor clearColor];
 }
 
 static void WCRStyleMyHeader(UITableView *tv) {
@@ -253,12 +273,24 @@ static void WCRStyleMyHeader(UITableView *tv) {
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     h.backgroundColor = [UIColor clearColor];
+    stopW = W;
     WCRClearBg(h, nil);
     name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
     WCRPlace(avatar, h, W / 2, cardTop + 49);
     WCRPlace(name, h, W / 2, cardTop + 114);
     WCRPlace(wid, h, W / 2, cardTop + 150);
-    if (status) WCRPlace(status, h, W / 2, cardTop + 188);
+    if (status) {
+        UIView *circle = nil;
+        for (UIView *sib in status.superview.subviews) {
+            if (sib == status || sib == avatar || [sib isKindOfClass:[UILabel class]] || sib.tag == 0x574354) continue;
+            CGSize z = sib.bounds.size;
+            if (z.width > 8 && z.width <= 44 && fabs(z.width - z.height) < 4) { circle = sib; break; }
+        }
+        CGFloat pw = status.bounds.size.width, cw = circle ? circle.bounds.size.width : 0, gap = 8;
+        CGFloat total = pw + (circle ? gap + cw : 0);
+        WCRPlace(status, h, W / 2 - total / 2 + pw / 2, cardTop + 188);
+        if (circle) WCRPlace(circle, h, W / 2 + total / 2 - cw / 2, cardTop + 188);
+    }
     if (h.bounds.size.height < cardTop + cardH + 12 - 0.5) {
         CGRect hf = h.frame; hf.size.height = cardTop + cardH + 12; h.frame = hf; tv.tableHeaderView = h;
     }
@@ -269,6 +301,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     %orig;
     if (!WCRAnyCardOn()) return;
     if (WCRCCfg().myPageCornerEnabled && WCRPageKind(self) == 3) WCRStyleMyHeader((UITableView *)self);
+    else if (WCRPageKind(self) == 6 && [NSStringFromClass([[(UITableView *)self nextResponder] class]) length] && ^BOOL{ for (UIResponder *r = (UIView *)self; r; r = r.nextResponder) if ([NSStringFromClass([r class]) isEqualToString:@"ContactInfoViewController"]) return YES; return NO; }()) WCRStyleInfoHeader((UITableView *)self);
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
 }
 %end
