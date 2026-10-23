@@ -53,20 +53,26 @@ static BOOL LYHWInChatPage(UIView *v) {
     return NO;
 }
 
+static void LYHWHideLinesIn(UIView *root, CGFloat minW, int depth) {
+    if (depth > 3 || !root) return;
+    for (UIView *v in [root.subviews copy]) {
+        if (v.tag == 0x574352 || v.tag == 0x574353 || v.tag == 0x574357) continue;
+        if ([v isKindOfClass:[UILabel class]] || [v isKindOfClass:[UIButton class]]) continue;
+        // 只按尺寸判断：极薄且够宽的横条一律当分隔线隐藏（不依赖类名）
+        CGFloat h = v.bounds.size.height, w = v.bounds.size.width;
+        if (h > 0.05 && h <= 1.5 && w >= minW) { v.hidden = YES; continue; }
+        LYHWHideLinesIn(v, minW, depth + 1);
+    }
+    // 有的分隔线是直接画在图层上的
+    for (CALayer *l in [root.layer.sublayers copy]) {
+        if (l.frame.size.height > 0.05 && l.frame.size.height <= 1.5 && l.frame.size.width >= minW) l.hidden = YES;
+    }
+}
+
 static void LYHWHideLines(UITableViewCell *cell) {
-    // 只隐藏确认是分割线的视图：精确 UIView/名字含 Line/Separator，无子视图，且已完成布局
-    NSArray *hosts = @[cell, cell.contentView];
-    for (UIView *host in hosts)
-        for (UIView *v in host.subviews) {
-            if (v.tag == 0x574352 || v.subviews.count > 0) continue;
-            NSString *cn = NSStringFromClass([v class]);
-            BOOL nameHit = [cn rangeOfString:@"Separator" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-                           [cn rangeOfString:@"Line" options:NSCaseInsensitiveSearch].location != NSNotFound;
-            BOOL plain = [cn isEqualToString:@"UIView"];
-            if (!nameHit && !plain) continue;
-            CGFloat h = v.bounds.size.height, w = v.bounds.size.width;
-            if (h > 0.1 && h <= 1.5 && w >= cell.bounds.size.width * 0.4) v.hidden = YES;
-        }
+    CGFloat minW = cell.bounds.size.width * 0.4;
+    LYHWHideLinesIn(cell, minW, 0);
+    LYHWHideLinesIn(cell.contentView, minW, 0);
 }
 
 static NSInteger LYHWPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 0其他
@@ -777,6 +783,13 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
     if (!card || card.tag != 0x574352) return;
     UIView *sel = cell.selectedBackgroundView;
     if (sel && sel.tag == 0x574353) LYHWSetCardFrame(sel, card.frame);
+    // 按下时整行会被压暗，阴影若还在就会从卡片下沿溢出、盖到下一张卡片上，
+    // 看起来像「选中特效包含了下一张卡片的上半部分」。按下期间直接收起阴影。
+    UIView *sh = [cell viewWithTag:0x574357];
+    if (sh) {
+        BOOL pressed = cell.highlighted || cell.selected;
+        [UIView performWithoutAnimation:^{ sh.hidden = pressed; }];
+    }
     CGFloat cw = card.bounds.size.width;
     for (UIView *sv in cell.subviews) {
         if (sv == cell.contentView || sv == card || sv == sel) continue;
