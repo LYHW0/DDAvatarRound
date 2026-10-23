@@ -257,10 +257,12 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     CGFloat w = host.bounds.size.width, h = host.bounds.size.height;
     if (w < 1 || h < 1) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
     // 参数未变时跳过 shadowPath 重赋值，避免每帧写路径触发 CoreAnimation 重走模糊合成。
-    if ([objc_getAssociatedObject(host, @selector(LYHWShadowKeyRad)] isEqual:(id)@(rad)) &&
-        [objc_getAssociatedObject(host, @selector(LYHWShadowKeyCM)] isEqual:(id)@(cm)) &&
-        [objc_getAssociatedObject(host, @selector(LYHWShadowKeySt)] isEqual:(id)@(st)) &&
-        CGRectEqualToRect([((NSValue *)objc_getAssociatedObject(host, @selector(LYHWShadowKeyFrame))) CGRectValue], host.frame)) goto shadow_skip;
+    if ([objc_getAssociatedObject(host, @selector(LYHWShadowKeyRad)) isEqual:(id)@(rad)] &&
+        [objc_getAssociatedObject(host, @selector(LYHWShadowKeyCM)) isEqual:(id)@(cm)] &&
+        [objc_getAssociatedObject(host, @selector(LYHWShadowKeySt)) isEqual:(id)@(st)] &&
+        CGRectEqualToRect([((NSValue *)objc_getAssociatedObject(host, @selector(LYHWShadowKeyFrame))) CGRectValue], host.frame)) {
+        goto shadow_skip;
+    }
     objc_setAssociatedObject(host, @selector(LYHWShadowKeyRad), @(rad), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(host, @selector(LYHWShadowKeyCM), @(cm), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(host, @selector(LYHWShadowKeySt), @(st), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
