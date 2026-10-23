@@ -184,6 +184,7 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
 //     卡片本身不透明、且压在阴影层上方，条带上半部分的阴影自然被盖住，
 //     露出来的只剩圆角板块底部那一圈；
 //   · 左滑时整行会移动，阴影留在原地会变成黑块，所以左滑中直接隐藏。
+static CFTimeInterval gLYHWShadowQuietUntil = 0;
 static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
     if (!cell || !card) return;
     double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
@@ -209,7 +210,7 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     host.layer.cornerRadius = card.layer.cornerRadius;
     host.layer.maskedCorners = card.layer.maskedCorners;
     if (@available(iOS 13.0, *)) host.layer.cornerCurve = kCACornerCurveContinuous;
-    host.layer.shadowOpacity = (float)st;
+    host.layer.shadowOpacity = (CACurrentMediaTime() < gLYHWShadowQuietUntil) ? 0.0f : (float)st;
 
     CGFloat rad = card.layer.cornerRadius;
     CACornerMask cm = card.layer.maskedCorners;
@@ -1150,9 +1151,28 @@ static void LYHWRestyleVisibleCells(UIView *root) {
         }];
     }
 }
+static void LYHWFadeInShadows(UIView *root) {
+    NSMutableArray *tabs = [NSMutableArray array];
+    LYHWFindTables(root, tabs, 0);
+    LYHWConfig *c = LYHWCCfg();
+    float st = c.cardShadowEnabled ? (float)MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.f;
+    for (UITableView *tv in tabs)
+        for (UITableViewCell *cell in tv.visibleCells)
+            for (UIView *h in cell.subviews) {
+                if (h.tag != 0x574357 || h.hidden) continue;
+                CABasicAnimation *a = [CABasicAnimation animationWithKeyPath:@"shadowOpacity"];
+                a.fromValue = @(h.layer.shadowOpacity); a.toValue = @(st); a.duration = 0.18;
+                h.layer.shadowOpacity = st;
+                [h.layer addAnimation:a forKey:@"LYHWShadowFade"];
+            }
+}
 static void LYHWRestyleOnAppear(UIViewController *vc) {
     if (!vc.isViewLoaded) return;
+    gLYHWShadowQuietUntil = CACurrentMediaTime() + 0.45;
     LYHWRestyleVisibleCells(vc.view);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        LYHWFadeInShadows(vc.view);
+    });
     dispatch_async(dispatch_get_main_queue(), ^{ LYHWRestyleVisibleCells(vc.view); });
 }
 %hook WCTimeLineViewController
