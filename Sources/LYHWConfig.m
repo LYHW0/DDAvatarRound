@@ -332,6 +332,7 @@ LYHW_BOOL(menuTextCenterEnabled, menuTextCenterEnabled, NO)
 
 LYHW_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, NO)
 LYHW_BOOL(cardShadowEnabled, cardShadowEnabled, YES)
+LYHW_BOOL(cellTapEffectHidden, cellTapEffectHidden, NO)
 LYHW_DOUBLE(myPageCornerRadius, myPageCornerRadius, 24.0)
 LYHW_DOUBLE(myPageCornerMargin, myPageCornerMargin, 20.0)
 LYHW_DOUBLE(cardShadowStrength, cardShadowStrength, 0.10)

@@ -618,10 +618,16 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
             cell.selectedBackgroundView = sel;
         }
         LYHWSetCardFrame(sel, card.frame);
-        sel.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-            return (t.userInterfaceStyle == UIUserInterfaceStyleDark
-                ? [UIColor colorWithWhite:0.22 alpha:1] : [UIColor colorWithWhite:0.88 alpha:1]);
-        }];
+        if (c.cellTapEffectHidden) {
+            // 隐藏点击特效：选中背景全透明，点按时不出现任何灰底
+            sel.backgroundColor = [UIColor clearColor];
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        } else {
+            sel.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+                return (t.userInterfaceStyle == UIUserInterfaceStyleDark
+                    ? [UIColor colorWithWhite:0.22 alpha:1] : [UIColor colorWithWhite:0.88 alpha:1]);
+            }];
+        }
         sel.layer.cornerRadius = card.layer.cornerRadius;
         sel.layer.maskedCorners = card.layer.maskedCorners;
         sel.layer.masksToBounds = YES;
@@ -703,6 +709,23 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
     if (!card || card.tag != 0x574352) return;
     UIView *sel = cell.selectedBackgroundView;
     if (sel && sel.tag == 0x574353) LYHWSetCardFrame(sel, card.frame);
+    if (LYHWCCfg().cellTapEffectHidden) {
+        if (sel) sel.backgroundColor = [UIColor clearColor];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        // 微信有些 cell 自己画高亮底（按下时才出现），一并清掉
+        for (UIView *sv in cell.subviews) {
+            if (sv == cell.contentView || sv == card || sv == sel) continue;
+            if (sv.tag == 0x574352 || sv.tag == 0x574353) continue;
+            UIColor *bc = sv.backgroundColor;
+            if (!bc) continue;
+            CGFloat w = 0, a = 0;
+            if ([bc getWhite:&w alpha:&a] && a > 0.02 && w < 0.97 &&
+                sv.bounds.size.height >= cell.bounds.size.height * 0.6) {
+                sv.backgroundColor = [UIColor clearColor];
+                sv.layer.backgroundColor = nil;
+            }
+        }
+    }
     // 按下时收起阴影、松开时恢复：统一交给阴影函数按 highlighted/selected 判断
     {
         NSIndexPath *ip = nil;
@@ -875,32 +898,47 @@ static void LYHWClearWiderWhite(UIView *v, CGFloat cardW, UIView *card, int dept
 // 头部卡片原来直接铺满整个 tableHeaderView 的高度，
 // 而微信的头部底部还留了一段空白/分隔区，卡片就会在内容下面多出一截空白再收圆角。
 // 这里按「真实内容」的最低点来收口：只统计可见的叶子视图与图文控件，忽略整块容器和细线。
+static BOOL LYHWVisibleInk(UIView *v) {
+    // 真正「看得见的内容」：有文字的 label、有图的 imageView、按钮、成员网格，
+    // 或者自身有不透明底色的小块。透明占位容器一律不算。
+    if ([v isKindOfClass:[UILabel class]]) return ((UILabel *)v).text.length > 0;
+    if ([v isKindOfClass:[UIImageView class]]) return ((UIImageView *)v).image != nil;
+    if ([v isKindOfClass:[UIButton class]]) return YES;
+    if ([v isKindOfClass:[UICollectionView class]]) return YES;
+    UIColor *bc = v.backgroundColor;
+    if (bc && CGColorGetAlpha(bc.CGColor) > 0.05) {
+        CGFloat w = 0, a = 0;
+        // 纯白/接近白的大块通常是微信自己的底板，不算内容
+        if ([bc getWhite:&w alpha:&a] && w > 0.93 && v.bounds.size.height > 20) return NO;
+        return YES;
+    }
+    if (v.layer.contents != nil) return YES;
+    return NO;
+}
+
 static void LYHWCollectContentBottom(UIView *v, UIView *skip, UIView *root, CGFloat *maxY, int depth) {
-    if (depth > 6) return;
+    if (depth > 7) return;
     for (UIView *sv in v.subviews) {
         if (sv == skip || sv.hidden || sv.alpha < 0.01) continue;
         if (sv.tag == 0x574354 || sv.tag == 0x574355 || sv.tag == 0x574356) continue;
         CGSize z = sv.bounds.size;
-        if (z.width < 1 || z.height <= 1.5) continue;       // 细线/占位不算内容
-        BOOL leaf = (sv.subviews.count == 0);
-        BOOL contentish = [sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] ||
-                          [sv isKindOfClass:[UIButton class]] || [sv isKindOfClass:[UICollectionView class]];
-        BOOL scrollish = [sv isKindOfClass:[UIScrollView class]];
-        if (leaf || contentish) {
+        if (z.width < 1 || z.height <= 1.5) continue;
+        if (LYHWVisibleInk(sv)) {
             CGRect r = [sv convertRect:sv.bounds toView:root];
             if (CGRectGetMaxY(r) > *maxY) *maxY = CGRectGetMaxY(r);
         }
-        if (!leaf && !scrollish) LYHWCollectContentBottom(sv, skip, root, maxY, depth + 1);
+        if (![sv isKindOfClass:[UICollectionView class]] && ![sv isKindOfClass:[UITableView class]])
+            LYHWCollectContentBottom(sv, skip, root, maxY, depth + 1);
     }
 }
 
 static CGFloat LYHWHeaderCardHeight(UIView *h, UIView *card, CGFloat top, CGFloat fallback) {
     CGFloat maxY = 0;
     LYHWCollectContentBottom(h, card, h, &maxY, 0);
-    if (maxY <= top + 20) return fallback;                  // 没量到内容就保持原样
-    CGFloat want = maxY - top + 14.0;                       // 内容下方留 14pt 内边距
+    if (maxY <= top + 20) return fallback;
+    CGFloat want = maxY - top + 16.0;      // 内容下方留 16pt
     if (want < 60) want = 60;
-    if (want > fallback) want = fallback;                   // 不允许超出原高度
+    if (want > fallback) want = fallback;
     return want;
 }
 

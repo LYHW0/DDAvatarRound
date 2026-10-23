@@ -305,6 +305,7 @@ extern NSString * const LYHWSettingsChangedNotification;
 
 @property (nonatomic, assign) BOOL floatingTabBarEnabled;
 @property (nonatomic, assign) BOOL cardShadowEnabled;
+@property (nonatomic, assign) BOOL cellTapEffectHidden;
 @property (nonatomic, assign) double myPageCornerRadius;
 @property (nonatomic, assign) double myPageCornerMargin;
 @property (nonatomic, assign) double cardShadowStrength;
