@@ -240,6 +240,16 @@ static BOOL LYHWIsSwipeHostView(UIView *v) {
     return NO;
 }
 
+static void LYHWClearNearBlack(UIView *v) {
+    if (!v) return;
+    UIColor *bgc = v.backgroundColor;
+    CGFloat w = 0, a = 1;
+    if (bgc && [bgc getWhite:&w alpha:&a] && a > 0.02 && w < 0.35) {
+        v.backgroundColor = [UIColor clearColor];
+        v.layer.backgroundColor = nil;
+    }
+}
+
 static void LYHWApplySwipeGeometry(UIView *v, CGFloat left, CGFloat right, CGFloat rad, CACornerMask cm) {
     if (!v) return;
     CGRect f = v.frame;
@@ -263,12 +273,7 @@ static void LYHWApplySwipeGeometry(UIView *v, CGFloat left, CGFloat right, CGFlo
     if (@available(iOS 13.0, *)) l.cornerCurve = kCACornerCurveContinuous;
     v.clipsToBounds = YES;
 
-    UIColor *bgc = v.backgroundColor;
-    CGFloat w = 0, a = 1;
-    if (bgc && [bgc getWhite:&w alpha:&a] && a > 0.02 && w < 0.35) {
-        v.backgroundColor = [UIColor clearColor];
-        l.backgroundColor = nil;
-    }
+    LYHWClearNearBlack(v);
 }
 
 static void LYHWKillShadow(UIView *v) {
@@ -293,6 +298,7 @@ static void LYHWScanSwipeViews(UIView *root, UIView *contentView,
         BOOL holdsContent = (contentView && [contentView isDescendantOfView:v]);
         if (holdsContent) {
             LYHWKillShadow(v);            // 容器的投影会压在白卡上变成黑边
+            LYHWClearNearBlack(v);        // 容器若是近黑底，左滑时会从卡片边上漏出来
             LYHWScanSwipeViews(v, contentView, left, right, rad, cm, depth + 1);
             continue;
         }
