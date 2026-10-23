@@ -255,11 +255,22 @@ static UIColor *WCRBarFill(void) {
 static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
     if (!cfg.topbarCornerEnabled) return;
     CGFloat r = cfg.topbarCornerRadius;
-    CACornerMask m = cfg.topbarCornerTopFlatEnabled
-        ? (kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner)
-        : (kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner);
+    CACornerMask m = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     for (UIView *sv in bar.subviews) {
         if (![NSStringFromClass([sv class]) isEqualToString:@"_UIBarBackground"]) continue;
+        if (!cfg.topbarCornerTopFlatEnabled) {
+            // 四角圆角：把底色层顶边拉回屏幕顶端（窗口 y=0），底边保持原导航栏底边
+            CGFloat wy = [bar convertPoint:CGPointZero toView:nil].y;
+            CGFloat bottomInWindow = wy + bar.bounds.size.height;
+            CGRect f = sv.frame;
+            f.origin.x = 0;
+            f.size.width = bar.bounds.size.width;
+            f.origin.y = -wy;
+            f.size.height = bottomInWindow;
+            if (fabs(sv.frame.origin.y - f.origin.y) > 0.5 || fabs(sv.frame.size.height - f.size.height) > 0.5 ||
+                fabs(sv.frame.size.width - f.size.width) > 0.5) sv.frame = f;
+            m = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
+        }
         sv.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
             return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
         sv.layer.cornerRadius = r;
