@@ -6,6 +6,14 @@
 
 static inline WCRConfig *WCRCCfg(void) { return [WCRConfig shared]; }
 
+static UIColor *WCRListGray(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark
+            ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1];
+    }];
+}
+
+
 static BOOL WCRAnyCardOn(void) {
     WCRConfig *c = WCRCCfg();
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
@@ -93,56 +101,6 @@ static void WCRRoundMedia(UIView *root, UIView *v) {
         WCRRoundMedia(root, sv);
     }
 }
-
-static BOOL WCRWhiteBg(UIView *v) {
-    UIColor *c = v.backgroundColor;
-    if (!c) return NO;
-    CGFloat w = 0, a = 0;
-    if ([c getWhite:&w alpha:&a]) return a > 0.02 && w > 0.9;
-    return NO;
-}
-
-// 清除列表背后比卡片更宽的白色底块，否则圆角外会露出直角白块
-static void WCRClearListBackdrop(UITableView *tv, UIColor *bg) {
-    if (!tv) return;
-    tv.backgroundView = nil;
-    tv.backgroundColor = bg;
-    NSMutableArray *hosts = [NSMutableArray array];
-    if (tv.superview) [hosts addObject:tv.superview];
-    [hosts addObject:tv];
-    CGFloat W = tv.bounds.size.width;
-    for (UIView *host in hosts) {
-        for (UIView *u in [host.subviews copy]) {
-            if (u == tv || [u isKindOfClass:[UITableViewCell class]]) continue;
-            if ([u isKindOfClass:[UILabel class]] || [u isKindOfClass:[UIImageView class]] ||
-                [u isKindOfClass:[UIButton class]] || [u isKindOfClass:[UIScrollView class]]) continue;
-            if (u.bounds.size.width >= W * 0.9 && u.bounds.size.height > 30 && WCRWhiteBg(u)) {
-                u.backgroundColor = bg;
-                u.layer.backgroundColor = bg.CGColor;
-            }
-        }
-    }
-}
-
-// 清除 cell 内容层里超出卡片宽度的白色底（同样会从圆角外露直角）
-static void WCRClearWideWhiteInCell(UITableViewCell *cell, CGFloat cardW) {
-    NSMutableArray *st = [NSMutableArray arrayWithObject:cell.contentView];
-    while (st.count) {
-        UIView *v = st.lastObject; [st removeLastObject];
-        for (UIView *sv in v.subviews) {
-            if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] ||
-                [sv isKindOfClass:[UIButton class]]) continue;
-            CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
-            if (sw >= cardW + 0.5 && sh > 6 && WCRWhiteBg(sv)) {
-                sv.backgroundColor = [UIColor clearColor];
-                sv.layer.backgroundColor = nil;
-                sv.layer.cornerRadius = 0;
-            }
-            if (sv.subviews.count) [st addObject:sv];
-        }
-    }
-}
-
 static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
     if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
@@ -170,7 +128,6 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     BOOL fancy = (kind != 4);
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
-
     if (profileLike) { radius = 24.0; margin = 10.0; }
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
@@ -197,11 +154,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     BOOL isLastRow = (ip.section == secLast && ip.row >= lr);
 
     // 列表底色：浅灰，卡片为白
-    UIColor *bg = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark
-            ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1];
-    }];
-
+    UIColor *bg = WCRListGray();
     tv.backgroundColor = bg;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
     tv.sectionIndexBackgroundColor = [UIColor clearColor];
@@ -230,12 +183,21 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
             return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
         }];
-        WCRClearListBackdrop(tv, bg);
+        tv.backgroundView = nil;
+        if (tv.superview) {
+            tv.superview.backgroundColor = bg;
+            NSMutableArray *cands = [NSMutableArray arrayWithArray:tv.superview.subviews];
+            [cands addObjectsFromArray:tv.subviews];
+            for (UIView *u in cands) {
+                if (u == tv || [u isKindOfClass:[UITableViewCell class]] || [u isKindOfClass:[UILabel class]]) continue;
+                if (u.bounds.size.width >= tv.bounds.size.width * 0.9 && u.bounds.size.height > 200 && u.subviews.count < 3) {
+                    u.backgroundColor = bg; u.layer.backgroundColor = bg.CGColor;
+                }
+            }
+        }
     }
-    if (!timeline) WCRClearListBackdrop(tv, bg);
-    WCRClearWideWhiteInCell(cell, card.bounds.size.width);
     card.layer.cornerRadius = radius;
-    card.layer.masksToBounds = YES;
+    card.layer.masksToBounds = !fancy;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     CACornerMask m = 0;
     if (isFirstRow) m |= kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
@@ -385,6 +347,15 @@ static void WCRClearBg(UIView *v, UIView *stop) {
             if (([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]]) && sv.subviews.count == 0) { sv.hidden = YES; continue; }
         }
         if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
+        // 头部里横穿整屏的窄白条（原生分段底色）：刷成列表灰，避免从卡片圆角外露白
+        if (sw >= stopW * 0.9 && sh > 1.5 && sh <= 30) {
+            CGFloat w = 0, a = 0;
+            UIColor *c0 = sv.backgroundColor;
+            if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) {
+                sv.backgroundColor = WCRListGray();
+                sv.layer.backgroundColor = nil;
+            }
+        }
         if (sv.subviews.count > 0 && sv.bounds.size.height > 40) sv.backgroundColor = [UIColor clearColor];
         WCRClearBg(sv, stop);
     }
@@ -399,6 +370,23 @@ static void WCRFlatWhite(UIView *v, UIColor *c, CGFloat W) {
         WCRFlatWhite(sv, c, W);
     }
 }
+// 只把列表自身及其父视图、头部容器的底色刷成列表灰，
+// 不碰卡片、不碰 cell 内部的任何视图，避免把卡片本身清成透明/灰色。
+static void WCRPaintListSurface(UITableView *tv, UIView *header) {
+    UIColor *bg = WCRListGray();
+    tv.backgroundColor = bg;
+    tv.backgroundView = nil;
+    if (header) header.backgroundColor = bg;
+    UIView *host = tv.superview;
+    if (host) {
+        CGFloat w = 0, a = 0;
+        UIColor *hc = host.backgroundColor;
+        BOOL whiteish = NO;
+        if (hc && [hc getWhite:&w alpha:&a]) whiteish = (a > 0.02 && w > 0.9);
+        if (whiteish) host.backgroundColor = bg;
+    }
+}
+
 static void WCRStyleInfoHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100 || h.bounds.size.height < 60) return;
@@ -410,19 +398,14 @@ static void WCRStyleInfoHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-    card.layer.masksToBounds = YES;
     double st = WCRCCfg().cardShadowEnabled ? WCRCCfg().cardShadowStrength : 0;
-    UIView *shHost = [h viewWithTag:0x574356];
-    if (!shHost) { shHost = [UIView new]; shHost.tag = 0x574356; shHost.userInteractionEnabled = NO; [h insertSubview:shHost aboveSubview:card]; }
-    shHost.frame = card.frame;
-    shHost.backgroundColor = [UIColor clearColor];
-    shHost.layer.cornerRadius = 24;
-    shHost.layer.shadowColor = [UIColor blackColor].CGColor; shHost.layer.shadowOpacity = (float)st;
-    shHost.layer.shadowRadius = 7; shHost.layer.shadowOffset = CGSizeMake(0, 4);
-    shHost.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:shHost.bounds cornerRadius:24].CGPath;
+    card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
+    card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
+    card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     WCRClearBg(h, card);
+    WCRPaintListSurface(tv, h);
 }
 
 static void WCRStyleMyHeader(UITableView *tv) {
@@ -455,21 +438,16 @@ static void WCRStyleMyHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-    card.layer.masksToBounds = YES;
     {
         double st = WCRCCfg().cardShadowEnabled ? WCRCCfg().cardShadowStrength : 0;
-        UIView *shHost = [h viewWithTag:0x574356];
-        if (!shHost) { shHost = [UIView new]; shHost.tag = 0x574356; shHost.userInteractionEnabled = NO; [h insertSubview:shHost aboveSubview:card]; }
-        shHost.frame = card.frame;
-        shHost.backgroundColor = [UIColor clearColor];
-        shHost.layer.cornerRadius = 24;
-        shHost.layer.shadowColor = [UIColor blackColor].CGColor; shHost.layer.shadowOpacity = (float)st;
-        shHost.layer.shadowRadius = 7; shHost.layer.shadowOffset = CGSizeMake(0, 4);
-        shHost.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:shHost.bounds cornerRadius:24].CGPath;
+        card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
+        card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
+        card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
     }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     WCRClearBg(h, card);
+    WCRPaintListSurface(tv, h);
     name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
     WCRPlace(avatar, h, W / 2, cardTop + 62);
     WCRPlace(name, h, W / 2, cardTop + 128);
