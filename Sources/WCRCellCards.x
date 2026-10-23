@@ -286,6 +286,24 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }
     WCRHideLines(cell);
     if (!timeline) WCRClipToCard(cell, card);
+    if (profileLike) {
+        // 资料页/群聊资料页：cell 的整块白底比卡片宽，左右两侧会露出直角白条，
+        // 这里把 cell 本身的背景与 contentView 都收回到卡片宽度范围内。
+        CGFloat mg = margin;
+        CGRect cf = cell.contentView.frame;
+        cell.contentView.clipsToBounds = YES;
+        cell.clipsToBounds = NO;
+        cell.backgroundColor = [UIColor clearColor];
+        if (cf.origin.x != 0) cell.contentView.frame = CGRectMake(0, cf.origin.y, cell.bounds.size.width, cf.size.height);
+        card.frame = CGRectMake(mg, 0, cell.bounds.size.width - mg * 2, cell.bounds.size.height);
+        for (UIView *sv in cell.subviews) {
+            if (sv == cell.contentView || sv == card || sv.tag == 0x574353) continue;
+            if (sv.bounds.size.width > cell.bounds.size.width - mg * 2 + 0.5 && sv.bounds.size.height > 4) {
+                sv.backgroundColor = [UIColor clearColor];
+                sv.layer.backgroundColor = nil;
+            }
+        }
+    }
     if (timeline) {
         if (c.timelineMediaCornerEnabled) WCRRoundMedia(cell, cell);
         CGFloat cw = cell.bounds.size.width;
