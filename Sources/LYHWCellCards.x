@@ -685,11 +685,12 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     } else if (m == 0) card.layer.cornerRadius = 0;
     {
         UIView *sel = cell.selectedBackgroundView;
-        if (!sel || sel.tag != 0x574353) {
-            sel = [UIView new]; sel.tag = 0x574353; sel.userInteractionEnabled = NO;
+        // 选中背景也必须锁 frame：长按高亮时 UIKit 会把它重设成整个 cell，盖住卡片外的留白
+        if (!sel || sel.tag != 0x574353 || ![sel isKindOfClass:[LYHWCardView class]]) {
+            sel = [LYHWCardView new]; sel.tag = 0x574353; sel.userInteractionEnabled = NO;
             cell.selectedBackgroundView = sel;
         }
-        sel.frame = card.frame;
+        LYHWSetCardFrame(sel, card.frame);
         sel.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
             return (t.userInterfaceStyle == UIUserInterfaceStyleDark
                 ? [UIColor colorWithWhite:0.22 alpha:1] : [UIColor colorWithWhite:0.88 alpha:1]);
@@ -769,6 +770,23 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
 
 
 
+// 按下/选中瞬间：选中背景对齐卡片；微信自带的整行高亮底（比卡片宽）清透明
+static void LYHWFixPressedState(UITableViewCell *cell) {
+    UIView *card = cell.backgroundView;
+    if (!card || card.tag != 0x574352) return;
+    UIView *sel = cell.selectedBackgroundView;
+    if (sel && sel.tag == 0x574353) LYHWSetCardFrame(sel, card.frame);
+    CGFloat cw = card.bounds.size.width;
+    for (UIView *sv in cell.subviews) {
+        if (sv == cell.contentView || sv == card || sv == sel) continue;
+        if (sv.tag == 0x574352 || sv.tag == 0x574353 || sv.tag == 0x574357) continue;
+        if (sv.bounds.size.width > cw + 1 && sv.bounds.size.height >= cell.bounds.size.height * 0.8) {
+            sv.backgroundColor = [UIColor clearColor];
+            sv.layer.backgroundColor = nil;
+        }
+    }
+}
+
 %hook UITableViewCell
 - (void)setClipsToBounds:(BOOL)clip {
     if (clip && [(UIView *)self viewWithTag:0x574357]) clip = NO;
@@ -802,6 +820,14 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
 - (void)prepareForReuse {
     %orig;
     LYHWHideShadowHost((UITableViewCell *)self);
+}
+- (void)setHighlighted:(BOOL)h animated:(BOOL)a {
+    %orig;
+    if (LYHWAnyCardOn()) LYHWFixPressedState((UITableViewCell *)self);
+}
+- (void)setSelected:(BOOL)sel animated:(BOOL)a {
+    %orig;
+    if (LYHWAnyCardOn()) LYHWFixPressedState((UITableViewCell *)self);
 }
 - (void)layoutSubviews {
     %orig;
