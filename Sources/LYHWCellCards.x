@@ -228,7 +228,6 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
 //   · 接触层：偏移小、模糊小，给出卡片与背景之间的分离感；
 //   · 环境层：偏移大、模糊大、透明度低，负责整体漂浮感。
 // 两层都用 shadowPath 精确贴合卡片圆角，所以圆角处不会出现方角或双层弧线。
-static const CGFloat kLYHWShSpread = 1.0;   // 阴影宿主相对卡片外扩（越小越贴合）
 
 static UIBezierPath *LYHWCardPath(CGRect r, CGFloat rad, CACornerMask cm) {
     if (rad < 0.5 || cm == 0) return [UIBezierPath bezierPathWithRect:r];
@@ -242,33 +241,38 @@ static UIBezierPath *LYHWCardPath(CGRect r, CGFloat rad, CACornerMask cm) {
 
 // 阴影只挂在 cell 自己的图层上，不额外加视图：
 // 少一层视图就少一次 frame 被 UIKit 重置的机会，转场/左滑都不会跳。
-static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
-    if (!cell || !card) return;
-    CALayer *host = cell.layer;
-    double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
-    BOOL swiped = LYHWCellIsSwiped(cell);
-    BOOL on = (st > 0.001) && isBlockBottom && !swiped;
-
+// 下沉式阴影路径：比卡片左右各内收、顶部下移，只让阴影从底边和底部圆角透出来。
+// 侧面不会出现一整条暗边，也不会把卡片周围的背景整体染深。
+static void LYHWSetSinkShadow(CALayer *L, CGRect cardFrame, CGFloat rad, CACornerMask cm, double st) {
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
-    if (host.masksToBounds) host.masksToBounds = NO;
-    if (!on) {
-        host.shadowOpacity = 0;
-        host.shadowPath = NULL;
+    if (st <= 0.001 || cardFrame.size.width < 1 || cardFrame.size.height < 1) {
+        L.shadowOpacity = 0;
+        L.shadowPath = NULL;
         [CATransaction commit];
         return;
     }
-    CGRect r = CGRectInset(card.frame, -kLYHWShSpread, -kLYHWShSpread);
-    CGFloat rad = card.layer.cornerRadius + kLYHWShSpread;
-    UIBezierPath *path = LYHWCardPath(r, rad, card.layer.maskedCorners);
-
-    // 单层阴影：模糊足够大、透明度足够低，边缘自然散开，不会有硬边
-    host.shadowColor = [UIColor blackColor].CGColor;
-    host.shadowOpacity = (float)(st * 0.9);
-    host.shadowRadius = 11.0;
-    host.shadowOffset = CGSizeMake(0, 4);
-    host.shadowPath = path.CGPath;
+    CGFloat dx = 7.0;
+    CGFloat dy = MIN(cardFrame.size.height * 0.45, 14.0);
+    CGRect r = cardFrame;
+    r.origin.x += dx; r.size.width -= dx * 2;
+    r.origin.y += dy; r.size.height -= dy;
+    if (r.size.width < 1 || r.size.height < 1) r = cardFrame;
+    UIBezierPath *path = LYHWCardPath(r, MAX(0, rad - 2), cm | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner);
+    L.masksToBounds = NO;
+    L.shadowColor = [UIColor blackColor].CGColor;
+    L.shadowOpacity = (float)MIN(1.0, st * 1.4);
+    L.shadowRadius = 9.0;
+    L.shadowOffset = CGSizeMake(0, 6);
+    L.shadowPath = path.CGPath;
     [CATransaction commit];
+}
+
+static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
+    if (!cell || !card) return;
+    double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
+    BOOL on = (st > 0.001) && isBlockBottom && !LYHWCellIsSwiped(cell) && !cell.highlighted && !cell.selected;
+    LYHWSetSinkShadow(cell.layer, card.frame, card.layer.cornerRadius, card.layer.maskedCorners, on ? st : 0);
 }
 
 // 兼容旧调用点
@@ -699,18 +703,20 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
     if (!card || card.tag != 0x574352) return;
     UIView *sel = cell.selectedBackgroundView;
     if (sel && sel.tag == 0x574353) LYHWSetCardFrame(sel, card.frame);
-    // 按下时整行被压暗，阴影若还在就会从卡片下沿外溢、盖到下一张卡片上。
-    // 阴影现在挂在 cell.layer 上，按下期间直接把透明度收掉，松开由样式流程恢复。
-    BOOL pressed = cell.highlighted || cell.selected;
-    if (cell.layer.shadowOpacity > 0.001 || pressed) {
-        [CATransaction begin];
-        [CATransaction setDisableActions:YES];
-        cell.layer.shadowOpacity = pressed ? 0 : cell.layer.shadowOpacity;
-        [CATransaction commit];
-    }
-    if (pressed) {
-        BOOL on = LYHWCCfg().cardShadowEnabled && LYHWCCfg().cardShadowStrength > 0.001;
-        if (on) LYHWStyleCellCard(cell);
+    // 按下时收起阴影、松开时恢复：统一交给阴影函数按 highlighted/selected 判断
+    {
+        NSIndexPath *ip = nil;
+        UITableView *tv = nil;
+        for (UIView *v = cell.superview; v; v = v.superview) if ([v isKindOfClass:[UITableView class]]) { tv = (UITableView *)v; break; }
+        if (tv) ip = [tv indexPathForCell:cell];
+        BOOL pressed = cell.highlighted || cell.selected;
+        if (pressed) {
+            [CATransaction begin]; [CATransaction setDisableActions:YES];
+            cell.layer.shadowOpacity = 0;
+            [CATransaction commit];
+        } else if (ip) {
+            LYHWStyleCellCard(cell);
+        }
     }
     CGFloat cw = card.bounds.size.width;
     for (UIView *sv in cell.subviews) {
@@ -877,6 +883,12 @@ static void LYHWStyleInfoHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    {
+        double hst = LYHWCCfg().cardShadowEnabled ? MAX(0.0, MIN(1.0, LYHWCCfg().cardShadowStrength)) : 0.0;
+        // 阴影画在头部视图图层上（卡片自己不裁剪也可以，但统一放到 h 上，与 cell 一致）
+        h.clipsToBounds = NO;
+        LYHWSetSinkShadow(h.layer, card.frame, 24, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
+    }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     LYHWClearBg(h, card);
@@ -914,6 +926,12 @@ static void LYHWStyleMyHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    {
+        double hst = LYHWCCfg().cardShadowEnabled ? MAX(0.0, MIN(1.0, LYHWCCfg().cardShadowStrength)) : 0.0;
+        // 阴影画在头部视图图层上（卡片自己不裁剪也可以，但统一放到 h 上，与 cell 一致）
+        h.clipsToBounds = NO;
+        LYHWSetSinkShadow(h.layer, card.frame, 24, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
+    }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     LYHWClearBg(h, card);
@@ -986,6 +1004,43 @@ static void LYHWPaintFooter(UITableView *tv) {
     LYHWClearFooterTree(f, tv.bounds.size.width, 0);
 }
 
+// 分组之间的头/尾视图默认是不透明的整宽灰底，层级在 cell 之上，
+// 会把上一张卡片的阴影齐刷刷切掉，留下一条条硬边的「小白条」。这里统一清成透明。
+static void LYHWClearHFView(UIView *v) {
+    v.backgroundColor = [UIColor clearColor];
+    v.layer.backgroundColor = nil;
+    if ([v isKindOfClass:[UITableViewHeaderFooterView class]]) {
+        UITableViewHeaderFooterView *hf = (UITableViewHeaderFooterView *)v;
+        if (hf.backgroundView) { hf.backgroundView.backgroundColor = [UIColor clearColor]; hf.backgroundView.hidden = YES; }
+        hf.contentView.backgroundColor = [UIColor clearColor];
+        if (@available(iOS 14.0, *)) {
+            UIBackgroundConfiguration *bc = [UIBackgroundConfiguration clearConfiguration];
+            hf.backgroundConfiguration = bc;
+        }
+    }
+    for (UIView *sv in v.subviews) {
+        if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
+        if (sv.bounds.size.width >= v.bounds.size.width * 0.9) {
+            sv.backgroundColor = [UIColor clearColor];
+            sv.layer.backgroundColor = nil;
+        }
+    }
+}
+
+static void LYHWClearSectionBars(UITableView *tv) {
+    CGFloat W = tv.bounds.size.width;
+    for (UIView *v in tv.subviews) {
+        if ([v isKindOfClass:[UITableViewCell class]] || v == tv.tableHeaderView || v == tv.tableFooterView) continue;
+        if ([v isKindOfClass:[UIImageView class]] && v.bounds.size.width < 10) continue; // 滚动条
+        BOOL hfClass = [v isKindOfClass:[UITableViewHeaderFooterView class]] ||
+                       [NSStringFromClass([v class]) rangeOfString:@"HeaderFooter"].location != NSNotFound ||
+                       [NSStringFromClass([v class]) rangeOfString:@"SectionHeader"].location != NSNotFound;
+        BOOL wideBar = v.bounds.size.width >= W * 0.9 && v.bounds.size.height > 1.5 && v.bounds.size.height < 80 && v.backgroundColor &&
+                       CGColorGetAlpha(v.backgroundColor.CGColor) > 0.02;
+        if (hfClass || wideBar) LYHWClearHFView(v);
+    }
+}
+
 %hook UITableView
 - (void)layoutSubviews {
     %orig;
@@ -1022,6 +1077,7 @@ static void LYHWPaintFooter(UITableView *tv) {
     else if ((LYHWCCfg().profilePageCornerEnabled && LYHWPageKind(self) == 7) || (LYHWCCfg().groupInfoCornerEnabled && LYHWPageKind(self) == 9)) LYHWStyleInfoHeader((UITableView *)self);
     [objc_getAssociatedObject(self, @selector(LYHWGroupInfo)) removeAllObjects];
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) LYHWStyleCellCard(cell);
+    if (LYHWPageKind(self) != 0) LYHWClearSectionBars((UITableView *)self);
 }
 %end
 
