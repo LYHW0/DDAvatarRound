@@ -872,13 +872,46 @@ static void LYHWClearWiderWhite(UIView *v, CGFloat cardW, UIView *card, int dept
     }
 }
 
+// 头部卡片原来直接铺满整个 tableHeaderView 的高度，
+// 而微信的头部底部还留了一段空白/分隔区，卡片就会在内容下面多出一截空白再收圆角。
+// 这里按「真实内容」的最低点来收口：只统计可见的叶子视图与图文控件，忽略整块容器和细线。
+static void LYHWCollectContentBottom(UIView *v, UIView *skip, UIView *root, CGFloat *maxY, int depth) {
+    if (depth > 6) return;
+    for (UIView *sv in v.subviews) {
+        if (sv == skip || sv.hidden || sv.alpha < 0.01) continue;
+        if (sv.tag == 0x574354 || sv.tag == 0x574355 || sv.tag == 0x574356) continue;
+        CGSize z = sv.bounds.size;
+        if (z.width < 1 || z.height <= 1.5) continue;       // 细线/占位不算内容
+        BOOL leaf = (sv.subviews.count == 0);
+        BOOL contentish = [sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] ||
+                          [sv isKindOfClass:[UIButton class]] || [sv isKindOfClass:[UICollectionView class]];
+        BOOL scrollish = [sv isKindOfClass:[UIScrollView class]];
+        if (leaf || contentish) {
+            CGRect r = [sv convertRect:sv.bounds toView:root];
+            if (CGRectGetMaxY(r) > *maxY) *maxY = CGRectGetMaxY(r);
+        }
+        if (!leaf && !scrollish) LYHWCollectContentBottom(sv, skip, root, maxY, depth + 1);
+    }
+}
+
+static CGFloat LYHWHeaderCardHeight(UIView *h, UIView *card, CGFloat top, CGFloat fallback) {
+    CGFloat maxY = 0;
+    LYHWCollectContentBottom(h, card, h, &maxY, 0);
+    if (maxY <= top + 20) return fallback;                  // 没量到内容就保持原样
+    CGFloat want = maxY - top + 14.0;                       // 内容下方留 14pt 内边距
+    if (want < 60) want = 60;
+    if (want > fallback) want = fallback;                   // 不允许超出原高度
+    return want;
+}
+
 static void LYHWStyleInfoHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100 || h.bounds.size.height < 60) return;
     CGFloat W = h.bounds.size.width, H = h.bounds.size.height;
     UIView *card = [h viewWithTag:0x574355];
     if (!card) { card = [UIView new]; card.tag = 0x574355; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
-    card.frame = CGRectMake(10, 4, W - 20, H - 12);
+    CGFloat cardH = LYHWHeaderCardHeight(h, card, 4, H - 12);
+    card.frame = CGRectMake(10, 4, W - 20, cardH);
     card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
@@ -894,6 +927,12 @@ static void LYHWStyleInfoHeader(UITableView *tv) {
     LYHWClearBg(h, card);
     LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
     LYHWPaintListSurface(tv, h);
+    // 卡片收口后，头部自身也要跟着收，否则卡片下方会多出一段空白
+    CGFloat wantH = CGRectGetMaxY(card.frame) + 8.0;
+    if (wantH > 40 && fabs(h.bounds.size.height - wantH) > 1.0 && wantH < H) {
+        CGRect hf = h.frame; hf.size.height = wantH; h.frame = hf;
+        tv.tableHeaderView = h;
+    }
 }
 
 static void LYHWStyleMyHeader(UITableView *tv) {
