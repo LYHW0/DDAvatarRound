@@ -982,6 +982,56 @@ static void LYHWRoundExact(UIView *v) {
 }
 %end
 
+// ===== 预览飞入/飞回动画：飞行的视图是预览页自己的（原生直角），需要让它的圆角随动画渐变 =====
+static UIView *LYHWSafeView(id obj, NSString *key) {
+    @try {
+        id v = [obj valueForKey:key];
+        return [v isKindOfClass:[UIView class]] ? (UIView *)v : nil;
+    } @catch (__unused NSException *e) { return nil; }
+}
+static void LYHWAnimateFlyCorner(UIView *v, BOOL toRound, CFTimeInterval dur) {
+    LYHWConfig *c = LYHWCCfg();
+    if (!v || !c.timelineCornerEnabled || !c.timelineMediaCornerEnabled) return;
+    CGFloat r = c.timelineMediaCornerRadius;
+    CALayer *l = v.layer;
+    CGFloat from = toRound ? 0 : r;
+    CGFloat to = toRound ? r : 0;
+    l.masksToBounds = YES;
+    if (@available(iOS 13.0, *)) l.cornerCurve = kCACornerCurveContinuous;
+    l.cornerRadius = to;
+    CABasicAnimation *a = [CABasicAnimation animationWithKeyPath:@"cornerRadius"];
+    a.fromValue = @(from); a.toValue = @(to);
+    a.duration = dur;
+    a.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+    [l addAnimation:a forKey:@"LYHWFlyCorner"];
+}
+%hook WCImageFullScreenViewContainer
+- (void)animationHideWithRotate {
+    %orig;
+    UIView *fly = LYHWSafeView(self, @"m_container");
+    LYHWAnimateFlyCorner(fly, YES, 0.28);
+}
+- (void)animationShowView {
+    %orig;
+    UIView *fly = LYHWSafeView(self, @"m_container");
+    LYHWAnimateFlyCorner(fly, NO, 0.28);
+}
+%end
+%hook WCPlayerConfigFullScreenViewController
+- (void)showVCAnimation {
+    %orig;
+    UIView *fly = LYHWSafeView(self, @"playerViewContainer");
+    LYHWAnimateFlyCorner(fly, NO, 0.28);
+}
+- (void)stopAndCloseFullScreenWindowAnimated:(BOOL)animated withCompletion:(id)completion {
+    if (animated) {
+        UIView *fly = LYHWSafeView(self, @"playerViewContainer");
+        LYHWAnimateFlyCorner(fly, YES, 0.28);
+    }
+    %orig;
+}
+%end
+
 %hook WCSightView
 - (void)layoutSubviews {
     %orig;
