@@ -935,6 +935,53 @@ static void LYHWRoundTimelineTemplate(UIView *v) {
     if (LYHWPageKind(v) != 5) return;
     LYHWRoundMedia(v, v);
 }
+// ===== 朋友圈真实媒体类（来自类库）：九宫格单格 WCImageView、视频 WCSNSNodeVideoView =====
+// 圆角挂在控件自身 layer 上；预览关闭动画结束(showViewWhenCloseFullScreenAnimationEnd)时 WeChat 会重置，必须当场补回
+static void LYHWRoundExact(UIView *v) {
+    LYHWConfig *c = LYHWCCfg();
+    if (!v || !c.timelineCornerEnabled || !c.timelineMediaCornerEnabled) return;
+    CGSize z = v.bounds.size;
+    if (z.width < 30 || z.height < 30) return;
+    CALayer *l = v.layer;
+    CGFloat r = c.timelineMediaCornerRadius;
+    if (fabs(l.cornerRadius - r) < 0.5 && l.masksToBounds) return;
+    [UIView performWithoutAnimation:^{
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        l.cornerRadius = r; l.masksToBounds = YES; v.clipsToBounds = YES;
+        if (@available(iOS 13.0, *)) l.cornerCurve = kCACornerCurveContinuous;
+        [CATransaction commit];
+    }];
+}
+%hook WCImageView
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundExact((UIView *)self);
+}
+- (void)showViewWhenCloseFullScreenAnimationEnd {
+    %orig;
+    LYHWRoundExact((UIView *)self);
+}
+- (void)hideViewWhenShowFullScreenAnimationEnd {
+    %orig;
+    LYHWRoundExact((UIView *)self);
+}
+%end
+%hook WCSNSNodeVideoView
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundExact((UIView *)self);
+}
+- (void)showViewWhenCloseFullScreenAnimationEnd {
+    %orig;
+    LYHWRoundExact((UIView *)self);
+}
+- (void)hideViewWhenShowFullScreenAnimationEnd {
+    %orig;
+    LYHWRoundExact((UIView *)self);
+}
+%end
+
 %hook WCSightView
 - (void)layoutSubviews {
     %orig;
@@ -983,8 +1030,19 @@ static void LYHWSweepTimelineMedia(UIView *root) {
     if (!root || !c.timelineCornerEnabled || !c.timelineMediaCornerEnabled) return;
     NSMutableArray *tabs = [NSMutableArray array];
     LYHWFindTables(root, tabs, 0);
+    Class cImg = NSClassFromString(@"WCImageView"), cVid = NSClassFromString(@"WCSNSNodeVideoView");
     for (UITableView *tv in tabs) {
-        for (UITableViewCell *cell in tv.visibleCells) LYHWRoundMedia(cell, cell);
+        for (UITableViewCell *cell in tv.visibleCells) {
+            LYHWRoundMedia(cell, cell);
+            NSMutableArray *st = [NSMutableArray arrayWithObject:cell];
+            while (st.count) {
+                UIView *v = st.lastObject; [st removeLastObject];
+                for (UIView *sv in v.subviews) {
+                    if ((cImg && [sv isKindOfClass:cImg]) || (cVid && [sv isKindOfClass:cVid])) LYHWRoundExact(sv);
+                    else [st addObject:sv];
+                }
+            }
+        }
     }
 }
 @interface LYHWTimelineLink : NSObject
