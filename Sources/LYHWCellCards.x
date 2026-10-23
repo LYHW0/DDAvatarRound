@@ -177,6 +177,47 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
     [CATransaction commit];
 }
 
+// 每张卡片独立的阴影层：形状与卡片完全一致，挂在 cell 上、位于卡片下方。
+// 卡片自身继续裁剪内容（圆角外不露直角），阴影不会被裁掉，也不会在列表底部堆成黑块。
+static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig *c) {
+    if (!cell || !card) return;
+    double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
+    UIView *host = [cell viewWithTag:0x574357];
+    if (st <= 0.001) { if (host) host.hidden = YES; return; }
+    if (!host) {
+        host = [UIView new];
+        host.tag = 0x574357;
+        host.userInteractionEnabled = NO;
+        host.backgroundColor = [UIColor clearColor];
+        host.layer.shadowColor = [UIColor blackColor].CGColor;
+        host.layer.shadowRadius = 6;
+        host.layer.shadowOffset = CGSizeMake(0, 2);
+    }
+    if (host.superview != cell) [cell insertSubview:host atIndex:0];
+    if (card.superview == cell && [cell.subviews indexOfObject:host] > [cell.subviews indexOfObject:card])
+        [cell insertSubview:host belowSubview:card];
+    host.hidden = NO;
+    if (!CGRectEqualToRect(host.frame, card.frame)) host.frame = card.frame;
+    host.layer.cornerRadius = card.layer.cornerRadius;
+    host.layer.maskedCorners = card.layer.maskedCorners;
+    if (@available(iOS 13.0, *)) host.layer.cornerCurve = kCACornerCurveContinuous;
+    host.layer.shadowOpacity = (float)st;
+    CGFloat rad = card.layer.cornerRadius;
+    CACornerMask cm = card.layer.maskedCorners;
+    UIBezierPath *path = nil;
+    if (rad < 0.5 || cm == 0) {
+        path = [UIBezierPath bezierPathWithRect:host.bounds];
+    } else {
+        UIRectCorner uc = 0;
+        if (cm & kCALayerMinXMinYCorner) uc |= UIRectCornerTopLeft;
+        if (cm & kCALayerMaxXMinYCorner) uc |= UIRectCornerTopRight;
+        if (cm & kCALayerMinXMaxYCorner) uc |= UIRectCornerBottomLeft;
+        if (cm & kCALayerMaxXMaxYCorner) uc |= UIRectCornerBottomRight;
+        path = [UIBezierPath bezierPathWithRoundedRect:host.bounds byRoundingCorners:uc cornerRadii:CGSizeMake(rad, rad)];
+    }
+    host.layer.shadowPath = path.CGPath;
+}
+
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
     if (LYHWClassExcluded(NSStringFromClass([cell class]))) return;
@@ -367,9 +408,7 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
         cell.contentView.layer.cornerRadius = 0;
         cell.clipsToBounds = NO;
     }
-    card.layer.shadowOpacity = 0;
-    card.layer.shadowPath = NULL;
-    for (CALayer *l in [card.layer.sublayers copy]) if ([l.name isEqualToString:@"LYHWShadow"]) [l removeFromSuperlayer];
+    LYHWApplyCardShadow(cell, card, c);
 }
 
 

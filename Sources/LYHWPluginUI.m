@@ -54,6 +54,8 @@ static NSDictionary *LYHWItem(NSString *title, NSString *key, NSString *kind,
     #define P(t, ...) LYHWPage(t, @[__VA_ARGS__])
     NSArray *pages = @[
         P(@"微信主页", LYHWItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
+                      LYHWItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1),
                       LYHWItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
                       LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
                       LYHWItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
