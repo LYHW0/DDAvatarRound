@@ -171,21 +171,7 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
     if (r.size.width < 1 || r.size.height < 1) { host.mask = nil; return; }
     cell.contentView.backgroundColor = [UIColor clearColor];
     cell.contentView.layer.backgroundColor = [UIColor clearColor].CGColor;
-    // 关键：如果卡片圆角 / 形状 / 阴影强度没有实际变化，就不重算 shadowPath。
-// 反复赋值相同路径会让 CoreAnimation 重走模糊合成路径，在转场帧会短暂漏出一帧实心阴影。
-// 用关联对象缓存「上次应用的参数」，相等则跳过。
-{{
-    static char kLYHWLastRad,kLYHWLastCM,kLYHWLastSt,kLYHWLastFrame;
-    CGFloat lr=[[objc_getAssociatedObject(host,&kLYHWLastRad) isEqual:(id)@((CGFloat)rad)] ? rad : -1];
-    CACornerMask lcm=[[objc_getAssociatedObject(host,&kLYHWLastCM) isEqual:(id)@((CACornerMask)cm)] ? cm : -1];
-    CGFloat lst=[[objc_getAssociatedObject(host,&kLYHWLastSt) isEqual:(id)@((CGFloat)st)] ? st : -1];
-    CGRect lf=[[objc_getAssociatedObject(host,&kLYHWLastFrame) isEqual:(id)@(__bridge id)(NSValue valueWithCGRect:host.frame))] ? host.frame : CGRectZero];
-    if (lr==rad && lcm==cm && lst==st && CGRectGetWidth(lf)==w && CGRectGetHeight(lf)==h) goto skip_path;
-    objc_setAssociatedObject(host,&kLYHWLastRad,@((id)@rad),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(host,&kLYHWLastCM,@((id)@(cm)),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(host,&kLYHWLastSt,@((id)@(st)),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(host,&kLYHWLastFrame,@((id)@(NSValue valueWithCGRect:host.frame)),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}}
+    CGFloat rad = card.layer.cornerRadius;
     CACornerMask cm = card.layer.maskedCorners;
     UIBezierPath *path = nil;
     if (rad < 0.5 || cm == 0) {
@@ -270,18 +256,15 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     CACornerMask cm = card.layer.maskedCorners;
     CGFloat w = host.bounds.size.width, h = host.bounds.size.height;
     if (w < 1 || h < 1) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
-    // 如果卡片的圆角、形状、阴影强度和宿主 frame 都没变，跳过 shadowPath 重赋值，
-    // 避免每帧都写一遍同一条路径，触发 CoreAnimation 重走模糊合成。
+    // 参数未变时跳过 shadowPath 重赋值，避免每帧写路径触发 CoreAnimation 重走模糊合成。
     if ([objc_getAssociatedObject(host, @selector(LYHWShadowKeyRad)] isEqual:(id)@(rad)) &&
         [objc_getAssociatedObject(host, @selector(LYHWShadowKeyCM)] isEqual:(id)@(cm)) &&
         [objc_getAssociatedObject(host, @selector(LYHWShadowKeySt)] isEqual:(id)@(st)) &&
-        CGRectEqualToRect([((NSValue *)objc_getAssociatedObject(host, @selector(LYHWShadowKeyHostFrame))) CGRectValue], host.frame)) {
-        goto shadow_skip_path;
-    }
+        CGRectEqualToRect([((NSValue *)objc_getAssociatedObject(host, @selector(LYHWShadowKeyFrame))) CGRectValue], host.frame)) goto shadow_skip;
     objc_setAssociatedObject(host, @selector(LYHWShadowKeyRad), @(rad), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(host, @selector(LYHWShadowKeyCM), @(cm), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(host, @selector(LYHWShadowKeySt), @(st), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(host, @selector(LYHWShadowKeyHostFrame), [NSValue valueWithCGRect:host.frame], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(host, @selector(LYHWShadowKeyFrame), [NSValue valueWithCGRect:host.frame], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     CGFloat bandH = MIN(h, 28.0);
     CGRect band = CGRectMake(0, h - bandH, w, bandH);
     UIRectCorner uc = 0;
@@ -294,11 +277,7 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     host.layer.shadowPath = path.CGPath;
     if (!host.layer.shadowPath) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
     host.layer.shadowOpacity = (float)st;   // 路径就绪后才开阴影，顺序不能反
-<<<<<<< HEAD
-skip_path:
-=======
-shadow_skip_path:
->>>>>>> 6599792 (v76: 参数未变时跳过 shadowPath 重赋值，避免转场帧实心阴影)
+shadow_skip:
 }
 
 // 阴影宿主的所有改动都必须关掉隐式动画：
