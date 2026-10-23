@@ -1,5 +1,5 @@
 //
-//  HBSpeedCellFactory.h
+//  LYHWSpeedCellFactory.h
 //  自定义界面速度 —— 行（cell）生成
 //
 //  原实现（-[TheSpecialController setEditUiWindowsSpeed] @0x9C20D0）：
@@ -16,16 +16,16 @@
 //
 
 #import <UIKit/UIKit.h>
-#import "HBSpeedMenuItem.h"
+#import "LYHWSpeedMenuItem.h"
 
-@interface HBSpeedCellFactory : NSObject
+@interface LYHWSpeedCellFactory : NSObject
 
 /// 生成一行。target/action 为点击回调（原插件用的是 target + selector）。
-+ (UITableViewCell *)cellForItem:(HBSpeedMenuItem *)item
++ (UITableViewCell *)cellForItem:(LYHWSpeedMenuItem *)item
                           target:(id)target
                           action:(SEL)action;
 
 /// 分组 footer 文案（原插件每行下面那行灰字）
-+ (NSString *)footerForItem:(HBSpeedMenuItem *)item;
++ (NSString *)footerForItem:(LYHWSpeedMenuItem *)item;
 
 @end

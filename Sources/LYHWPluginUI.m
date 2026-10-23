@@ -1,34 +1,34 @@
 //
-//  WCRPluginUI.m
+//  LYHWPluginUI.m
 //  LYHW
 //
 
-#import "WCRPluginUI.h"
-#import "WCRConfig.h"
-#import "HBSpeedMenuItem.h"
-#import "HBSpeedCellFactory.h"
-#import "HBSpeedAlert.h"
-#import "HBSpeedConfig.h"
+#import "LYHWPluginUI.h"
+#import "LYHWConfig.h"
+#import "LYHWSpeedMenuItem.h"
+#import "LYHWSpeedCellFactory.h"
+#import "LYHWSpeedAlert.h"
+#import "LYHWSpeedConfig.h"
 #import <objc/runtime.h>
 
-static NSString * const kCellID = @"WCRPluginCell";
+static NSString * const kCellID = @"LYHWPluginCell";
 
-static NSDictionary *WCRPage(NSString *title, NSArray *items) {
+static NSDictionary *LYHWPage(NSString *title, NSArray *items) {
     return @{ @"title": title, @"kind": @"page", @"items": items };
 }
 
-static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
+static NSDictionary *LYHWItem(NSString *title, NSString *key, NSString *kind,
                              double minValue, double maxValue) {
     return @{ @"title": title, @"key": key, @"kind": kind,
               @"min": @(minValue), @"max": @(maxValue) };
 }
 
-@interface WCRPluginSettingsViewController ()
+@interface LYHWPluginSettingsViewController ()
 @property (nonatomic, strong) NSArray<NSDictionary *> *sections;
 @property (nonatomic, copy) NSString *pageTitle;
 @end
 
-@implementation WCRPluginSettingsViewController
+@implementation LYHWPluginSettingsViewController
 
 - (instancetype)init {
     self = [super initWithStyle:UITableViewStyleInsetGrouped];
@@ -51,39 +51,39 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
 
     if (self.sections) return;
-    #define P(t, ...) WCRPage(t, @[__VA_ARGS__])
+    #define P(t, ...) LYHWPage(t, @[__VA_ARGS__])
     NSArray *pages = @[
-        P(@"微信主页", WCRItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
-                      WCRItem(@"全局卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
-                      WCRItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1),
-                      WCRItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
-                      WCRItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30),
-                      WCRItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 80),
-                      WCRItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40)),
-        P(@"通讯录页", WCRItem(@"卡片圆角", @"homepageCornerEnabled", @"bool", 0, 1)),
-        P(@"发现页", WCRItem(@"卡片圆角", @"discoverPageCornerEnabled", @"bool", 0, 1),
-                     WCRItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
-                     WCRItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30),
-                     WCRItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
-                     WCRItem(@"朋友圈卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
-                     WCRItem(@"朋友圈图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
-                     WCRItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
-                     WCRItem(@"朋友圈评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
-                     WCRItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
-        P(@"我的页面", WCRItem(@"卡片圆角", @"myPageCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
-                      WCRItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
-                      WCRItem(@"服务页圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
-                      WCRItem(@"服务页圆角半径", @"servicePageCornerRadius", @"num", 2, 40)),
-        P(@"微信设置页", WCRItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
-        P(@"资料页圆角", WCRItem(@"好友资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1),
-                       WCRItem(@"群聊资料页圆角", @"groupInfoCornerEnabled", @"bool", 0, 1)),
+        P(@"微信主页", LYHWItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
+                      LYHWItem(@"全局卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
+                      LYHWItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1),
+                      LYHWItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
+                      LYHWItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30),
+                      LYHWItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 80),
+                      LYHWItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40)),
+        P(@"通讯录页", LYHWItem(@"卡片圆角", @"homepageCornerEnabled", @"bool", 0, 1)),
+        P(@"发现页", LYHWItem(@"卡片圆角", @"discoverPageCornerEnabled", @"bool", 0, 1),
+                     LYHWItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
+                     LYHWItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30),
+                     LYHWItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
+                     LYHWItem(@"朋友圈卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
+                     LYHWItem(@"朋友圈图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
+                     LYHWItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
+                     LYHWItem(@"朋友圈评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
+                     LYHWItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
+        P(@"我的页面", LYHWItem(@"卡片圆角", @"myPageCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
+                      LYHWItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
+                      LYHWItem(@"服务页圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"服务页圆角半径", @"servicePageCornerRadius", @"num", 2, 40)),
+        P(@"微信设置页", LYHWItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
+        P(@"资料页圆角", LYHWItem(@"好友资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1),
+                       LYHWItem(@"群聊资料页圆角", @"groupInfoCornerEnabled", @"bool", 0, 1)),
         @{ @"title": @"自定义界面速度", @"kind": @"speed", @"key": @"editUiWindowsSpeed" },
     ];
     #undef P
@@ -122,23 +122,23 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 
 - (BOOL)boolValueForKey:(NSString *)key {
     id value = nil;
-    @try { value = [[WCRConfig shared] valueForKey:key]; } @catch (__unused id e) {}
-    if (!value) value = [[WCRConfig shared] objectForKey:key def:nil];
+    @try { value = [[LYHWConfig shared] valueForKey:key]; } @catch (__unused id e) {}
+    if (!value) value = [[LYHWConfig shared] objectForKey:key def:nil];
     return [value boolValue];
 }
 
 - (double)numberValueForKey:(NSString *)key item:(NSDictionary *)item {
     id value = nil;
-    @try { value = [[WCRConfig shared] valueForKey:key]; } @catch (__unused id e) {}
-    if (!value) value = [[WCRConfig shared] objectForKey:key def:nil];
+    @try { value = [[LYHWConfig shared] valueForKey:key]; } @catch (__unused id e) {}
+    if (!value) value = [[LYHWConfig shared] objectForKey:key def:nil];
     if (!value) return 0.0;
     double v = [value doubleValue];
     return MAX([item[@"min"] doubleValue], MIN([item[@"max"] doubleValue], v));
 }
 
 - (void)commitValue:(id)value forKey:(NSString *)key {
-    [[WCRConfig shared] setObject:value forKey:key];
-    [[NSNotificationCenter defaultCenter] postNotificationName:WCRSettingsChangedNotification
+    [[LYHWConfig shared] setObject:value forKey:key];
+    [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification
                                                         object:nil];
 }
 
@@ -188,8 +188,8 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
     cell.textLabel.text = item[@"title"];
 
     if ([item[@"kind"] isEqualToString:@"speed"]) {
-        HBSpeedMenuItem *speedItem = [HBSpeedMenuItem uiSpeedItem];
-        UITableViewCell *speedCell = [HBSpeedCellFactory cellForItem:speedItem target:self action:@selector(hb_speedCellTapped)];
+        LYHWSpeedMenuItem *speedItem = [LYHWSpeedMenuItem uiSpeedItem];
+        UITableViewCell *speedCell = [LYHWSpeedCellFactory cellForItem:speedItem target:self action:@selector(hb_speedCellTapped)];
         speedCell.textLabel.textColor = [UIColor labelColor];
         return speedCell;
     }
@@ -219,15 +219,15 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 
     NSDictionary *item = [self itemAtIndexPath:indexPath];
     if ([item[@"kind"] isEqualToString:@"page"]) {
-        WCRPluginSettingsViewController *sub = [[WCRPluginSettingsViewController alloc] init];
+        LYHWPluginSettingsViewController *sub = [[LYHWPluginSettingsViewController alloc] init];
         sub.pageTitle = item[@"title"];
         sub.sections = @[ @{ @"header": item[@"title"], @"items": item[@"items"] } ];
         [self.navigationController pushViewController:sub animated:YES];
         return;
     }
     if ([item[@"kind"] isEqualToString:@"speed"]) {
-        HBSpeedMenuItem *speedItem = [HBSpeedMenuItem uiSpeedItem];
-        [HBSpeedAlert showEditorFrom:self item:speedItem onChanged:^(__unused float v) { [self.tableView reloadData]; }];
+        LYHWSpeedMenuItem *speedItem = [LYHWSpeedMenuItem uiSpeedItem];
+        [LYHWSpeedAlert showEditorFrom:self item:speedItem onChanged:^(__unused float v) { [self.tableView reloadData]; }];
         return;
     }
     if ([item[@"kind"] isEqualToString:@"action"]) {
@@ -263,14 +263,14 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 
 - (void)hb_speedCellTapped {
     __weak typeof(self) ws = self;
-    [HBSpeedAlert showEditorFrom:self item:[HBSpeedMenuItem uiSpeedItem] onChanged:^(__unused float v) { [ws.tableView reloadData]; }];
+    [LYHWSpeedAlert showEditorFrom:self item:[LYHWSpeedMenuItem uiSpeedItem] onChanged:^(__unused float v) { [ws.tableView reloadData]; }];
 }
 
 - (void)hb_speedAlertConfirm:(id)sender {
     NSString *t = nil;
     @try { t = [sender valueForKey:@"textFieldText"]; } @catch (__unused id e) {}
-    HBSetUISpeed((float)t.floatValue);
-    [HBSpeedAlert showRestartPromptFrom:self item:[HBSpeedMenuItem uiSpeedItem]];
+    LYHWSetUISpeed((float)t.floatValue);
+    [LYHWSpeedAlert showRestartPromptFrom:self item:[LYHWSpeedMenuItem uiSpeedItem]];
 }
 
 - (void)toast:(NSString *)title msg:(NSString *)msg {
@@ -280,7 +280,7 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
 }
 
 - (void)exportConfig {
-    NSDictionary *d = [[WCRConfig shared] exportAll];
+    NSDictionary *d = [[LYHWConfig shared] exportAll];
     NSData *data = [NSJSONSerialization dataWithJSONObject:d options:NSJSONWritingPrettyPrinted error:nil];
     if (!data) { [self toast:@"导出失败" msg:@"配置无法序列化"]; return; }
     NSString *json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
@@ -307,8 +307,8 @@ static NSDictionary *WCRItem(NSString *title, NSString *key, NSString *kind,
         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [a addAction:[UIAlertAction actionWithTitle:@"导入" style:UIAlertActionStyleDefault handler:^(UIAlertAction *x) {
-        NSInteger n = [[WCRConfig shared] importAll:obj];
-        [[NSNotificationCenter defaultCenter] postNotificationName:WCRSettingsChangedNotification object:nil];
+        NSInteger n = [[LYHWConfig shared] importAll:obj];
+        [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification object:nil];
         [ws.tableView reloadData];
         [ws toast:@"导入完成" msg:[NSString stringWithFormat:@"已导入 %ld 项，重新进入页面后生效。", (long)n]];
     }]];

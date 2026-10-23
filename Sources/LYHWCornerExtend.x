@@ -1,5 +1,5 @@
 //
-//  WCRCornerExtend.x  —  圆角模块扩展（基于 LYHW 2.1-9 逆向分析补全）
+//  LYHWCornerExtend.x  —  圆角模块扩展（基于 LYHW 2.1-9 逆向分析补全）
 //
 //  新增 hook：
 //    MMSearchBar / UISearchBar（搜索框圆角）
@@ -17,14 +17,14 @@
 
 #import <objc/message.h>
 #import <objc/runtime.h>
-#import "WCRConfig.h"
-#import "WCRCommon.h"
+#import "LYHWConfig.h"
+#import "LYHWCommon.h"
 
 %config(generator=MobileSubstrate)
 
-static inline WCRConfig *WCRCfgEx(void) { return [WCRConfig shared]; }
+static inline LYHWConfig *LYHWCfgEx(void) { return [LYHWConfig shared]; }
 
-static void WCRTopRound(UIView *v, CGFloat r) {
+static void LYHWTopRound(UIView *v, CGFloat r) {
     if (!v) return;
     v.layer.cornerRadius = r;
     v.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
@@ -36,7 +36,7 @@ static void WCRTopRound(UIView *v, CGFloat r) {
 
 #pragma mark - MMSearchBar / UISearchBar (搜索框圆角)
 
-static UIImage *WCRSearchFieldImage(CGFloat r, UITraitCollection *tc) {
+static UIImage *LYHWSearchFieldImage(CGFloat r, UITraitCollection *tc) {
     BOOL dark = tc.userInterfaceStyle == UIUserInterfaceStyleDark;
     CGFloat h = 38, w = r * 2 + 2;
     UIGraphicsImageRenderer *rd = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(w, h)];
@@ -46,19 +46,19 @@ static UIImage *WCRSearchFieldImage(CGFloat r, UITraitCollection *tc) {
     }];
     return [img resizableImageWithCapInsets:UIEdgeInsetsMake(h / 2 - 1, r, h / 2 - 1, r)];
 }
-static void WCRApplySearchBarImage(UISearchBar *sb, CGFloat r) {
+static void LYHWApplySearchBarImage(UISearchBar *sb, CGFloat r) {
     NSString *sig = [NSString stringWithFormat:@"%.1f-%ld", r, (long)sb.traitCollection.userInterfaceStyle];
-    UIImage *mine = objc_getAssociatedObject(sb, @selector(WCRSearchFieldImage));
-    if ([objc_getAssociatedObject(sb, @selector(WCRApplySearchBarImage)) isEqual:sig] && mine &&
+    UIImage *mine = objc_getAssociatedObject(sb, @selector(LYHWSearchFieldImage));
+    if ([objc_getAssociatedObject(sb, @selector(LYHWApplySearchBarImage)) isEqual:sig] && mine &&
         [sb searchFieldBackgroundImageForState:UIControlStateNormal] == mine) return;
-    objc_setAssociatedObject(sb, @selector(WCRApplySearchBarImage), sig, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    mine = WCRSearchFieldImage(r, sb.traitCollection);
-    objc_setAssociatedObject(sb, @selector(WCRSearchFieldImage), mine, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(sb, @selector(LYHWApplySearchBarImage), sig, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    mine = LYHWSearchFieldImage(r, sb.traitCollection);
+    objc_setAssociatedObject(sb, @selector(LYHWSearchFieldImage), mine, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [sb setSearchFieldBackgroundImage:mine forState:UIControlStateNormal];
     [sb setBackgroundImage:[UIImage new]];
     if (@available(iOS 13.0, *)) sb.searchTextField.backgroundColor = [UIColor clearColor];
 }
-static void WCRRoundSearchBoxes(UIView *bar, UIView *v, CGFloat r, int depth) {
+static void LYHWRoundSearchBoxes(UIView *bar, UIView *v, CGFloat r, int depth) {
     if (depth > 7) return;
     CGFloat W = bar.bounds.size.width;
     for (UIView *sv in v.subviews) {
@@ -73,11 +73,11 @@ static void WCRRoundSearchBoxes(UIView *bar, UIView *v, CGFloat r, int depth) {
             if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
             sv.clipsToBounds = YES;
         }
-        WCRRoundSearchBoxes(bar, sv, r, depth + 1);
+        LYHWRoundSearchBoxes(bar, sv, r, depth + 1);
     }
 }
-static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
-    if (depth == 0) WCRRoundSearchBoxes(v, v, r, 0);
+static void LYHWRoundSearchFields(UIView *v, CGFloat r, int depth) {
+    if (depth == 0) LYHWRoundSearchBoxes(v, v, r, 0);
     if (depth > 6) return;
     for (UIView *sv in v.subviews) {
         if ([sv isKindOfClass:[UITextField class]]) {
@@ -90,7 +90,7 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
             }
             continue;
         }
-        WCRRoundSearchFields(sv, r, depth + 1);
+        LYHWRoundSearchFields(sv, r, depth + 1);
     }
 }
 
@@ -98,16 +98,16 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.searchCornerEnabled) return;
     
     double radius = cfg.searchCornerRadius;
     double borderSize = cfg.searchCornerBorderSize;
-    UIColor *borderColor = WCRColorForAppearance(cfg.searchCornerBorderColorLight,
+    UIColor *borderColor = LYHWColorForAppearance(cfg.searchCornerBorderColorLight,
                                                   cfg.searchCornerBorderColorDark);
     
     (void)borderSize; (void)borderColor;
-    WCRRoundSearchFields((UIView *)self, radius, 0);
+    LYHWRoundSearchFields((UIView *)self, radius, 0);
     
     // 边距调整（如果 layout 支持）
     if (cfg.searchCornerMargin > 0.01) {
@@ -131,20 +131,20 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
 %hook UISearchBar
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.searchCornerEnabled) return;
-    WCRApplySearchBarImage((UISearchBar *)self, cfg.searchCornerRadius);
-    WCRRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
+    LYHWApplySearchBarImage((UISearchBar *)self, cfg.searchCornerRadius);
+    LYHWRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
 }
 %end
 
 %hook MMUISearchBar
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.searchCornerEnabled) return;
-    if ([(id)self isKindOfClass:[UISearchBar class]]) WCRApplySearchBarImage((UISearchBar *)self, cfg.searchCornerRadius);
-    WCRRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
+    if ([(id)self isKindOfClass:[UISearchBar class]]) LYHWApplySearchBarImage((UISearchBar *)self, cfg.searchCornerRadius);
+    LYHWRoundSearchFields((UIView *)self, cfg.searchCornerRadius, 0);
 }
 %end
 
@@ -154,15 +154,15 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.inputCornerEnabled) return;
     
     double radius = cfg.inputCornerRadius;
     double borderSize = cfg.inputCornerBorderSize;
-    UIColor *borderColor = WCRColorForAppearance(cfg.inputCornerBorderColorLight,
+    UIColor *borderColor = LYHWColorForAppearance(cfg.inputCornerBorderColorLight,
                                                   cfg.inputCornerBorderColorDark);
     
-    WCRApplyCorner((UIView *)self, radius, borderSize, borderColor, YES);
+    LYHWApplyCorner((UIView *)self, radius, borderSize, borderColor, YES);
     
     // 透明度
     if (cfg.inputCornerBoxTransparencyEnabled) {
@@ -175,7 +175,7 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
 %hook MMInputToolView
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     UIView *me = (UIView *)self;
     UIView *tool = nil;
     @try { id t = [me valueForKey:@"toolView"]; if ([t isKindOfClass:[UIView class]]) tool = t; } @catch (__unused id e) {}
@@ -206,7 +206,7 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
     mine.hidden = NO;
     mine.frame = CGRectMake(0, 0, W, H + 80);
     mine.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.965 alpha:1]; }];
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor whiteColor]; }];
     mine.layer.cornerRadius = cfg.toolbarCornerRadius;
     mine.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     if (@available(iOS 13.0, *)) mine.layer.cornerCurve = kCACornerCurveContinuous;
@@ -217,14 +217,14 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.inputCornerEnabled) return;
     
     for (UIView *sub in ((UIView *)self).subviews) {
         if ([sub isKindOfClass:NSClassFromString(@"MMGrowTextView")] ||
             [[NSStringFromClass([sub class]) lowercaseString] containsString:@"textinput"]) {
-            WCRApplyCorner(sub, cfg.inputCornerRadius, cfg.inputCornerBorderSize,
-                          WCRColorForAppearance(cfg.inputCornerBorderColorLight,
+            LYHWApplyCorner(sub, cfg.inputCornerRadius, cfg.inputCornerBorderSize,
+                          LYHWColorForAppearance(cfg.inputCornerBorderColorLight,
                                                 cfg.inputCornerBorderColorDark), YES);
         }
     }
@@ -234,7 +234,7 @@ static void WCRRoundSearchFields(UIView *v, CGFloat r, int depth) {
 
 #pragma mark - 顶栏圆角（导航栏背景只圆下角）
 
-static UIView *WCRBarBackground(UIView *bar) {
+static UIView *LYHWBarBackground(UIView *bar) {
     for (UIView *sv in bar.subviews) {
         NSString *cn = NSStringFromClass([sv class]);
         if ([cn containsString:@"BarBackground"] || [cn containsString:@"BackgroundView"]) return sv;
@@ -242,9 +242,9 @@ static UIView *WCRBarBackground(UIView *bar) {
     return nil;
 }
 
-static UIColor *WCRBarFill(void) {
+static UIColor *LYHWBarFill(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor whiteColor]; }];
 }
 
 // 聊天页顶栏（MMUINavigationBar）的真实结构：
@@ -252,7 +252,7 @@ static UIColor *WCRBarFill(void) {
 //     _UIBarBackground   （frame y=-59，高103，clip=1，是顶栏底色层，背景 nil）
 //     _UINavigationBarContentView （按钮/标题，不能裁剪）
 // 只圆化 _UIBarBackground 这一层，并用它自己的底色填充，不动内容层。
-static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
+static void LYHWRoundCustomNavBar(UIView *bar, LYHWConfig *cfg) {
     if (!cfg.topbarCornerEnabled) return;
     CGFloat r = cfg.topbarCornerRadius;
     CACornerMask m = cfg.topbarCornerTopFlatEnabled
@@ -271,14 +271,14 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
 %hook MMUINavigationBar
 - (void)layoutSubviews {
     %orig;
-    WCRRoundCustomNavBar((UIView *)self, WCRCfgEx());
+    LYHWRoundCustomNavBar((UIView *)self, LYHWCfgEx());
 }
 %end
 
 %hook UINavigationBar
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     UIView *bar = (UIView *)self;
     if ([NSStringFromClass([bar class]) isEqualToString:@"MMUINavigationBar"]) {
         // 自绘顶栏（MMUINavigationBar）不再改动：此前的底色/圆角处理会产生多余的白色圆角块
@@ -287,7 +287,7 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
     UIView *mine = [bar viewWithTag:0x574E43];
     BOOL transparent = NO;
     if ([bar respondsToSelector:@selector(isTransparentNavBar)]) transparent = ((BOOL (*)(id, SEL))objc_msgSend)(bar, @selector(isTransparentNavBar));
-    UIView *bg = WCRBarBackground(bar);
+    UIView *bg = LYHWBarBackground(bar);
     BOOL bgOff = bg && bg.tag != 0x574E42 && (bg.hidden || bg.alpha < 0.05);
     if (!cfg.topbarCornerEnabled || transparent || bgOff) {
         mine.hidden = YES;
@@ -304,7 +304,7 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
     CGFloat y0 = -fr.origin.y;
     mine.hidden = NO;
     mine.frame = CGRectMake(0, y0, bar.bounds.size.width, bar.bounds.size.height - y0);
-    mine.backgroundColor = WCRBarFill();
+    mine.backgroundColor = LYHWBarFill();
     mine.layer.cornerRadius = cfg.topbarCornerRadius;
     mine.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
     if (@available(iOS 13.0, *)) mine.layer.cornerCurve = kCACornerCurveContinuous;
@@ -325,7 +325,7 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
                 CGFloat w = 0, a = 0;
                 UIColor *uc = u.backgroundColor;
                 if (uc && [uc getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) {
-                    u.backgroundColor = [UIColor colorWithWhite:0.93 alpha:1];
+                    u.backgroundColor = [UIColor whiteColor];
                     u.layer.backgroundColor = nil;
                 }
             }
@@ -341,23 +341,23 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
 %hook UITabBar
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.toolbarCornerEnabled) return;
-    UIView *bg = WCRBarBackground((UIView *)self);
-    if (bg) WCRTopRound(bg, cfg.toolbarCornerRadius);
+    UIView *bg = LYHWBarBackground((UIView *)self);
+    if (bg) LYHWTopRound(bg, cfg.toolbarCornerRadius);
 }
 %end
 
 %hook MMTabBar
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.toolbarCornerEnabled) return;
     UIView *me = (UIView *)self;
     UIView *bg = nil;
     if ([me respondsToSelector:@selector(backgroundView)]) bg = [me valueForKey:@"backgroundView"];
-    if (![bg isKindOfClass:[UIView class]]) bg = WCRBarBackground(me);
-    if (bg) { WCRTopRound(bg, cfg.toolbarCornerRadius); bg.userInteractionEnabled = NO; }
+    if (![bg isKindOfClass:[UIView class]]) bg = LYHWBarBackground(me);
+    if (bg) { LYHWTopRound(bg, cfg.toolbarCornerRadius); bg.userInteractionEnabled = NO; }
 }
 %end
 
@@ -367,15 +367,15 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
 
 - (void)showMenuFromView:(UIView *)targetView rect:(CGRect)targetRect {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.menuCornerEnabled) return;
     
     // 菜单视图通常是 UICalloutBar 或 _UIEditMenuListView
     @try {
         UIView *menuView = [self valueForKey:@"_menuView"];
         if (menuView) {
-            WCRApplyCorner(menuView, cfg.menuCornerRadius, cfg.menuCornerBorderSize,
-                          WCRColorForAppearance(cfg.menuCornerBorderColorLight,
+            LYHWApplyCorner(menuView, cfg.menuCornerRadius, cfg.menuCornerBorderSize,
+                          LYHWColorForAppearance(cfg.menuCornerBorderColorLight,
                                                 cfg.menuCornerBorderColorDark), YES);
         }
     } @catch (NSException *e) { /* ignore */ }
@@ -389,16 +389,16 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *cfg = WCRCfgEx();
+    LYHWConfig *cfg = LYHWCfgEx();
     if (!cfg.plusMenuCornerEnabled) return;
     
     double radius = cfg.plusMenuCornerRadius;
-    WCRApplyCorner((UIView *)self, radius, 0, nil, YES);
+    LYHWApplyCorner((UIView *)self, radius, 0, nil, YES);
     
     // 给内部按钮也套圆角
     for (UIView *sub in ((UIView *)self).subviews) {
         if ([sub isKindOfClass:[UIButton class]]) {
-            WCRApplyCorner(sub, radius * 0.6, 0, nil, YES);
+            LYHWApplyCorner(sub, radius * 0.6, 0, nil, YES);
         }
     }
 }
@@ -421,7 +421,7 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
 // 真实层级：MMMsgContentNavBar (0,0,393x98)
 //   UIView (0,0,393x98)  ← 灰色底 + UIVisualEffectView（这一层才是可见的顶栏底）
 // 只圆化这个底视图，不改 frame 和颜色，按钮/标题不动。
-static void WCRRoundMsgNavBar(UIView *nav, WCRConfig *cfg) {
+static void LYHWRoundMsgNavBar(UIView *nav, LYHWConfig *cfg) {
     if (!cfg.topbarCornerEnabled) return;
     CGFloat r = cfg.topbarCornerRadius;
     CACornerMask m = cfg.topbarCornerTopFlatEnabled
@@ -436,12 +436,20 @@ static void WCRRoundMsgNavBar(UIView *nav, WCRConfig *cfg) {
         if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
         sv.layer.masksToBounds = YES;
         sv.clipsToBounds = YES;
+        // 圆角面填纯白：毛玻璃层本身透明，给它的内容层铺白，模糊观感保留
+        for (UIView *inner in sv.subviews) {
+            NSString *cn = NSStringFromClass([inner class]);
+            if ([cn containsString:@"EffectSubview"] || [cn containsString:@"ContentView"]) {
+                inner.backgroundColor = [UIColor whiteColor];
+                inner.layer.backgroundColor = [UIColor whiteColor].CGColor;
+            }
+        }
     }
 }
 
 %hook MMMsgContentNavBar
 - (void)layoutSubviews {
     %orig;
-    WCRRoundMsgNavBar((UIView *)self, WCRCfgEx());
+    LYHWRoundMsgNavBar((UIView *)self, LYHWCfgEx());
 }
 %end

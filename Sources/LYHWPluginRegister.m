@@ -1,5 +1,5 @@
 //
-//  WCRPluginRegister.m
+//  LYHWPluginRegister.m
 //  LYHW
 //
 //  把微信内设置页注册进 wcplugins 的"插件收纳"。
@@ -14,12 +14,12 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-static const NSInteger WCRRegisterMaxAttempts = 60;
-static const NSTimeInterval WCRRegisterRetryDelay = 0.5;
-static BOOL WCRDidRegisterPluginEntry = NO;
+static const NSInteger LYHWRegisterMaxAttempts = 60;
+static const NSTimeInterval LYHWRegisterRetryDelay = 0.5;
+static BOOL LYHWDidRegisterPluginEntry = NO;
 
-static void WCRTryRegisterPluginEntry(NSInteger attempt) {
-    if (WCRDidRegisterPluginEntry) return;
+static void LYHWTryRegisterPluginEntry(NSInteger attempt) {
+    if (LYHWDidRegisterPluginEntry) return;
 
     Class mgrClass = NSClassFromString(@"WCPluginsMgr");
     if (mgrClass) {
@@ -39,13 +39,13 @@ static void WCRTryRegisterPluginEntry(NSInteger attempt) {
 
                 NSString *title = @"兰因后悟";
                 NSString *version = @"1.0.0";
-                NSString *controllerName = @"WCRPluginSettingsViewController";
+                NSString *controllerName = @"LYHWPluginSettingsViewController";
                 [inv setArgument:&title atIndex:2];
                 [inv setArgument:&version atIndex:3];
                 [inv setArgument:&controllerName atIndex:4];
                 [inv invoke];
 
-                WCRDidRegisterPluginEntry = YES;
+                LYHWDidRegisterPluginEntry = YES;
                 NSLog(@"[LYHW] registered into WCPluginsMgr");
             } @catch (NSException *e) {
                 NSLog(@"[LYHW] register failed: %@", e);
@@ -53,21 +53,21 @@ static void WCRTryRegisterPluginEntry(NSInteger attempt) {
         }
     }
 
-    if (WCRDidRegisterPluginEntry) return;
-    if (attempt >= WCRRegisterMaxAttempts) {
+    if (LYHWDidRegisterPluginEntry) return;
+    if (attempt >= LYHWRegisterMaxAttempts) {
         NSLog(@"[LYHW] WCPluginsMgr not available, plugin entry not registered");
         return;
     }
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(WCRRegisterRetryDelay * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(LYHWRegisterRetryDelay * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        WCRTryRegisterPluginEntry(attempt + 1);
+        LYHWTryRegisterPluginEntry(attempt + 1);
     });
 }
 
 __attribute__((constructor))
-static void WCRPluginRegisterEntry(void) {
+static void LYHWPluginRegisterEntry(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        WCRTryRegisterPluginEntry(0);
+        LYHWTryRegisterPluginEntry(0);
     });
 }

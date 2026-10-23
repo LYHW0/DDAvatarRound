@@ -1,11 +1,11 @@
 //
-//  HBSpeedMenuItem.h
+//  LYHWSpeedMenuItem.h
 //  自定义界面速度 —— 菜单项数据表（与原插件二进制里的文案逐字对齐）
 //
 
 #import <Foundation/Foundation.h>
 
-@interface HBSpeedMenuItem : NSObject
+@interface LYHWSpeedMenuItem : NSObject
 
 /// 行标题（原二进制：自定义界面速度:）
 @property (nonatomic, copy) NSString *title;

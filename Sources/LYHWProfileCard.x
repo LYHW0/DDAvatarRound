@@ -1,5 +1,5 @@
 //
-//  WCRProfileCard.x  —  模块二：资料卡美化（联系人资料页 / 名片页）
+//  LYHWProfileCard.x  —  模块二：资料卡美化（联系人资料页 / 名片页）
 //
 //  原版 hook 点：
 //    ContactInfoViewController(viewDidLoad / viewWillAppear: / viewDidLayoutSubviews)
@@ -10,15 +10,15 @@
 //  昵称与签名配色、微信号默认隐藏。
 //
 
-#import "WCRConfig.h"
-#import "WCRCommon.h"
+#import "LYHWConfig.h"
+#import "LYHWCommon.h"
 
-static inline WCRConfig *WCRPCfg(void) { return [WCRConfig shared]; }
+static inline LYHWConfig *LYHWPCfg(void) { return [LYHWConfig shared]; }
 
 static const NSInteger kWCRProfileBackgroundTag = 0x57524350; // "WRCP"
 
-static CGFloat WCRProfileCornerRadius(void) {
-    WCRConfig *cfg = WCRPCfg();
+static CGFloat LYHWProfileCornerRadius(void) {
+    LYHWConfig *cfg = LYHWPCfg();
     if (cfg.profileFollowGlobalCornerEnabled) {
         return cfg.globalCornerRadius;
     }
@@ -26,15 +26,15 @@ static CGFloat WCRProfileCornerRadius(void) {
 }
 
 /// 给资料卡铺背景（图片优先，其次纯色）
-static void WCRApplyProfileBackground(UIViewController *vc) {
+static void LYHWApplyProfileBackground(UIViewController *vc) {
     if (!vc || !vc.isViewLoaded) return;
-    WCRConfig *cfg = WCRPCfg();
+    LYHWConfig *cfg = LYHWPCfg();
     if (!cfg.profileCardBeautifyEnabled) return;
 
     UIView *root = vc.view;
 
     // 纯色背景
-    root.backgroundColor = WCRColorForAppearance(cfg.profileCardBackgroundLightColor,
+    root.backgroundColor = LYHWColorForAppearance(cfg.profileCardBackgroundLightColor,
                                                  cfg.profileCardBackgroundDarkColor);
 
     // 背景图
@@ -58,12 +58,12 @@ static void WCRApplyProfileBackground(UIViewController *vc) {
 }
 
 /// 给资料卡里的"卡片"上圆角
-static void WCRApplyProfileCardCorner(UIViewController *vc) {
+static void LYHWApplyProfileCardCorner(UIViewController *vc) {
     if (!vc || !vc.isViewLoaded) return;
-    WCRConfig *cfg = WCRPCfg();
+    LYHWConfig *cfg = LYHWPCfg();
     if (!cfg.profileCornerEnabled || YES) return;
 
-    CGFloat radius = WCRProfileCornerRadius();
+    CGFloat radius = LYHWProfileCornerRadius();
     UIView *root = vc.view;
 
     // 资料页主体是一个 UITableView（或包了一层容器），逐个裁圆角
@@ -75,23 +75,23 @@ static void WCRApplyProfileCardCorner(UIViewController *vc) {
 
             for (UIView *cell in table.subviews) {
                 if ([NSStringFromClass([cell class]) containsString:@"Cell"]) {
-                    WCRApplyCorner(((UITableViewCell *)cell).contentView, radius, 0, nil, YES);
+                    LYHWApplyCorner(((UITableViewCell *)cell).contentView, radius, 0, nil, YES);
                 }
             }
         } else if ([NSStringFromClass([sub class]) containsString:@"Header"]) {
-            WCRApplyCorner(sub, radius, 0, nil, YES);
+            LYHWApplyCorner(sub, radius, 0, nil, YES);
         }
     }
 }
 
 /// 昵称 / 签名配色
-static void WCRApplyProfileColors(UIViewController *vc) {
+static void LYHWApplyProfileColors(UIViewController *vc) {
     if (!vc || !vc.isViewLoaded) return;
-    WCRConfig *cfg = WCRPCfg();
+    LYHWConfig *cfg = LYHWPCfg();
     if (!cfg.profileCardBeautifyEnabled) return;
 
-    UIColor *nameColor = WCRColorForAppearance(cfg.profileCardNameLightColor, cfg.profileCardNameDarkColor);
-    UIColor *signColor = WCRColorForAppearance(cfg.profileCardSignatureLightColor, cfg.profileCardSignatureDarkColor);
+    UIColor *nameColor = LYHWColorForAppearance(cfg.profileCardNameLightColor, cfg.profileCardNameDarkColor);
+    UIColor *signColor = LYHWColorForAppearance(cfg.profileCardSignatureLightColor, cfg.profileCardSignatureDarkColor);
 
     __block void (^walk)(UIView *);
     __weak __typeof__(walk) weakWalk = nil;
@@ -124,20 +124,20 @@ static void WCRApplyProfileColors(UIViewController *vc) {
 - (void)viewDidLoad {
     %orig;
     UIViewController *controller = (UIViewController *)self;
-    WCRApplyProfileBackground(controller);
-    WCRApplyProfileCardCorner(controller);
-    WCRApplyProfileColors(controller);
+    LYHWApplyProfileBackground(controller);
+    LYHWApplyProfileCardCorner(controller);
+    LYHWApplyProfileColors(controller);
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    WCRApplyProfileBackground((UIViewController *)self);
+    LYHWApplyProfileBackground((UIViewController *)self);
 }
 
 - (void)viewDidLayoutSubviews {
     %orig;
-    WCRApplyProfileBackground((UIViewController *)self);
-    WCRApplyProfileCardCorner((UIViewController *)self);
+    LYHWApplyProfileBackground((UIViewController *)self);
+    LYHWApplyProfileCardCorner((UIViewController *)self);
 }
 
 %end

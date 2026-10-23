@@ -1,12 +1,12 @@
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
-#import "WCRConfig.h"
-#import "WCRCommon.h"
+#import "LYHWConfig.h"
+#import "LYHWCommon.h"
 
-static inline WCRConfig *WCRCCfg(void) { return [WCRConfig shared]; }
+static inline LYHWConfig *LYHWCCfg(void) { return [LYHWConfig shared]; }
 
-static UIColor *WCRListGray(void) {
+static UIColor *LYHWListGray(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark
             ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1];
@@ -14,15 +14,15 @@ static UIColor *WCRListGray(void) {
 }
 
 
-static BOOL WCRAnyCardOn(void) {
-    WCRConfig *c = WCRCCfg();
+static BOOL LYHWAnyCardOn(void) {
+    LYHWConfig *c = LYHWCCfg();
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
            c.discoverPageCornerEnabled || c.myPageCornerEnabled || c.settingPageCornerEnabled ||
            c.timelineCornerEnabled || c.profilePageCornerEnabled ||
            c.servicePageCornerEnabled || c.groupInfoCornerEnabled;
 }
 
-static BOOL WCRClassExcluded(NSString *cls) {
+static BOOL LYHWClassExcluded(NSString *cls) {
     NSArray *bad = @[@"Input", @"Keyboard", @"SearchBar", @"Emoticon", @"Alert"];
     for (NSString *b in bad) {
         if ([cls rangeOfString:b options:NSCaseInsensitiveSearch].location != NSNotFound) return YES;
@@ -30,15 +30,15 @@ static BOOL WCRClassExcluded(NSString *cls) {
     return NO;
 }
 
-static UIColor *WCRCardFill(void) {
-    WCRConfig *c = WCRCCfg();
-    UIColor *u = WCRColorForAppearance(c.globalCornerBackgroundColorLight,
+static UIColor *LYHWCardFill(void) {
+    LYHWConfig *c = LYHWCCfg();
+    UIColor *u = LYHWColorForAppearance(c.globalCornerBackgroundColorLight,
                                        c.globalCornerBackgroundColorDark);
     if (!u) return [UIColor secondarySystemBackgroundColor];
     return u;
 }
 
-static BOOL WCRInChatPage(UIView *v) {
+static BOOL LYHWInChatPage(UIView *v) {
     UIResponder *r = v;
     while (r) {
         if ([r isKindOfClass:[UIViewController class]]) {
@@ -52,7 +52,7 @@ static BOOL WCRInChatPage(UIView *v) {
     return NO;
 }
 
-static void WCRHideLines(UITableViewCell *cell) {
+static void LYHWHideLines(UITableViewCell *cell) {
     // 只隐藏确认是分割线的视图：精确 UIView/名字含 Line/Separator，无子视图，且已完成布局
     NSArray *hosts = @[cell, cell.contentView];
     for (UIView *host in hosts)
@@ -68,7 +68,7 @@ static void WCRHideLines(UITableViewCell *cell) {
         }
 }
 
-static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 0其他
+static NSInteger LYHWPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 0其他
     for (UIResponder *r = v; r; r = r.nextResponder) {
         if (![r isKindOfClass:[UIViewController class]]) continue;
         NSString *n = NSStringFromClass([r class]);
@@ -86,32 +86,32 @@ static NSInteger WCRPageKind(UIView *v) { // 1主列表 2通讯录 3我 4发现 
     return 0;
 }
 
-static void WCRRoundMedia(UIView *root, UIView *v) {
+static void LYHWRoundMedia(UIView *root, UIView *v) {
     for (UIView *sv in v.subviews) {
         NSString *cn = NSStringFromClass([sv class]);
         CGSize z = sv.bounds.size;
         BOOL media = [cn rangeOfString:@"WebImageView"].location != NSNotFound || [cn rangeOfString:@"SightView"].location != NSNotFound ||
                      [cn rangeOfString:@"MediaItem"].location != NSNotFound || [cn rangeOfString:@"ImageView"].location != NSNotFound || [sv isKindOfClass:[UIImageView class]];
         if (media && z.width >= 60 && z.height >= 60 && z.width < root.bounds.size.width - 40 && sv.layer.cornerRadius < 1) {
-            sv.layer.cornerRadius = WCRCCfg().timelineMediaCornerRadius; sv.layer.masksToBounds = YES; sv.clipsToBounds = YES;
+            sv.layer.cornerRadius = LYHWCCfg().timelineMediaCornerRadius; sv.layer.masksToBounds = YES; sv.clipsToBounds = YES;
             if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
             continue;
         }
         if (media) continue;
-        WCRRoundMedia(root, sv);
+        LYHWRoundMedia(root, sv);
     }
 }
 // 给内容层套一个与卡片形状完全一致的裁剪遮罩，
 // 这样卡片圆角之外不可能再露出任何直角白块。
-static void WCRClipToCard(UITableViewCell *cell, UIView *card) {
+static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
     if (!cell || !card) return;
     CALayer *host = cell.contentView.layer;
     CAShapeLayer *mask = nil;
     if ([host.mask isKindOfClass:[CAShapeLayer class]] &&
-        [host.mask.name isEqualToString:@"WCRClipMask"]) mask = (CAShapeLayer *)host.mask;
+        [host.mask.name isEqualToString:@"LYHWClipMask"]) mask = (CAShapeLayer *)host.mask;
     if (!mask) {
         mask = [CAShapeLayer layer];
-        mask.name = @"WCRClipMask";
+        mask.name = @"LYHWClipMask";
         host.mask = mask;
     }
     CGRect r = [cell convertRect:card.frame fromView:card.superview];
@@ -138,8 +138,8 @@ static void WCRClipToCard(UITableViewCell *cell, UIView *card) {
     CALayer *bgHost = card.layer;
     CAShapeLayer *bgMask = nil;
     if ([bgHost.mask isKindOfClass:[CAShapeLayer class]] &&
-        [bgHost.mask.name isEqualToString:@"WCRBgMask"]) bgMask = (CAShapeLayer *)bgHost.mask;
-    if (!bgMask) { bgMask = [CAShapeLayer layer]; bgMask.name = @"WCRBgMask"; bgHost.mask = bgMask; }
+        [bgHost.mask.name isEqualToString:@"LYHWBgMask"]) bgMask = (CAShapeLayer *)bgHost.mask;
+    if (!bgMask) { bgMask = [CAShapeLayer layer]; bgMask.name = @"LYHWBgMask"; bgHost.mask = bgMask; }
     bgMask.frame = bgHost.bounds;
     CGRect local = card.bounds;
     UIBezierPath *lp = nil;
@@ -156,18 +156,18 @@ static void WCRClipToCard(UITableViewCell *cell, UIView *card) {
     [CATransaction commit];
 }
 
-static void WCRStyleCellCard(UITableViewCell *cell) {
+static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
-    if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
+    if (LYHWClassExcluded(NSStringFromClass([cell class]))) return;
     UITableView *tv = nil;
     for (UIView *v = cell.superview; v; v = v.superview)
         if ([v isKindOfClass:[UITableView class]]) { tv = (UITableView *)v; break; }
-    if (!tv || WCRInChatPage(tv)) return;
+    if (!tv || LYHWInChatPage(tv)) return;
     NSIndexPath *ip = [tv indexPathForCell:cell];
     if (!ip) return;
 
-    WCRConfig *c = WCRCCfg();
-    NSInteger kind = WCRPageKind(tv);
+    LYHWConfig *c = LYHWCCfg();
+    NSInteger kind = LYHWPageKind(tv);
     if (kind == 0) return;
     BOOL profileLike = (kind == 7 || kind == 9);
     if (kind == 9) { if (!c.groupInfoCornerEnabled) return; kind = 6; }
@@ -209,7 +209,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     BOOL isLastRow = (ip.section == secLast && ip.row >= lr);
 
     // 列表底色：浅灰，卡片为白
-    UIColor *bg = WCRListGray();
+    UIColor *bg = LYHWListGray();
     tv.backgroundColor = bg;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
     tv.sectionIndexBackgroundColor = [UIColor clearColor];
@@ -233,7 +233,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }
     // 同组整块：上下不留缝，只有首尾行有圆角
     card.frame = CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height);
-    card.backgroundColor = WCRCardFill();
+    card.backgroundColor = LYHWCardFill();
     if (kind == 1 && !timeline) {
         card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
             return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
@@ -284,8 +284,8 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         if (@available(iOS 13.0, *)) sel.layer.cornerCurve = kCACornerCurveContinuous;
         cell.multipleSelectionBackgroundView = nil;
     }
-    WCRHideLines(cell);
-    if (!timeline) WCRClipToCard(cell, card);
+    LYHWHideLines(cell);
+    if (!timeline) LYHWClipToCard(cell, card);
     if (profileLike) {
         // 群聊页真实层级：cell 里有整屏宽（393）的白色视图（非卡片宿主 0x574352），
         // 它的直角会从卡片圆角外露出。这里把它们统一清透明，只保留卡片宿主。
@@ -329,7 +329,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         }
     }
     if (timeline) {
-        if (c.timelineMediaCornerEnabled) WCRRoundMedia(cell, cell);
+        if (c.timelineMediaCornerEnabled) LYHWRoundMedia(cell, cell);
         CGFloat cw = cell.bounds.size.width;
         NSMutableArray *st = [NSMutableArray arrayWithObject:cell.contentView];
         while (st.count) {
@@ -347,12 +347,12 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     }
     card.layer.shadowOpacity = 0;
     card.layer.shadowPath = NULL;
-    for (CALayer *l in [card.layer.sublayers copy]) if ([l.name isEqualToString:@"WCRShadow"]) [l removeFromSuperlayer];
+    for (CALayer *l in [card.layer.sublayers copy]) if ([l.name isEqualToString:@"LYHWShadow"]) [l removeFromSuperlayer];
     {
         double strength = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
         if (strength > 0) {
-            NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(WCRGroupInfo));
-            if (!gi) { gi = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(WCRGroupInfo), gi, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+            NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(LYHWGroupInfo));
+            if (!gi) { gi = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(LYHWGroupInfo), gi, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
             NSInteger frow = (secFirst == ip.section) ? fr : 0;
             NSInteger lrow = (secLast == ip.section) ? lr : MAX(0, [tv numberOfRowsInSection:secLast] - 1);
             gi[@(secFirst)] = @[@(secFirst), @(frow), @(secLast), @(lrow), @(margin), @(radius), @(timeline ? 6.0 : 0.0), @(strength)];
@@ -362,11 +362,11 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
 
 
 
-static void WCRUpdateGroupShadows(UITableView *tv) {
-    NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(WCRGroupInfo));
-    NSMutableDictionary *pool = objc_getAssociatedObject(tv, @selector(WCRShadowPool));
+static void LYHWUpdateGroupShadows(UITableView *tv) {
+    NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(LYHWGroupInfo));
+    NSMutableDictionary *pool = objc_getAssociatedObject(tv, @selector(LYHWShadowPool));
     if (!gi.count && !pool.count) return;
-    if (!pool) { pool = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(WCRShadowPool), pool, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+    if (!pool) { pool = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(LYHWShadowPool), pool, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
     NSInteger ns = tv.numberOfSections;
     NSMutableSet *used = [NSMutableSet set];
     [CATransaction begin]; [CATransaction setDisableActions:YES];
@@ -408,19 +408,19 @@ static void WCRUpdateGroupShadows(UITableView *tv) {
 %hook UITableViewCell
 - (void)layoutSubviews {
     %orig;
-    if (!WCRAnyCardOn()) return;
-    WCRStyleCellCard((UITableViewCell *)self);
+    if (!LYHWAnyCardOn()) return;
+    LYHWStyleCellCard((UITableViewCell *)self);
 }
 %end
 
 %hook UICollectionViewCell
 - (void)layoutSubviews {
     %orig;
-    if (!WCRAnyCardOn()) return;
+    if (!LYHWAnyCardOn()) return;
     UICollectionViewCell *cell = (UICollectionViewCell *)self;
     NSString *cls = NSStringFromClass([cell class]);
-    if (WCRClassExcluded(cls) || WCRInChatPage(cell) || WCRPageKind(cell) != 4) return;
-    WCRConfig *c = WCRCCfg();
+    if (LYHWClassExcluded(cls) || LYHWInChatPage(cell) || LYHWPageKind(cell) != 4) return;
+    LYHWConfig *c = LYHWCCfg();
     CGFloat radius = c.globalCornerRadius > 0 ? c.globalCornerRadius : 12.0;
     cell.contentView.layer.cornerRadius = radius;
     cell.contentView.layer.masksToBounds = YES;
@@ -428,14 +428,14 @@ static void WCRUpdateGroupShadows(UITableView *tv) {
 }
 %end
 
-static void WCRPlace(UIView *v, UIView *h, CGFloat tx, CGFloat ty) {
+static void LYHWPlace(UIView *v, UIView *h, CGFloat tx, CGFloat ty) {
     v.transform = CGAffineTransformIdentity;
     CGRect f = [v.superview convertRect:v.frame toView:h];
     v.transform = CGAffineTransformMakeTranslation(tx - CGRectGetMidX(f), ty - CGRectGetMidY(f));
 }
 
 static CGFloat stopW = 0;
-static void WCRClearBg(UIView *v, UIView *stop) {
+static void LYHWClearBg(UIView *v, UIView *stop) {
     for (UIView *sv in v.subviews) {
         if (sv == stop || sv.tag == 0x574354 || sv.tag == 0x574355) continue;
         CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
@@ -450,28 +450,28 @@ static void WCRClearBg(UIView *v, UIView *stop) {
             CGFloat w = 0, a = 0;
             UIColor *c0 = sv.backgroundColor;
             if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) {
-                sv.backgroundColor = WCRListGray();
+                sv.backgroundColor = LYHWListGray();
                 sv.layer.backgroundColor = nil;
             }
         }
         if (sv.subviews.count > 0 && sv.bounds.size.height > 40) sv.backgroundColor = [UIColor clearColor];
-        WCRClearBg(sv, stop);
+        LYHWClearBg(sv, stop);
     }
 }
 
-static void WCRFlatWhite(UIView *v, UIColor *c, CGFloat W) {
+static void LYHWFlatWhite(UIView *v, UIColor *c, CGFloat W) {
     for (UIView *sv in v.subviews) {
         if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIButton class]]) continue;
         if (sv.bounds.size.width >= W * 0.85 && sv.bounds.size.height >= 60) {
             sv.backgroundColor = c; sv.layer.cornerRadius = 0; sv.layer.backgroundColor = c.CGColor;
         }
-        WCRFlatWhite(sv, c, W);
+        LYHWFlatWhite(sv, c, W);
     }
 }
 // 只把列表自身及其父视图、头部容器的底色刷成列表灰，
 // 不碰卡片、不碰 cell 内部的任何视图，避免把卡片本身清成透明/灰色。
-static void WCRPaintListSurface(UITableView *tv, UIView *header) {
-    UIColor *bg = WCRListGray();
+static void LYHWPaintListSurface(UITableView *tv, UIView *header) {
+    UIColor *bg = LYHWListGray();
     tv.backgroundColor = bg;
     tv.backgroundView = nil;
     if (header) header.backgroundColor = bg;
@@ -487,7 +487,7 @@ static void WCRPaintListSurface(UITableView *tv, UIView *header) {
 
 // 头部里比卡片更宽的白色底块（原生整宽底）会从卡片圆角外露出直角，
 // 只清这类视图，绝不碰卡片自身。
-static void WCRClearWiderWhite(UIView *v, CGFloat cardW, UIView *card, int depth) {
+static void LYHWClearWiderWhite(UIView *v, CGFloat cardW, UIView *card, int depth) {
     if (depth > 6) return;
     for (UIView *sv in v.subviews) {
         if (sv == card || [sv isDescendantOfView:card]) continue;
@@ -502,11 +502,11 @@ static void WCRClearWiderWhite(UIView *v, CGFloat cardW, UIView *card, int depth
             }
         }
         if (![sv isKindOfClass:[UILabel class]] && ![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UIButton class]])
-            WCRClearWiderWhite(sv, cardW, card, depth + 1);
+            LYHWClearWiderWhite(sv, cardW, card, depth + 1);
     }
 }
 
-static void WCRStyleInfoHeader(UITableView *tv) {
+static void LYHWStyleInfoHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100 || h.bounds.size.height < 60) return;
     CGFloat W = h.bounds.size.width, H = h.bounds.size.height;
@@ -517,18 +517,18 @@ static void WCRStyleInfoHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-    double st = WCRCCfg().cardShadowEnabled ? WCRCCfg().cardShadowStrength : 0;
+    double st = LYHWCCfg().cardShadowEnabled ? LYHWCCfg().cardShadowStrength : 0;
     card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
     card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
     card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
-    WCRClearBg(h, card);
-    WCRClearWiderWhite(h, card.bounds.size.width, card, 0);
-    WCRPaintListSurface(tv, h);
+    LYHWClearBg(h, card);
+    LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
+    LYHWPaintListSurface(tv, h);
 }
 
-static void WCRStyleMyHeader(UITableView *tv) {
+static void LYHWStyleMyHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100) return;
     CGFloat W = h.bounds.size.width;
@@ -559,20 +559,20 @@ static void WCRStyleMyHeader(UITableView *tv) {
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     {
-        double st = WCRCCfg().cardShadowEnabled ? WCRCCfg().cardShadowStrength : 0;
+        double st = LYHWCCfg().cardShadowEnabled ? LYHWCCfg().cardShadowStrength : 0;
         card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
         card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
         card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
     }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
-    WCRClearBg(h, card);
-    WCRClearWiderWhite(h, card.bounds.size.width, card, 0);
-    WCRPaintListSurface(tv, h);
+    LYHWClearBg(h, card);
+    LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
+    LYHWPaintListSurface(tv, h);
     name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
-    WCRPlace(avatar, h, W / 2, cardTop + 62);
-    WCRPlace(name, h, W / 2, cardTop + 128);
-    WCRPlace(wid, h, W / 2, cardTop + 163);
+    LYHWPlace(avatar, h, W / 2, cardTop + 62);
+    LYHWPlace(name, h, W / 2, cardTop + 128);
+    LYHWPlace(wid, h, W / 2, cardTop + 163);
     if (status) {
         UIView *circle = nil;
         NSMutableArray *st2 = [NSMutableArray arrayWithObject:h];
@@ -588,16 +588,16 @@ static void WCRStyleMyHeader(UITableView *tv) {
         CGFloat pw = status.bounds.size.width, cw = circle ? circle.bounds.size.width : 0, gap = 8;
         CGFloat total = pw + (circle ? gap + cw : 0);
         if (circle) {
-            WCRPlace(circle, h, W / 2 - total / 2 + cw / 2, cardTop + 200);
-            WCRPlace(status, h, W / 2 + total / 2 - pw / 2, cardTop + 200);
-        } else WCRPlace(status, h, W / 2, cardTop + 200);
+            LYHWPlace(circle, h, W / 2 - total / 2 + cw / 2, cardTop + 200);
+            LYHWPlace(status, h, W / 2 + total / 2 - pw / 2, cardTop + 200);
+        } else LYHWPlace(status, h, W / 2, cardTop + 200);
     }
     if (fabs(h.bounds.size.height - (cardTop + cardH)) > 0.5) {
         CGRect hf = h.frame; hf.size.height = cardTop + cardH; h.frame = hf; tv.tableHeaderView = h;
     }
 }
 
-static void WCRRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
+static void LYHWRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
     if (depth > 8) return;
     for (UIView *sv in v.subviews) {
         CGSize z = sv.bounds.size;
@@ -610,21 +610,21 @@ static void WCRRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
                 sv.clipsToBounds = YES;
             }
         }
-        WCRRoundHeaderSearch(sv, W, r, depth + 1);
+        LYHWRoundHeaderSearch(sv, W, r, depth + 1);
     }
 }
 
 %hook UITableView
 - (void)layoutSubviews {
     %orig;
-    if (WCRCCfg().searchCornerEnabled) {
-        NSInteger pk = WCRPageKind(self);
+    if (LYHWCCfg().searchCornerEnabled) {
+        NSInteger pk = LYHWPageKind(self);
         UIView *th = [(UITableView *)self tableHeaderView];
-        if ((pk == 1 || pk == 2) && th) WCRRoundHeaderSearch(th, ((UIView *)self).bounds.size.width, WCRCCfg().searchCornerRadius, 0);
+        if ((pk == 1 || pk == 2) && th) LYHWRoundHeaderSearch(th, ((UIView *)self).bounds.size.width, LYHWCCfg().searchCornerRadius, 0);
     }
-    if (!WCRAnyCardOn()) return;
-    if (WCRCCfg().myPageCornerEnabled && WCRPageKind(self) == 3) {
-        WCRStyleMyHeader((UITableView *)self);
+    if (!LYHWAnyCardOn()) return;
+    if (LYHWCCfg().myPageCornerEnabled && LYHWPageKind(self) == 3) {
+        LYHWStyleMyHeader((UITableView *)self);
         UITableView *mtv = (UITableView *)self;
         mtv.alwaysBounceVertical = NO;
         {
@@ -643,26 +643,26 @@ static void WCRRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
         }
         if (mtv.tableFooterView && mtv.tableFooterView.bounds.size.height > 1) { UIView *f = [UIView new]; f.frame = CGRectMake(0, 0, 1, 0.01); mtv.tableFooterView = f; }
     }
-    else if ((WCRCCfg().profilePageCornerEnabled && WCRPageKind(self) == 7) || (WCRCCfg().groupInfoCornerEnabled && WCRPageKind(self) == 9)) WCRStyleInfoHeader((UITableView *)self);
-    [objc_getAssociatedObject(self, @selector(WCRGroupInfo)) removeAllObjects];
-    for (UITableViewCell *cell in [(UITableView *)self visibleCells]) WCRStyleCellCard(cell);
-    WCRUpdateGroupShadows((UITableView *)self);
+    else if ((LYHWCCfg().profilePageCornerEnabled && LYHWPageKind(self) == 7) || (LYHWCCfg().groupInfoCornerEnabled && LYHWPageKind(self) == 9)) LYHWStyleInfoHeader((UITableView *)self);
+    [objc_getAssociatedObject(self, @selector(LYHWGroupInfo)) removeAllObjects];
+    for (UITableViewCell *cell in [(UITableView *)self visibleCells]) LYHWStyleCellCard(cell);
+    LYHWUpdateGroupShadows((UITableView *)self);
 }
 %end
 
-static void WCRClearTree(UIView *v) {
+static void LYHWClearTree(UIView *v) {
     v.backgroundColor = [UIColor clearColor];
-    for (UIView *sv in v.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) WCRClearTree(sv);
+    for (UIView *sv in v.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) LYHWClearTree(sv);
 }
 %hook ChatFoldCellView
 - (void)layoutSubviews {
     %orig;
-    if (WCRCCfg().mainFrameCornerEnabled) WCRClearTree((UIView *)self);
+    if (LYHWCCfg().mainFrameCornerEnabled) LYHWClearTree((UIView *)self);
 }
 %end
 
 
-static BOOL WCRIsWhiteish(UIColor *c) {
+static BOOL LYHWIsWhiteish(UIColor *c) {
     CGFloat w = 0, a = 0;
     if (!c) return YES;
     if ([c getWhite:&w alpha:&a]) return a < 0.05 || w > 0.985;
@@ -673,7 +673,7 @@ static BOOL WCRIsWhiteish(UIColor *c) {
 %hook WCTimeLineCommentCellView
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *c = WCRCCfg();
+    LYHWConfig *c = LYHWCCfg();
     if (!c.timelineCommentCornerEnabled) return;
     UIView *me = (UIView *)self;
     UIView *box = nil;
@@ -684,12 +684,12 @@ static BOOL WCRIsWhiteish(UIColor *c) {
         for (UIView *sv in v.subviews) {
             if ([sv isKindOfClass:[UILabel class]] || sv.hidden) continue;
             CGSize z = sv.bounds.size;
-            BOOL filled = !WCRIsWhiteish(sv.backgroundColor) || ([sv isKindOfClass:[UIImageView class]] && ((UIImageView *)sv).image);
+            BOOL filled = !LYHWIsWhiteish(sv.backgroundColor) || ([sv isKindOfClass:[UIImageView class]] && ((UIImageView *)sv).image);
             if (filled && z.width >= W * 0.6 && z.height >= 16 && z.width * z.height > best) { best = z.width * z.height; box = sv; }
             if (z.width >= W * 0.6) [st addObject:sv];
         }
     }
-    if (!box && !WCRIsWhiteish(me.backgroundColor)) box = me;
+    if (!box && !LYHWIsWhiteish(me.backgroundColor)) box = me;
     if (!box) return;
     BOOL top = YES, bot = YES;
     if ([me respondsToSelector:@selector(needTopRoundCorner)]) top = ((BOOL (*)(id, SEL))objc_msgSend)(me, @selector(needTopRoundCorner));
@@ -706,12 +706,12 @@ static BOOL WCRIsWhiteish(UIColor *c) {
 
 
 #pragma mark - 服务页（WCPayMainViewControllerV2）
-static BOOL WCRInService(UIView *v) {
+static BOOL LYHWInService(UIView *v) {
     for (UIResponder *r = v; r; r = r.nextResponder)
         if ([r isKindOfClass:[UIViewController class]]) return [NSStringFromClass([r class]) isEqualToString:@"WCPayMainViewControllerV2"];
     return NO;
 }
-static void WCRRoundCard(UIView *v, CGFloat r) {
+static void LYHWRoundCard(UIView *v, CGFloat r) {
     v.layer.cornerRadius = r;
     if (@available(iOS 13.0, *)) v.layer.cornerCurve = kCACornerCurveContinuous;
     v.layer.masksToBounds = YES;
@@ -719,10 +719,10 @@ static void WCRRoundCard(UIView *v, CGFloat r) {
 %hook UICollectionView
 - (void)layoutSubviews {
     %orig;
-    WCRConfig *c = WCRCCfg();
+    LYHWConfig *c = LYHWCCfg();
     if (!c.servicePageCornerEnabled) return;
     UICollectionView *cv = (UICollectionView *)self;
-    if (!WCRInService(cv)) return;
+    if (!LYHWInService(cv)) return;
     CGFloat W = cv.bounds.size.width, r = c.servicePageCornerRadius, m = 10;
     cv.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
@@ -732,7 +732,7 @@ static void WCRRoundCard(UIView *v, CGFloat r) {
         CGRect f = sv.frame;
         if (f.size.width >= W * 0.9 && f.size.height >= 60) {
             f.origin.x = m; f.size.width = W - m * 2; sv.frame = f;
-            WCRRoundCard(sv, r);
+            LYHWRoundCard(sv, r);
         }
     }
     UIViewController *vc = nil;
@@ -742,7 +742,7 @@ static void WCRRoundCard(UIView *v, CGFloat r) {
         if ([hv isKindOfClass:[UIView class]]) {
             UIView *target = hv;
             for (UIView *sv in hv.subviews) if (sv.bounds.size.width >= hv.bounds.size.width * 0.85 && sv.bounds.size.height >= 80) { target = sv; break; }
-            WCRRoundCard(target, r);
+            LYHWRoundCard(target, r);
         }
     } @catch (__unused id e) {}
 }
@@ -752,7 +752,7 @@ static void WCRRoundCard(UIView *v, CGFloat r) {
 %hook WCOperateFloatView
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCCfg().timelineCommentCornerEnabled) return;
+    if (!LYHWCCfg().timelineCommentCornerEnabled) return;
     UIView *me = (UIView *)self;
     CGFloat h = me.bounds.size.height;
     if (h < 10) return;

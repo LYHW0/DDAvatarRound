@@ -2,7 +2,7 @@
     entry = {
         bundle = LYHWPrefs;
         cell = PSLinkCell;
-        detail = WCRRootListController;
+        detail = LYHWRootListController;
         label = "LYHW";
     };
 }

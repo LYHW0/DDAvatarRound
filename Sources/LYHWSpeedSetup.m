@@ -1,39 +1,39 @@
 //
-//  HBSpeedSetup.m
+//  LYHWSpeedSetup.m
 //
 
-#import "HBSpeedSetup.h"
-#import "HBSpeedHook.h"
-#import "HBSpeedConfig.h"
+#import "LYHWSpeedSetup.h"
+#import "LYHWSpeedHook.h"
+#import "LYHWSpeedConfig.h"
 #import <UIKit/UIKit.h>
 
-@implementation HBSpeedSetup
+@implementation LYHWSpeedSetup
 @end
 
-static void HBOnSpeedSettingsChanged(CFNotificationCenterRef center,
+static void LYHWOnSpeedSettingsChanged(CFNotificationCenterRef center,
                                      void *observer,
                                      CFStringRef name,
                                      const void *object,
                                      CFDictionaryRef userInfo)
 {
     // 配置热更新：把新速度立刻套到已有窗口（可选，删掉这段就是纯「重启生效」）
-    HBApplyUISpeedToAllWindows();
+    LYHWApplyUISpeedToAllWindows();
 }
 
-void HBSetupUISpeedFeature(void)
+void LYHWSetupUISpeedFeature(void)
 {
     static BOOL done = NO;
     if (done) return;
     done = YES;
 
-    HBInstallUISpeedHook();                 // 核心：hook -[UIWindow setWindowLevel:]
-    HBApplyUISpeedToAllWindows();           // 已存在的窗口先套一次
+    LYHWInstallUISpeedHook();                 // 核心：hook -[UIWindow setWindowLevel:]
+    LYHWApplyUISpeedToAllWindows();           // 已存在的窗口先套一次
 
     // 配置变化时的热更新（可选）
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
                                     NULL,
-                                    HBOnSpeedSettingsChanged,
-                                    CFSTR("HBSpeedSettingsDidChange"),
+                                    LYHWOnSpeedSettingsChanged,
+                                    CFSTR("LYHWSpeedSettingsDidChange"),
                                     NULL,
                                     CFNotificationSuspensionBehaviorDeliverImmediately);
 }

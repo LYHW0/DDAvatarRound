@@ -1,5 +1,5 @@
 //
-//  WCRMenu.x  —  模块四：菜单美化（长按菜单 / 加号菜单 / 右键菜单）
+//  LYHWMenu.x  —  模块四：菜单美化（长按菜单 / 加号菜单 / 右键菜单）
 //
 //  原版 hook 点：
 //    MMMenuContentView(addSeparatorLineInY:left:right: / layoutSubviews)
@@ -9,13 +9,13 @@
 //  效果：菜单整体圆角、背景色/背景图、文字色、图标色、宽度与每行个数、去掉分割线。
 //
 
-#import "WCRConfig.h"
-#import "WCRCommon.h"
+#import "LYHWConfig.h"
+#import "LYHWCommon.h"
 
-static inline WCRConfig *WCRMCfg(void) { return [WCRConfig shared]; }
+static inline LYHWConfig *LYHWMCfg(void) { return [LYHWConfig shared]; }
 
-static NSString *WCRMenuBackgroundImagePath(void) {
-    NSString *folder = WCRMCfg().menuBackgroundImageFolder;
+static NSString *LYHWMenuBackgroundImagePath(void) {
+    NSString *folder = LYHWMCfg().menuBackgroundImageFolder;
     if (folder.length == 0) return nil;
 
     NSFileManager *fm = [NSFileManager defaultManager];
@@ -35,32 +35,32 @@ static NSString *WCRMenuBackgroundImagePath(void) {
 }
 
 /// 给菜单容器上样式
-static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
+static void LYHWStyleMenuContainer(UIView *view, BOOL plusMenu) {
     if (!view) return;
-    WCRConfig *cfg = WCRMCfg();
+    LYHWConfig *cfg = LYHWMCfg();
 
     BOOL cornerOn = plusMenu ? cfg.plusMenuCornerEnabled : cfg.menuCornerEnabled;
     CGFloat radius = plusMenu ? cfg.plusMenuCornerRadius : cfg.menuCornerRadius;
     CGFloat borderSize = plusMenu ? cfg.plusMenuBorderSize : cfg.menuCornerBorderSize;
     UIColor *borderColor = plusMenu
-        ? WCRColorForAppearance(cfg.plusMenuBorderColorLight, cfg.plusMenuBorderColorDark)
-        : WCRColorForAppearance(cfg.menuCornerBorderColorLight, cfg.menuCornerBorderColorDark);
+        ? LYHWColorForAppearance(cfg.plusMenuBorderColorLight, cfg.plusMenuBorderColorDark)
+        : LYHWColorForAppearance(cfg.menuCornerBorderColorLight, cfg.menuCornerBorderColorDark);
 
     if (cornerOn) {
-        WCRApplyCorner(view, radius, borderSize, borderColor, YES);
+        LYHWApplyCorner(view, radius, borderSize, borderColor, YES);
     }
 
     // 背景色
     if (cfg.menuColorEnabled) {
-        view.backgroundColor = WCRColorForAppearance(cfg.menuColorLight, cfg.menuColorDark);
+        view.backgroundColor = LYHWColorForAppearance(cfg.menuColorLight, cfg.menuColorDark);
     }
 
     // 背景图
     if (cfg.menuUseImageBackground) {
-        NSString *path = WCRMenuBackgroundImagePath();
+        NSString *path = LYHWMenuBackgroundImagePath();
         UIImage *image = path ? [UIImage imageWithContentsOfFile:path] : nil;
         if (image) {
-            UIImageView *bg = (UIImageView *)[view viewWithTag:0x5752434D]; // "WCRM"
+            UIImageView *bg = (UIImageView *)[view viewWithTag:0x5752434D]; // "LYHWM"
             if (!bg) {
                 bg = [[UIImageView alloc] initWithFrame:view.bounds];
                 bg.tag = 0x5752434D;
@@ -74,20 +74,20 @@ static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
             bg.alpha = cfg.menuBackgroundViewAlpha;
 
             if (cornerOn) {
-                WCRApplyCorner(bg, radius, 0, nil, YES);
+                LYHWApplyCorner(bg, radius, 0, nil, YES);
             }
         }
     }
 
     // 文字色
     if (cfg.menuTextColorEnabled) {
-        UIColor *textColor = WCRColorForAppearance(cfg.menuTextColorLight, cfg.menuTextColorDark);
-        WCRTintLabels(view, textColor, nil);
+        UIColor *textColor = LYHWColorForAppearance(cfg.menuTextColorLight, cfg.menuTextColorDark);
+        LYHWTintLabels(view, textColor, nil);
     }
 
     // 图标色
     if (cfg.menuIconColorEnabled) {
-        UIColor *iconColor = WCRColorForAppearance(cfg.menuIconColorLight, cfg.menuIconColorDark);
+        UIColor *iconColor = LYHWColorForAppearance(cfg.menuIconColorLight, cfg.menuIconColorDark);
         for (UIView *sub in view.subviews) {
             if ([sub isKindOfClass:[UIImageView class]]) {
                 UIImageView *iv = (UIImageView *)sub;
@@ -102,10 +102,10 @@ static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
 
 - (void)layoutSubviews {
     %orig;
-    WCRStyleMenuContainer((UIView *)self, NO);
+    LYHWStyleMenuContainer((UIView *)self, NO);
 
     // 菜单宽度
-    WCRConfig *cfg = WCRMCfg();
+    LYHWConfig *cfg = LYHWMCfg();
     UIView *menuView = (UIView *)self;
     if (cfg.menuSizeEnabled && cfg.menuWidth > 0.01) {
         CGRect f = menuView.frame;
@@ -118,7 +118,7 @@ static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
 
 - (void)addSeparatorLineInY:(double)y left:(double)left right:(double)right {
     // 原版菜单美化本身就带"隐藏分割线"：配了圆角后默认不再绘制
-    if (WCRMCfg().menuCornerEnabled) {
+    if (LYHWMCfg().menuCornerEnabled) {
         return;
     }
     %orig;
@@ -130,7 +130,7 @@ static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
 
 - (void)setMenuStyle:(long long)style {
     %orig;
-    if (!WCRMCfg().menuCornerEnabled) return;
+    if (!LYHWMCfg().menuCornerEnabled) return;
 
     id controller = (id)self;
     UIView *menuView = nil;
@@ -139,7 +139,7 @@ static void WCRStyleMenuContainer(UIView *view, BOOL plusMenu) {
     } @catch (NSException *e) { (void)e; }
 
     if ([menuView isKindOfClass:[UIView class]]) {
-        WCRStyleMenuContainer(menuView, NO);
+        LYHWStyleMenuContainer(menuView, NO);
     }
 }
 

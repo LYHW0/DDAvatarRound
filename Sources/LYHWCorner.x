@@ -1,5 +1,5 @@
 //
-//  WCRCorner.x  —  模块一：界面圆角（全局卡片化圆角）
+//  LYHWCorner.x  —  模块一：界面圆角（全局卡片化圆角）
 //
 //  hook 点全部来自原版 LYHW 二进制的初始化函数（__init_offsets → MSHookMessageEx）：
 //    MMTableViewCell(layoutSubviews/setFrame:/setBackgroundColor:)
@@ -15,15 +15,15 @@
 //  圆角默认 15pt（与原版一致），可配描边、间距、背景色。
 //
 
-#import "WCRConfig.h"
-#import "WCRCommon.h"
+#import "LYHWConfig.h"
+#import "LYHWCommon.h"
 
-static inline WCRConfig *WCRCfg(void) { return [WCRConfig shared]; }
+static inline LYHWConfig *LYHWCfg(void) { return [LYHWConfig shared]; }
 
 /// 判断是否该给这个视图上圆角（按板块开关）
-static BOOL WCRCornerEnabledForView(UIView *view) {
+static BOOL LYHWCornerEnabledForView(UIView *view) {
     if (!view) return NO;
-    WCRConfig *cfg = WCRCfg();
+    LYHWConfig *cfg = LYHWCfg();
 
     NSString *cls = NSStringFromClass([view class]);
     if ([cls isEqualToString:@"NewMainFrameCell"] ||
@@ -43,17 +43,17 @@ static BOOL WCRCornerEnabledForView(UIView *view) {
 }
 
 /// 给容器套用卡片样式：圆角 + 描边 + 背景 + 内缩
-static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
+static void LYHWStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
     if (!view) return;
-    WCRConfig *cfg = WCRCfg();
+    LYHWConfig *cfg = LYHWCfg();
 
-    UIColor *bg = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
+    UIColor *bg = LYHWColorForAppearance(cfg.globalCornerBackgroundColorLight,
                                         cfg.globalCornerBackgroundColorDark);
-    UIColor *stroke = WCRColorForAppearance(cfg.globalCornerStrokeColorLight,
+    UIColor *stroke = LYHWColorForAppearance(cfg.globalCornerStrokeColorLight,
                                             cfg.globalCornerStrokeColorDark);
 
     view.backgroundColor = bg;
-    WCRApplyCorner(view, radius, cfg.globalCornerStroke, stroke, YES);
+    LYHWApplyCorner(view, radius, cfg.globalCornerStroke, stroke, YES);
 
     if (inset > 0.01) {
         CGRect b = view.bounds;
@@ -72,11 +72,11 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    return; // 已由 WCRCellCards.x 统一处理
+    return; // 已由 LYHWCellCards.x 统一处理
     UIView *view = (UIView *)self;
-    if (!WCRCornerEnabledForView(view)) return;
+    if (!LYHWCornerEnabledForView(view)) return;
 
-    WCRConfig *cfg = WCRCfg();
+    LYHWConfig *cfg = LYHWCfg();
     CGFloat radius = cfg.globalCornerRadius;
     CGFloat margin = cfg.globalCornerMargin;
     UITableViewCell *cell = (UITableViewCell *)view;
@@ -84,10 +84,10 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
     // cell 本身透明，圆角套在 contentView 上，避免把分隔线一起裁掉
     cell.backgroundColor = [UIColor clearColor];
-    content.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
+    content.backgroundColor = LYHWColorForAppearance(cfg.globalCornerBackgroundColorLight,
                                                       cfg.globalCornerBackgroundColorDark);
-    WCRApplyCorner(content, radius, cfg.globalCornerStroke,
-                   WCRColorForAppearance(cfg.globalCornerStrokeColorLight,
+    LYHWApplyCorner(content, radius, cfg.globalCornerStroke,
+                   LYHWColorForAppearance(cfg.globalCornerStrokeColorLight,
                                          cfg.globalCornerStrokeColorDark), YES);
 
     if (@available(iOS 13.0, *)) {
@@ -111,7 +111,7 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().mainFrameCornerEnabled) return;
+    if (!LYHWCfg().mainFrameCornerEnabled) return;
     UITableView *tableView = (UITableView *)self;
     tableView.backgroundColor = [UIColor clearColor];
     tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
@@ -123,17 +123,17 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    return; // 已由 WCRCellCards.x 统一处理
-    if (!WCRCfg().mainFrameCornerEnabled) return;
+    return; // 已由 LYHWCellCards.x 统一处理
+    if (!LYHWCfg().mainFrameCornerEnabled) return;
 
-    WCRConfig *cfg = WCRCfg();
+    LYHWConfig *cfg = LYHWCfg();
     UITableViewCell *cell = (UITableViewCell *)self;
     cell.backgroundColor = [UIColor clearColor];
     UIView *content = cell.contentView;
-    content.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
+    content.backgroundColor = LYHWColorForAppearance(cfg.globalCornerBackgroundColorLight,
                                                       cfg.globalCornerBackgroundColorDark);
-    WCRApplyCorner(content, cfg.globalCornerRadius, cfg.globalCornerStroke,
-                   WCRColorForAppearance(cfg.globalCornerStrokeColorLight,
+    LYHWApplyCorner(content, cfg.globalCornerRadius, cfg.globalCornerStroke,
+                   LYHWColorForAppearance(cfg.globalCornerStrokeColorLight,
                                          cfg.globalCornerStrokeColorDark), YES);
 
     CGFloat margin = cfg.globalCornerMargin;
@@ -151,14 +151,14 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().mainFrameCornerEnabled) return;
+    if (!LYHWCfg().mainFrameCornerEnabled) return;
     UIView *fv = (UIView *)self;
     fv.backgroundColor = [UIColor clearColor];
     for (UIView *sv in fv.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) sv.backgroundColor = [UIColor clearColor];
 }
 
 - (void)setBackgroundColor:(UIColor *)color {
-    if (WCRCfg().mainFrameCornerEnabled) {
+    if (LYHWCfg().mainFrameCornerEnabled) {
         %orig([UIColor clearColor]);
     } else {
         %orig;
@@ -171,10 +171,10 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().discoverPageCornerEnabled) return;
-    WCRApplyCorner((UIView *)self, WCRCfg().globalCornerRadius, WCRCfg().globalCornerStroke,
-                   WCRColorForAppearance(WCRCfg().globalCornerStrokeColorLight,
-                                         WCRCfg().globalCornerStrokeColorDark), YES);
+    if (!LYHWCfg().discoverPageCornerEnabled) return;
+    LYHWApplyCorner((UIView *)self, LYHWCfg().globalCornerRadius, LYHWCfg().globalCornerStroke,
+                   LYHWColorForAppearance(LYHWCfg().globalCornerStrokeColorLight,
+                                         LYHWCfg().globalCornerStrokeColorDark), YES);
 }
 
 %end
@@ -183,10 +183,10 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().discoverPageCornerEnabled) return;
-    WCRApplyCorner((UIView *)self, WCRCfg().globalCornerRadius, WCRCfg().globalCornerStroke,
-                   WCRColorForAppearance(WCRCfg().globalCornerStrokeColorLight,
-                                         WCRCfg().globalCornerStrokeColorDark), YES);
+    if (!LYHWCfg().discoverPageCornerEnabled) return;
+    LYHWApplyCorner((UIView *)self, LYHWCfg().globalCornerRadius, LYHWCfg().globalCornerStroke,
+                   LYHWColorForAppearance(LYHWCfg().globalCornerStrokeColorLight,
+                                         LYHWCfg().globalCornerStrokeColorDark), YES);
 }
 
 %end
@@ -195,8 +195,8 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().homepageCornerEnabled) return;
-    WCRApplyCorner((UIView *)self, WCRCfg().globalCornerRadius, 0, nil, YES);
+    if (!LYHWCfg().homepageCornerEnabled) return;
+    LYHWApplyCorner((UIView *)self, LYHWCfg().globalCornerRadius, 0, nil, YES);
 }
 
 %end
@@ -205,10 +205,10 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().homepageCornerEnabled) return;
-    WCRApplyCorner((UIView *)self, WCRCfg().globalCornerRadius, WCRCfg().globalCornerStroke,
-                   WCRColorForAppearance(WCRCfg().globalCornerStrokeColorLight,
-                                         WCRCfg().globalCornerStrokeColorDark), YES);
+    if (!LYHWCfg().homepageCornerEnabled) return;
+    LYHWApplyCorner((UIView *)self, LYHWCfg().globalCornerRadius, LYHWCfg().globalCornerStroke,
+                   LYHWColorForAppearance(LYHWCfg().globalCornerStrokeColorLight,
+                                         LYHWCfg().globalCornerStrokeColorDark), YES);
 }
 
 %end
@@ -217,10 +217,10 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().discoverPageCornerEnabled) return;
+    if (!LYHWCfg().discoverPageCornerEnabled) return;
     for (UIView *sub in ((UIView *)self).subviews) {
         if ([sub isKindOfClass:[UIImageView class]]) {
-            WCRApplyCornerToImageView((UIImageView *)sub, WCRCfg().globalCornerRadius, 0, [UIColor clearColor]);
+            LYHWApplyCornerToImageView((UIImageView *)sub, LYHWCfg().globalCornerRadius, 0, [UIColor clearColor]);
         }
     }
 }
@@ -231,8 +231,8 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().discoverPageCornerEnabled) return;
-    WCRApplyCorner((UIView *)self, WCRCfg().globalCornerRadius, 0, nil, YES);
+    if (!LYHWCfg().discoverPageCornerEnabled) return;
+    LYHWApplyCorner((UIView *)self, LYHWCfg().globalCornerRadius, 0, nil, YES);
 }
 
 %end
@@ -241,12 +241,12 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    return; // 由 WCRCellCards.x 统一处理
-    WCRConfig *cfg = WCRCfg();
-    ((UITableViewCell *)self).contentView.backgroundColor = WCRColorForAppearance(cfg.globalCornerBackgroundColorLight,
+    return; // 由 LYHWCellCards.x 统一处理
+    LYHWConfig *cfg = LYHWCfg();
+    ((UITableViewCell *)self).contentView.backgroundColor = LYHWColorForAppearance(cfg.globalCornerBackgroundColorLight,
                                                               cfg.globalCornerBackgroundColorDark);
-    WCRApplyCorner(((UITableViewCell *)self).contentView, cfg.globalCornerRadius, cfg.globalCornerStroke,
-                   WCRColorForAppearance(cfg.globalCornerStrokeColorLight,
+    LYHWApplyCorner(((UITableViewCell *)self).contentView, cfg.globalCornerRadius, cfg.globalCornerStroke,
+                   LYHWColorForAppearance(cfg.globalCornerStrokeColorLight,
                                          cfg.globalCornerStrokeColorDark), YES);
 }
 
@@ -256,7 +256,7 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().homepageCornerEnabled) return;
+    if (!LYHWCfg().homepageCornerEnabled) return;
     UIView *me = (UIView *)self;
     me.backgroundColor = [UIColor clearColor];
     @try {
@@ -277,8 +277,8 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().discoverPageCornerEnabled) return;
-    WCRApplyCorner((UIView *)self, WCRCfg().globalCornerRadius, 0, nil, YES);
+    if (!LYHWCfg().discoverPageCornerEnabled) return;
+    LYHWApplyCorner((UIView *)self, LYHWCfg().globalCornerRadius, 0, nil, YES);
 }
 
 %end
@@ -287,8 +287,8 @@ static void WCRStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!WCRCfg().discoverPageCornerEnabled) return;
-    WCRApplyCorner((UIView *)self, WCRCfg().globalCornerRadius * 0.6, 0, nil, YES);
+    if (!LYHWCfg().discoverPageCornerEnabled) return;
+    LYHWApplyCorner((UIView *)self, LYHWCfg().globalCornerRadius * 0.6, 0, nil, YES);
 }
 
 %end

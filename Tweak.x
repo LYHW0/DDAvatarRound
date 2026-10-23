@@ -9,30 +9,30 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import "WCRConfig.h"
-#import "HBSpeedSetup.h"
+#import "LYHWConfig.h"
+#import "LYHWSpeedSetup.h"
 
-static void WCRSettingsChangedCallback(CFNotificationCenterRef center,
+static void LYHWSettingsChangedCallback(CFNotificationCenterRef center,
                                        void *observer,
                                        CFStringRef name,
                                        const void *object,
                                        CFDictionaryRef userInfo) {
     // 设置面板写在另一个进程，收到通知后重新读盘
-    [[WCRConfig shared] reload];
-    [[NSNotificationCenter defaultCenter] postNotificationName:WCRSettingsChangedNotification
+    [[LYHWConfig shared] reload];
+    [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification
                                                         object:nil];
 }
 
 %ctor {
     @autoreleasepool {
         // 先把配置初始化好，避免首个界面加载时读不到
-        [WCRConfig shared];
-        HBSetupUISpeedFeature();
+        [LYHWConfig shared];
+        LYHWSetupUISpeedFeature();
 
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
                                         NULL,
-                                        WCRSettingsChangedCallback,
-                                        (__bridge CFStringRef)WCRSettingsChangedNotification,
+                                        LYHWSettingsChangedCallback,
+                                        (__bridge CFStringRef)LYHWSettingsChangedNotification,
                                         NULL,
                                         CFNotificationSuspensionBehaviorDeliverImmediately);
 

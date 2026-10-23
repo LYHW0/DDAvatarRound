@@ -1,5 +1,5 @@
 //
-//  WCRConfig.h
+//  LYHWConfig.h
 //  LYHW
 //
 //  基于 LYHW 2.1-9 逆向分析完整还原的配置头文件
@@ -11,9 +11,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-extern NSString * const WCRSettingsChangedNotification;
+extern NSString * const LYHWSettingsChangedNotification;
 
-@interface WCRConfig : NSObject
+@interface LYHWConfig : NSObject
 
 + (instancetype)shared;
 - (void)reload;

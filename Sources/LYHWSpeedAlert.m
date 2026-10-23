@@ -1,10 +1,10 @@
 //
-//  HBSpeedAlert.m
+//  LYHWSpeedAlert.m
 //
 
-#import "HBSpeedAlert.h"
-#import "HBSpeedConfig.h"
-#import "HBSpeedHook.h"
+#import "LYHWSpeedAlert.h"
+#import "LYHWSpeedConfig.h"
+#import "LYHWSpeedHook.h"
 
 // 想把弹窗换回微信原生风格（黄白助手那种）时，把下面改成 1，
 // 并且确保宿主进程里确实有 WCUIAlertView（微信内部类）。
@@ -12,7 +12,7 @@
 #define HB_USE_WECHAT_ALERT_STYLE 0
 #endif
 
-@implementation HBSpeedAlert
+@implementation LYHWSpeedAlert
 
 #pragma mark - 取当前顶层控制器
 
@@ -32,8 +32,8 @@
 #pragma mark - 输入框
 
 + (void)showEditorFrom:(UIViewController *)host
-                  item:(HBSpeedMenuItem *)item
-             onChanged:(HBSpeedChangedBlock)onChanged
+                  item:(LYHWSpeedMenuItem *)item
+             onChanged:(LYHWSpeedChangedBlock)onChanged
 {
     if (!host) host = [self topViewController];
     if (!host) return;
@@ -52,7 +52,7 @@
             [alert showTextFieldWithMaxLen:item.textMaxLength];
         }
         if ([alert respondsToSelector:@selector(setTextFieldDefaultText:)]) {
-            [alert setTextFieldDefaultText:HBSpeedDisplayText()];
+            [alert setTextFieldDefaultText:LYHWSpeedDisplayText()];
         }
         if ([alert respondsToSelector:@selector(show)]) {
             [alert show];
@@ -62,7 +62,7 @@
 #endif
 
     // ── 通用实现（任何工程可用）──
-    NSString *cur = HBSpeedDisplayText();
+    NSString *cur = LYHWSpeedDisplayText();
 
     UIAlertController *ac =
         [UIAlertController alertControllerWithTitle:item.alertTitle
@@ -88,9 +88,9 @@
         if (text.length > item.textMaxLength) {
             text = [text substringToIndex:item.textMaxLength];
         }
-        // 原实现：v = [text floatValue]; [HBConfigUtil setEditUiWindowsSpeed:v];
+        // 原实现：v = [text floatValue]; [LYHWConfigUtil setEditUiWindowsSpeed:v];
         float v = [text floatValue];
-        HBSetUISpeed(v);
+        LYHWSetUISpeed(v);
 
         if (onChanged) onChanged(v);
         [self showRestartPromptFrom:host item:item];
@@ -101,7 +101,7 @@
 
 #pragma mark - 重启提示
 
-+ (void)showRestartPromptFrom:(UIViewController *)host item:(HBSpeedMenuItem *)item
++ (void)showRestartPromptFrom:(UIViewController *)host item:(LYHWSpeedMenuItem *)item
 {
     if (!host) host = [self topViewController];
     if (!host) return;
@@ -114,7 +114,7 @@
     [ac addAction:[UIAlertAction actionWithTitle:item.restartNowButton
                                           style:UIAlertActionStyleDestructive
                                         handler:^(UIAlertAction *a) {
-        HBReloadHostApplication();
+        LYHWReloadHostApplication();
     }]];
 
     [ac addAction:[UIAlertAction actionWithTitle:item.restartLaterButton

@@ -11,7 +11,7 @@
 
 ## 一、这五个板块都做了什么
 
-### 1. 界面圆角（`Sources/WCRCorner.x`）
+### 1. 界面圆角（`Sources/LYHWCorner.x`）
 把列表切成"卡片"：会话列表、通讯录、发现页、收藏页、折叠分组。
 
 挂的类和原版一致：
@@ -27,7 +27,7 @@ NewContactsItemCell  ThemeBoxSegmentedView   WCSegmentedControl
 
 设置项：圆角大小（默认 **15**，取自原版二进制默认值）、卡片间距、左右留白、描边宽度、深浅色背景/描边。
 
-### 2. 资料卡美化（`Sources/WCRProfileCard.x`）
+### 2. 资料卡美化（`Sources/LYHWProfileCard.x`）
 联系人资料页 / 名片页：背景图、背景色、卡片圆角（可跟随全局圆角）、昵称与签名配色、微信号默认隐藏。
 
 ```
@@ -46,7 +46,7 @@ MainFrameLogicController(playNewMsgNotify:NotifyFlag:)
 横幅窗口是运行时动态创建的，这里用"结构扫描 + 定时补样式"定位，
 不写死私有类名，微信小版本升级不会直接失效。
 
-### 4. 菜单美化（`Sources/WCRMenu.x`）
+### 4. 菜单美化（`Sources/LYHWMenu.x`）
 长按菜单 / 加号菜单：圆角、描边、底色、背景图、文字色、图标色、宽度、去掉分割线。
 
 ```
@@ -54,7 +54,7 @@ MMMenuContentView(layoutSubviews / addSeparatorLineInY:left:right:)
 MMMenuController(setMenuStyle:)
 ```
 
-### 5. 头像框圆角（`Sources/WCRAvatar.x`）
+### 5. 头像框圆角（`Sources/LYHWAvatar.x`）
 头像圆角按**百分比**控制（默认 **100%** = 正圆，与原版默认值一致），可加描边、可缩放留白。
 
 ```
@@ -114,13 +114,13 @@ LYHW/
 ├── LYHW.plist     # 注入过滤（微信各包名）
 ├── Tweak.x                   # 入口：配置加载 + 跨进程设置同步
 ├── Sources/
-│   ├── WCRCommon.h/.m        # 颜色解析 / 圆角 / 视图工具
-│   ├── WCRConfig.h/.m        # 配置中心（key 与原版同名）
-│   ├── WCRCorner.x           # 模块一：界面圆角
-│   ├── WCRProfileCard.x      # 模块二：资料卡美化
+│   ├── LYHWCommon.h/.m        # 颜色解析 / 圆角 / 视图工具
+│   ├── LYHWConfig.h/.m        # 配置中心（key 与原版同名）
+│   ├── LYHWCorner.x           # 模块一：界面圆角
+│   ├── LYHWProfileCard.x      # 模块二：资料卡美化
 │   ├── WCRMsgBanner.x        # 模块三：消息横幅美化
-│   ├── WCRMenu.x             # 模块四：菜单美化
-│   └── WCRAvatar.x           # 模块五：头像框圆角
+│   ├── LYHWMenu.x             # 模块四：菜单美化
+│   └── LYHWAvatar.x           # 模块五：头像框圆角
 ├── prefs/                    # 设置面板（PreferenceBundle）
 │   ├── WCRRootListController.m
 │   ├── Resources/Info.plist
@@ -144,6 +144,6 @@ LYHW/
 
 ## 七、改色 / 改默认值
 
-- 改默认值：`Sources/WCRConfig.m` 里每个宏后面第三个参数就是默认值。
+- 改默认值：`Sources/LYHWConfig.m` 里每个宏后面第三个参数就是默认值。
 - 加设置项：`prefs/WCRRootListController.m` 的 `-specifiers` 里照着 `switchRow/sliderRow/textRow` 加一行即可。
-- 想让某个页面也上圆角：在 `WCRCorner.x` 里照着现有写法加个 `%hook 类名 - (void)layoutSubviews { %orig; WCRApplyCorner(...); }`。
+- 想让某个页面也上圆角：在 `LYHWCorner.x` 里照着现有写法加个 `%hook 类名 - (void)layoutSubviews { %orig; WCRApplyCorner(...); }`。

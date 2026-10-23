@@ -1,8 +1,8 @@
 //
-//  HBSpeedHook.h
+//  LYHWSpeedHook.h
 //  自定义界面速度 —— 生效层（Hook）
 //
-//  逆向来源：HBWechatHelper.dylib
+//  逆向来源：LYHWWechatHelper.dylib
 //  原实现：
 //    安装点 0x38D31C：
 //      MSHookMessageEx(objc_getClass("UIWindow"),
@@ -11,7 +11,7 @@
 //                      &orig(0x193C248));
 //    替换实现 0x4BC32C：
 //      call orig(self, _cmd, level);
-//      float s = [HBConfigUtil editUiWindowsSpeed];
+//      float s = [LYHWConfigUtil editUiWindowsSpeed];
 //      if (s != 1.0f) { [[self layer] setSpeed:s]; }
 //
 //  为什么挂 setWindowLevel: ？
@@ -28,17 +28,17 @@ extern "C" {
 #endif
 
 /// 安装 Hook。重复调用安全（幂等）。
-void HBInstallUISpeedHook(void);
+void LYHWInstallUISpeedHook(void);
 
 /// 卸载 Hook，恢复原实现。
-void HBUninstallUISpeedHook(void);
+void LYHWUninstallUISpeedHook(void);
 
-/// 重启宿主 App（原插件用 HBReloadOpenApp，没有则退到 exit(0)）
-void HBReloadHostApplication(void);
+/// 重启宿主 App（原插件用 LYHWReloadOpenApp，没有则退到 exit(0)）
+void LYHWReloadHostApplication(void);
 
 /// 把当前速度立刻套到所有已存在的窗口上。
 /// 原插件靠「重启微信生效」实现，这个方法是等效的免重启通道（可选调用）。
-void HBApplyUISpeedToAllWindows(void);
+void LYHWApplyUISpeedToAllWindows(void);
 
 #ifdef __cplusplus
 }

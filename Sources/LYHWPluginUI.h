@@ -1,5 +1,5 @@
 //
-//  WCRPluginUI.h
+//  LYHWPluginUI.h
 //  LYHW
 //
 //  微信内设置页。注册到 wcplugins 的插件收纳里，
@@ -10,7 +10,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface WCRPluginSettingsViewController : UITableViewController
+@interface LYHWPluginSettingsViewController : UITableViewController
 @end
 
 NS_ASSUME_NONNULL_END

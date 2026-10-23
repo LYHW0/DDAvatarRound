@@ -1,19 +1,19 @@
 //
-//  WCRCommon.m
+//  LYHWCommon.m
 //  LYHW
 //
 
-#import "WCRCommon.h"
+#import "LYHWCommon.h"
 #import <math.h>
 
-BOOL WCRIsDarkMode(void) {
+BOOL LYHWIsDarkMode(void) {
     if (@available(iOS 13.0, *)) {
         return UITraitCollection.currentTraitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
     }
     return NO;
 }
 
-UIColor *WCRColorFromHex(NSString *hex, UIColor *fallback) {
+UIColor *LYHWColorFromHex(NSString *hex, UIColor *fallback) {
     if (hex.length == 0) return fallback;
 
     NSString *s = [hex stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -39,17 +39,17 @@ UIColor *WCRColorFromHex(NSString *hex, UIColor *fallback) {
     return [UIColor colorWithRed:r green:g blue:b alpha:a];
 }
 
-UIColor *WCRColorForAppearance(NSString *lightHex, NSString *darkHex) {
+UIColor *LYHWColorForAppearance(NSString *lightHex, NSString *darkHex) {
     if (@available(iOS 13.0, *)) {
         return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *trait) {
             BOOL dark = (trait.userInterfaceStyle == UIUserInterfaceStyleDark);
-            return WCRColorFromHex(dark ? darkHex : lightHex, [UIColor clearColor]);
+            return LYHWColorFromHex(dark ? darkHex : lightHex, [UIColor clearColor]);
         }];
     }
-    return WCRColorFromHex(lightHex, [UIColor clearColor]);
+    return LYHWColorFromHex(lightHex, [UIColor clearColor]);
 }
 
-NSString *WCRHexFromColor(UIColor *color) {
+NSString *LYHWHexFromColor(UIColor *color) {
     if (!color) return @"";
     CGFloat r = 0, g = 0, b = 0, a = 0;
     if (![color getRed:&r green:&g blue:&b alpha:&a]) {
@@ -59,7 +59,7 @@ NSString *WCRHexFromColor(UIColor *color) {
             (int)lround(r * 255.0), (int)lround(g * 255.0), (int)lround(b * 255.0)];
 }
 
-void WCRApplyCorner(UIView *view,
+void LYHWApplyCorner(UIView *view,
                     CGFloat radius,
                     CGFloat borderWidth,
                     UIColor *borderColor,
@@ -83,7 +83,7 @@ void WCRApplyCorner(UIView *view,
     }
 }
 
-void WCRApplyCornerToImageView(UIImageView *imageView, CGFloat radius, CGFloat borderWidth, UIColor *borderColor) {
+void LYHWApplyCornerToImageView(UIImageView *imageView, CGFloat radius, CGFloat borderWidth, UIColor *borderColor) {
     if (!imageView) return;
     CALayer *layer = imageView.layer;
     if (@available(iOS 13.0, *)) {
@@ -99,7 +99,7 @@ void WCRApplyCornerToImageView(UIImageView *imageView, CGFloat radius, CGFloat b
     }
 }
 
-void WCRTintLabels(UIView *root, UIColor *color, NSArray<NSString *> *skipClassNames) {
+void LYHWTintLabels(UIView *root, UIColor *color, NSArray<NSString *> *skipClassNames) {
     if (!root || !color) return;
     NSSet *skip = skipClassNames.count ? [NSSet setWithArray:skipClassNames] : nil;
 
@@ -109,21 +109,21 @@ void WCRTintLabels(UIView *root, UIColor *color, NSArray<NSString *> *skipClassN
         }
     }
     for (UIView *sub in root.subviews) {
-        WCRTintLabels(sub, color, skipClassNames);
+        LYHWTintLabels(sub, color, skipClassNames);
     }
 }
 
-UIView *WCRFirstSubviewOfClass(UIView *root, Class cls) {
+UIView *LYHWFirstSubviewOfClass(UIView *root, Class cls) {
     if (!root || !cls) return nil;
     if ([root isKindOfClass:cls]) return root;
     for (UIView *sub in root.subviews) {
-        UIView *hit = WCRFirstSubviewOfClass(sub, cls);
+        UIView *hit = LYHWFirstSubviewOfClass(sub, cls);
         if (hit) return hit;
     }
     return nil;
 }
 
-CGRect WCRSafeBounds(UIView *view) {
+CGRect LYHWSafeBounds(UIView *view) {
     if (!view) return CGRectZero;
     return UIEdgeInsetsInsetRect(view.bounds, view.safeAreaInsets);
 }

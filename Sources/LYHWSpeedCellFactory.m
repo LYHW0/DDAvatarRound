@@ -1,19 +1,19 @@
 //
-//  HBSpeedCellFactory.m
+//  LYHWSpeedCellFactory.m
 //
 
-#import "HBSpeedCellFactory.h"
-#import "HBSpeedConfig.h"
+#import "LYHWSpeedCellFactory.h"
+#import "LYHWSpeedConfig.h"
 #import <objc/message.h>
 
-@implementation HBSpeedCellFactory
+@implementation LYHWSpeedCellFactory
 
 + (NSString *)rightValueText
 {
-    return HBSpeedDisplayText();   // @"%.1f"
+    return LYHWSpeedDisplayText();   // @"%.1f"
 }
 
-+ (UITableViewCell *)cellForItem:(HBSpeedMenuItem *)item
++ (UITableViewCell *)cellForItem:(LYHWSpeedMenuItem *)item
                           target:(id)target
                           action:(SEL)action
 {
@@ -24,8 +24,8 @@
     if (mgr &&
         [mgr respondsToSelector:@selector(normalCellForSel:target:title:rightValue:canRightValueCopy:)]) {
         SEL sel = action ?: NSSelectorFromString(item.tapSelectorName);
-        typedef id (*HBNormalCellFn)(id, SEL, SEL, id, NSString *, NSString *, BOOL);
-        id cell = ((HBNormalCellFn)objc_msgSend)(mgr,
+        typedef id (*LYHWNormalCellFn)(id, SEL, SEL, id, NSString *, NSString *, BOOL);
+        id cell = ((LYHWNormalCellFn)objc_msgSend)(mgr,
                                                  @selector(normalCellForSel:target:title:rightValue:canRightValueCopy:),
                                                  sel,
                                                  target,
@@ -38,7 +38,7 @@
     }
 
     // ── 路 2：普通 UITableViewCell（Value1：左标题 / 右值）──
-    static NSString * const kReuse = @"HBSpeedValueCell";
+    static NSString * const kReuse = @"LYHWSpeedValueCell";
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1
                                                    reuseIdentifier:kReuse];
     cell.textLabel.text          = item.title;
@@ -49,7 +49,7 @@
     return cell;
 }
 
-+ (NSString *)footerForItem:(HBSpeedMenuItem *)item
++ (NSString *)footerForItem:(LYHWSpeedMenuItem *)item
 {
     return item.footer;
 }

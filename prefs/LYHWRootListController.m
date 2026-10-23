@@ -1,5 +1,5 @@
 //
-//  WCRRootListController.m
+//  LYHWRootListController.m
 //  LYHW 设置面板
 //
 //  说明：为了不依赖私有框架头文件（不同 SDK 版本差异大），
@@ -41,17 +41,17 @@
 static NSString * const kWRCPrefsSuite = @"com.lyhw.LYHW";
 static NSString * const kWRCPrefsChanged = @"com.lyhw.settings_changed";
 
-typedef NS_ENUM(NSInteger, WCRCellType) {
-    WCRCellSwitch = 0,
-    WCRCellSlider,
-    WCRCellTextField,
-    WCRCellButton,
+typedef NS_ENUM(NSInteger, LYHWCellType) {
+    LYHWCellSwitch = 0,
+    LYHWCellSlider,
+    LYHWCellTextField,
+    LYHWCellButton,
 };
 
-@interface WCRRootListController : PSListController
+@interface LYHWRootListController : PSListController
 @end
 
-@implementation WCRRootListController {
+@implementation LYHWRootListController {
     NSMutableArray<PSSpecifier *> *_specs;
 }
 

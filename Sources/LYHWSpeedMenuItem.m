@@ -1,14 +1,14 @@
 //
-//  HBSpeedMenuItem.m
+//  LYHWSpeedMenuItem.m
 //
 
-#import "HBSpeedMenuItem.h"
+#import "LYHWSpeedMenuItem.h"
 
-@implementation HBSpeedMenuItem
+@implementation LYHWSpeedMenuItem
 
 + (instancetype)uiSpeedItem
 {
-    HBSpeedMenuItem *it = [HBSpeedMenuItem new];
+    LYHWSpeedMenuItem *it = [LYHWSpeedMenuItem new];
 
     it.title       = @"自定义界面速度:";
     it.valueFormat = @"%.1f";
