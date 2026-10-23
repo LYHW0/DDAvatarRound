@@ -1146,6 +1146,7 @@ static void LYHWRestyleVisibleCells(UIView *root) {
         [UIView performWithoutAnimation:^{
             [CATransaction begin];
             [CATransaction setDisableActions:YES];
+            [tv layoutIfNeeded];
             for (UITableViewCell *cell in tv.visibleCells) {
                 [cell setNeedsLayout];
                 [cell layoutIfNeeded];
@@ -1154,6 +1155,31 @@ static void LYHWRestyleVisibleCells(UIView *root) {
             [CATransaction commit];
         }];
     }
+}
+@interface LYHWRestyleLink : NSObject
+@property (nonatomic, weak) UIViewController *vc;
+@property (nonatomic, strong) CADisplayLink *link;
+@property (nonatomic, assign) CFTimeInterval deadline;
+@end
+@implementation LYHWRestyleLink
+- (void)tick:(CADisplayLink *)l {
+    UIViewController *vc = self.vc;
+    if (!vc || !vc.isViewLoaded || CACurrentMediaTime() > self.deadline) {
+        [l invalidate]; self.link = nil;
+        if (vc) objc_setAssociatedObject(vc, @selector(tick:), nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+    LYHWRestyleVisibleCells(vc.view);
+}
+@end
+static void LYHWStartRestyleLink(UIViewController *vc, CFTimeInterval dur) {
+    LYHWRestyleLink *old = objc_getAssociatedObject(vc, @selector(tick:));
+    if (old) { [old.link invalidate]; old.link = nil; }
+    LYHWRestyleLink *o = [LYHWRestyleLink new];
+    o.vc = vc; o.deadline = CACurrentMediaTime() + dur;
+    o.link = [CADisplayLink displayLinkWithTarget:o selector:@selector(tick:)];
+    [o.link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    objc_setAssociatedObject(vc, @selector(tick:), o, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 static void LYHWFadeInShadows(UIView *root) {
     NSMutableArray *tabs = [NSMutableArray array];
@@ -1175,11 +1201,7 @@ static void LYHWRestyleOnAppear(UIViewController *vc) {
     gLYHWShadowQuietUntil = CACurrentMediaTime() + 0.45;
     LYHWRestyleVisibleCells(vc.view);
     // 返回转场期间微信会反复重置 cell：在转场的每个阶段都重套一次卡片样式
-    double delays[] = {0.016, 0.04, 0.08, 0.14, 0.22, 0.32, 0.45};
-    for (int i = 0; i < 7; i++)
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delays[i] * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            LYHWRestyleVisibleCells(vc.view);
-        });
+    LYHWStartRestyleLink(vc, 0.6);
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         LYHWFadeInShadows(vc.view);
     });
