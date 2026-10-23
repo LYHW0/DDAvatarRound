@@ -226,6 +226,90 @@ static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig 
     host.layer.shadowPath = path.CGPath;
 }
 
+// 左滑按钮条（原生 UISwipeActionPullView / 微信自绘的 *Swipe*/*Pull* 容器）：
+//   · 原生是全通栏、直角、还带一层投影，左滑时看起来像「从屏幕最右边钻出来」，
+//     而且那层投影会压在白卡上，在按钮左侧留下一条黑色渐变块；
+//   · 这里把它整体收进卡片范围（右缘对齐卡片右缘）、按卡片圆角裁边、去掉投影，
+//     并把容器底色里的近黑清成透明 —— 按钮就从圆角框里出来了。
+static BOOL LYHWIsSwipeHostView(UIView *v) {
+    if (!v) return NO;
+    NSString *cn = NSStringFromClass([v class]);
+    if (cn.length == 0) return NO;
+    if ([cn rangeOfString:@"Swipe" options:NSCaseInsensitiveSearch].location != NSNotFound) return YES;
+    if ([cn rangeOfString:@"Pull" options:NSCaseInsensitiveSearch].location != NSNotFound) return YES;
+    return NO;
+}
+
+static void LYHWApplySwipeGeometry(UIView *v, CGFloat left, CGFloat right, CGFloat rad, CACornerMask cm) {
+    if (!v) return;
+    CGRect f = v.frame;
+    if (f.size.width < 1 || f.size.height < 8) return;
+    BOOL changed = NO;
+    // ① 右缘收进卡片（宽度不变、整体左移，避免按钮被压扁）
+    if (CGRectGetMaxX(f) > right + 0.5) { f.origin.x = right - f.size.width; changed = YES; }
+    // ② 左缘不出卡片
+    if (f.origin.x < left - 0.5) { f.origin.x = left; changed = YES; }
+    if (changed && !CGRectEqualToRect(v.frame, f)) v.frame = f;
+
+    // ③ 按卡片圆角裁边 + 去掉投影 + 清掉近黑底
+    CALayer *l = v.layer;
+    l.shadowOpacity = 0;
+    l.shadowRadius = 0;
+    l.shadowOffset = CGSizeZero;
+    l.shadowPath = NULL;
+    l.masksToBounds = YES;
+    l.cornerRadius = rad;
+    l.maskedCorners = cm;
+    if (@available(iOS 13.0, *)) l.cornerCurve = kCACornerCurveContinuous;
+    v.clipsToBounds = YES;
+
+    UIColor *bgc = v.backgroundColor;
+    CGFloat w = 0, a = 1;
+    if (bgc && [bgc getWhite:&w alpha:&a] && a > 0.02 && w < 0.35) {
+        v.backgroundColor = [UIColor clearColor];
+        l.backgroundColor = nil;
+    }
+}
+
+static void LYHWKillShadow(UIView *v) {
+    if (!v) return;
+    CALayer *l = v.layer;
+    l.shadowOpacity = 0;
+    l.shadowRadius = 0;
+    l.shadowOffset = CGSizeZero;
+    l.shadowPath = NULL;
+}
+
+// 注意：iOS 11+ 的层级是 cell → _UITableViewCellSwipeContainerView → (contentView, UISwipeActionPullView)。
+// 容器本身包着 contentView，**绝不能**改它的 frame/裁剪，否则整行内容都会跟着被裁。
+// 所以：包着 contentView 的视图只往里递归（顺手清掉它的投影），真正动手的只有按钮条。
+static void LYHWScanSwipeViews(UIView *root, UIView *contentView,
+                               CGFloat left, CGFloat right,
+                               CGFloat rad, CACornerMask cm, int depth) {
+    if (!root || depth > 4) return;
+    for (UIView *v in [root.subviews copy]) {
+        if (v == contentView) continue;
+        if (v.tag == 0x574352 || v.tag == 0x574353 || v.tag == 0x574357) continue;
+        BOOL holdsContent = (contentView && [contentView isDescendantOfView:v]);
+        if (holdsContent) {
+            LYHWKillShadow(v);            // 容器的投影会压在白卡上变成黑边
+            LYHWScanSwipeViews(v, contentView, left, right, rad, cm, depth + 1);
+            continue;
+        }
+        if (LYHWIsSwipeHostView(v)) { LYHWApplySwipeGeometry(v, left, right, rad, cm); continue; }
+        LYHWScanSwipeViews(v, contentView, left, right, rad, cm, depth + 1);
+    }
+}
+
+static void LYHWConstrainSwipeViews(UITableViewCell *cell, UIView *card) {
+    if (!cell || !card) return;
+    CGRect cr = card.frame;
+    if (cr.size.width < 1 || cr.size.height < 1) return;
+    LYHWScanSwipeViews(cell, cell.contentView,
+                       CGRectGetMinX(cr), CGRectGetMaxX(cr),
+                       card.layer.cornerRadius, card.layer.maskedCorners, 0);
+}
+
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
     if (LYHWClassExcluded(NSStringFromClass([cell class]))) return;
@@ -417,6 +501,7 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
         cell.clipsToBounds = NO;
     }
     LYHWApplyCardShadow(cell, card, c, isLastRow);
+    LYHWConstrainSwipeViews(cell, card);
 }
 
 
