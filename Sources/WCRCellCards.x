@@ -101,6 +101,42 @@ static void WCRRoundMedia(UIView *root, UIView *v) {
         WCRRoundMedia(root, sv);
     }
 }
+// 给内容层套一个与卡片形状完全一致的裁剪遮罩，
+// 这样卡片圆角之外不可能再露出任何直角白块。
+static void WCRClipToCard(UITableViewCell *cell, UIView *card) {
+    if (!cell || !card) return;
+    CALayer *host = cell.contentView.layer;
+    CAShapeLayer *mask = nil;
+    if ([host.mask isKindOfClass:[CAShapeLayer class]] &&
+        [host.mask.name isEqualToString:@"WCRClipMask"]) mask = (CAShapeLayer *)host.mask;
+    if (!mask) {
+        mask = [CAShapeLayer layer];
+        mask.name = @"WCRClipMask";
+        host.mask = mask;
+    }
+    CGRect r = [cell convertRect:card.frame fromView:card.superview];
+    if (r.size.width < 1 || r.size.height < 1) { host.mask = nil; return; }
+    CGFloat rad = card.layer.cornerRadius;
+    CACornerMask cm = card.layer.maskedCorners;
+    UIBezierPath *path = nil;
+    if (rad < 0.5 || cm == 0) {
+        path = [UIBezierPath bezierPathWithRect:r];
+    } else {
+        UIRectCorner uc = 0;
+        if (cm & kCALayerMinXMinYCorner) uc |= UIRectCornerTopLeft;
+        if (cm & kCALayerMaxXMinYCorner) uc |= UIRectCornerTopRight;
+        if (cm & kCALayerMinXMaxYCorner) uc |= UIRectCornerBottomLeft;
+        if (cm & kCALayerMaxXMaxYCorner) uc |= UIRectCornerBottomRight;
+        path = [UIBezierPath bezierPathWithRoundedRect:r
+                                    byRoundingCorners:uc
+                                          cornerRadii:CGSizeMake(rad, rad)];
+    }
+    [CATransaction begin]; [CATransaction setDisableActions:YES];
+    mask.frame = host.bounds;
+    mask.path = path.CGPath;
+    [CATransaction commit];
+}
+
 static void WCRStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
     if (WCRClassExcluded(NSStringFromClass([cell class]))) return;
@@ -230,6 +266,7 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
         cell.multipleSelectionBackgroundView = nil;
     }
     WCRHideLines(cell);
+    if (!timeline) WCRClipToCard(cell, card);
     if (timeline) {
         if (c.timelineMediaCornerEnabled) WCRRoundMedia(cell, cell);
         CGFloat cw = cell.bounds.size.width;
@@ -387,6 +424,27 @@ static void WCRPaintListSurface(UITableView *tv, UIView *header) {
     }
 }
 
+// 头部里比卡片更宽的白色底块（原生整宽底）会从卡片圆角外露出直角，
+// 只清这类视图，绝不碰卡片自身。
+static void WCRClearWiderWhite(UIView *v, CGFloat cardW, UIView *card, int depth) {
+    if (depth > 6) return;
+    for (UIView *sv in v.subviews) {
+        if (sv == card || [sv isDescendantOfView:card]) continue;
+        if (sv.tag == 0x574354 || sv.tag == 0x574355 || sv.tag == 0x574356) continue;
+        CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
+        if (sw > cardW + 1.0 && sh > 4) {
+            CGFloat w = 0, a = 0;
+            UIColor *c0 = sv.backgroundColor;
+            if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) {
+                sv.backgroundColor = [UIColor clearColor];
+                sv.layer.backgroundColor = nil;
+            }
+        }
+        if (![sv isKindOfClass:[UILabel class]] && ![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UIButton class]])
+            WCRClearWiderWhite(sv, cardW, card, depth + 1);
+    }
+}
+
 static void WCRStyleInfoHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100 || h.bounds.size.height < 60) return;
@@ -405,6 +463,7 @@ static void WCRStyleInfoHeader(UITableView *tv) {
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     WCRClearBg(h, card);
+    WCRClearWiderWhite(h, card.bounds.size.width, card, 0);
     WCRPaintListSurface(tv, h);
 }
 
@@ -447,6 +506,7 @@ static void WCRStyleMyHeader(UITableView *tv) {
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     WCRClearBg(h, card);
+    WCRClearWiderWhite(h, card.bounds.size.width, card, 0);
     WCRPaintListSurface(tv, h);
     name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
     WCRPlace(avatar, h, W / 2, cardTop + 62);

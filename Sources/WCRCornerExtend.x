@@ -278,6 +278,27 @@ static UIColor *WCRBarFill(void) {
     if (@available(iOS 13.0, *)) mine.layer.cornerCurve = kCACornerCurveContinuous;
     if (bg) { bg.tag = 0x574E42; bg.alpha = 0; }
     @try { id fx = [bar valueForKey:@"effectSubview"]; if ([fx isKindOfClass:[UIView class]]) ((UIView *)fx).alpha = 0; } @catch (__unused id e) {}
+    // 顶栏圆角外面不能再有整块白色/灰色底，否则圆角切掉的位置会露出直角。
+    // 只处理导航栏自身与它的父视图，不碰页面内容。
+    UIView *host = bar.superview;
+    if (host) {
+        for (UIView *u in [host.subviews copy]) {
+            if (u == bar || [u isKindOfClass:[UINavigationBar class]]) continue;
+            if ([u isKindOfClass:[UILabel class]] || [u isKindOfClass:[UIImageView class]] ||
+                [u isKindOfClass:[UIButton class]] || [u isKindOfClass:[UIScrollView class]] ||
+                [u isKindOfClass:[UITableView class]] || [u isKindOfClass:[UICollectionView class]]) continue;
+            CGRect uf = u.frame;
+            if (uf.size.width >= bar.bounds.size.width * 0.9 && uf.size.height > 20 &&
+                CGRectGetMaxY(uf) <= CGRectGetMaxY(bar.frame) + 1) {
+                CGFloat w = 0, a = 0;
+                UIColor *uc = u.backgroundColor;
+                if (uc && [uc getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) {
+                    u.backgroundColor = [UIColor colorWithWhite:0.93 alpha:1];
+                    u.layer.backgroundColor = nil;
+                }
+            }
+        }
+    }
     bar.clipsToBounds = NO;
     (void)top;
 }
