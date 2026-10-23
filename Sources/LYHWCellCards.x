@@ -237,17 +237,21 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     if (host.superview != cell) [cell insertSubview:host atIndex:0];
     if (card.superview == cell && [cell.subviews indexOfObject:host] > [cell.subviews indexOfObject:card])
         [cell insertSubview:host belowSubview:card];
+    // 先校验尺寸，再显示/设不透明度：
+    // 转场那几帧 cell 尺寸可能是 0，以前会「先开阴影、再因尺寸不合法提前返回」，
+    // 结果 shadowPath 还是上一种形状（甚至是空的）→ 整圈又大又深的一片，闪一下就消失。
+    CGFloat cw = card.frame.size.width, ch = card.frame.size.height;
+    if (cw < 1 || ch < 1) { host.hidden = YES; host.layer.shadowPath = NULL; return; }
     host.hidden = NO;
     if (!CGRectEqualToRect(host.frame, card.frame)) host.frame = card.frame;
     host.layer.cornerRadius = card.layer.cornerRadius;
     host.layer.maskedCorners = card.layer.maskedCorners;
     if (@available(iOS 13.0, *)) host.layer.cornerCurve = kCACornerCurveContinuous;
-    host.layer.shadowOpacity = (float)st;
 
     CGFloat rad = card.layer.cornerRadius;
     CACornerMask cm = card.layer.maskedCorners;
     CGFloat w = host.bounds.size.width, h = host.bounds.size.height;
-    if (w < 1 || h < 1) return;
+    if (w < 1 || h < 1) { host.hidden = YES; host.layer.shadowPath = NULL; return; }
     CGFloat bandH = MIN(h, 28.0);
     CGRect band = CGRectMake(0, h - bandH, w, bandH);
     UIRectCorner uc = 0;
@@ -258,6 +262,7 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     else path = [UIBezierPath bezierPathWithRoundedRect:band byRoundingCorners:uc
                                           cornerRadii:CGSizeMake(rad, rad)];
     host.layer.shadowPath = path.CGPath;
+    host.layer.shadowOpacity = (float)st;   // 路径就绪后才开阴影，顺序不能反
 }
 
 // 阴影宿主的所有改动都必须关掉隐式动画：
