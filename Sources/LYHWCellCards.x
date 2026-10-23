@@ -225,17 +225,16 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
         if (host) { host.hidden = YES; host.layer.shadowOpacity = 0; }
         return;
     }
-    if (!host) {
-        host = [UIView new];
+    if (!host || ![host isKindOfClass:[LYHWCardView class]]) {
+        // 用锁 frame 的子类做宿主：UIKit 转场里如果再把宿主拉到通栏，
+        // setFrame 会被纠正回 lockedFrame，shadowPath 和宿主尺寸不会脱节。
+        host = [LYHWCardView new];
         host.tag = 0x574357;
         host.userInteractionEnabled = NO;
         host.backgroundColor = [UIColor clearColor];
         host.layer.shadowColor = [UIColor blackColor].CGColor;
         host.layer.shadowRadius = 7;
         host.layer.shadowOffset = CGSizeMake(0, 3);
-        // 关键：新建宿主必须先有 shadowPath（哪怕空路径）且不透明度为 0。
-        // 否则在「已有不透明度、还没有路径」的那一帧，系统会按图层形状算默认阴影，
-        // 表现为整块/整圈又大又虚的阴影闪一下。
         host.layer.shadowPath = [UIBezierPath bezierPathWithRect:CGRectZero].CGPath;
         host.layer.shadowOpacity = 0;
     }
@@ -248,7 +247,7 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     CGFloat cw = card.frame.size.width, ch = card.frame.size.height;
     if (cw < 1 || ch < 1) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
     host.hidden = NO;
-    if (!CGRectEqualToRect(host.frame, card.frame)) host.frame = card.frame;
+    LYHWSetCardFrame(host, card.frame);
     host.layer.cornerRadius = card.layer.cornerRadius;
     host.layer.maskedCorners = card.layer.maskedCorners;
     if (@available(iOS 13.0, *)) host.layer.cornerCurve = kCACornerCurveContinuous;
