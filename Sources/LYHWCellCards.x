@@ -370,66 +370,9 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
     card.layer.shadowOpacity = 0;
     card.layer.shadowPath = NULL;
     for (CALayer *l in [card.layer.sublayers copy]) if ([l.name isEqualToString:@"LYHWShadow"]) [l removeFromSuperlayer];
-    {
-        double strength = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
-        if (strength > 0) {
-            NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(LYHWGroupInfo));
-            if (!gi) { gi = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(LYHWGroupInfo), gi, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
-            NSInteger frow = (secFirst == ip.section) ? fr : 0;
-            NSInteger lrow = (secLast == ip.section) ? lr : MAX(0, [tv numberOfRowsInSection:secLast] - 1);
-            gi[@(secFirst)] = @[@(secFirst), @(frow), @(secLast), @(lrow), @(margin), @(radius), @(timeline ? 6.0 : 0.0), @(strength)];
-        }
-    }
 }
 
 
-
-static void LYHWUpdateGroupShadows(UITableView *tv) {
-    NSMutableDictionary *gi = objc_getAssociatedObject(tv, @selector(LYHWGroupInfo));
-    NSMutableDictionary *pool = objc_getAssociatedObject(tv, @selector(LYHWShadowPool));
-    if (!gi.count && !pool.count) return;
-    if (!pool) { pool = [NSMutableDictionary dictionary]; objc_setAssociatedObject(tv, @selector(LYHWShadowPool), pool, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
-    NSInteger ns = tv.numberOfSections;
-    NSMutableSet *used = [NSMutableSet set];
-    [CATransaction begin]; [CATransaction setDisableActions:YES];
-    for (NSNumber *k in gi) {
-        NSArray *v = gi[k];
-        NSInteger s0 = [v[0] integerValue], r0 = [v[1] integerValue], s1 = [v[2] integerValue], r1 = [v[3] integerValue];
-        if (s0 >= ns || s1 >= ns || r0 >= [tv numberOfRowsInSection:s0] || r1 >= [tv numberOfRowsInSection:s1]) continue;
-        CGFloat m = [v[4] doubleValue], rr = [v[5] doubleValue], inset = [v[6] doubleValue];
-        CGRect a = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:r0 inSection:s0]];
-        CGRect b = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:r1 inSection:s1]];
-        CGFloat top = a.origin.y + inset, bot = CGRectGetMaxY(b) - inset;
-        if (bot - top < 4) continue;
-        CGRect g = CGRectMake(m, top, tv.bounds.size.width - m * 2, bot - top);
-        UIView *sh = pool[k];
-        if (!sh) {
-            sh = [UIView new]; sh.userInteractionEnabled = NO; sh.backgroundColor = [UIColor clearColor];
-            sh.layer.shadowColor = [UIColor blackColor].CGColor;
-            sh.layer.shadowRadius = 7; sh.layer.shadowOffset = CGSizeMake(0, 4);
-            pool[k] = sh;
-        }
-        UIView *bgv = tv.backgroundView;
-        if (sh.superview != tv) {
-            [sh removeFromSuperview];
-            if (bgv && bgv.superview == tv) [tv insertSubview:sh aboveSubview:bgv]; else [tv insertSubview:sh atIndex:0];
-        }
-        sh.layer.zPosition = -1;
-        sh.hidden = NO;
-        if (!CGRectEqualToRect(sh.frame, g)) {
-            sh.frame = g;
-            sh.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:sh.bounds cornerRadius:rr].CGPath;
-        }
-        sh.layer.shadowOpacity = (float)[v[7] doubleValue];
-        [used addObject:k];
-    }
-    for (NSNumber *k in pool) if (![used containsObject:k]) ((UIView *)pool[k]).hidden = YES;
-    // 有 cell 处于左滑状态时，整组阴影全部隐藏，避免露出黑底
-    BOOL swiped = NO;
-    for (UITableViewCell *cell in [tv visibleCells]) { if (LYHWCellIsSwiped(cell)) { swiped = YES; break; } }
-    if (swiped) for (NSNumber *k in pool) ((UIView *)pool[k]).hidden = YES;
-    [CATransaction commit];
-}
 
 %hook UITableViewCell
 - (void)layoutSubviews {
@@ -543,10 +486,6 @@ static void LYHWStyleInfoHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-    double st = LYHWCCfg().cardShadowEnabled ? LYHWCCfg().cardShadowStrength : 0;
-    card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
-    card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
-    card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     LYHWClearBg(h, card);
@@ -584,12 +523,6 @@ static void LYHWStyleMyHeader(UITableView *tv) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-    {
-        double st = LYHWCCfg().cardShadowEnabled ? LYHWCCfg().cardShadowStrength : 0;
-        card.layer.shadowColor = [UIColor blackColor].CGColor; card.layer.shadowOpacity = (float)st;
-        card.layer.shadowRadius = 7; card.layer.shadowOffset = CGSizeMake(0, 4);
-        card.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:card.bounds cornerRadius:24].CGPath;
-    }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     LYHWClearBg(h, card);
@@ -672,7 +605,6 @@ static void LYHWRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
     else if ((LYHWCCfg().profilePageCornerEnabled && LYHWPageKind(self) == 7) || (LYHWCCfg().groupInfoCornerEnabled && LYHWPageKind(self) == 9)) LYHWStyleInfoHeader((UITableView *)self);
     [objc_getAssociatedObject(self, @selector(LYHWGroupInfo)) removeAllObjects];
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) LYHWStyleCellCard(cell);
-    LYHWUpdateGroupShadows((UITableView *)self);
 }
 %end
 

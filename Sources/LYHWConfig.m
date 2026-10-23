@@ -331,7 +331,7 @@ LYHW_STRING(menuIconColorDark, menuIconColorDark, @"#F2F2F7")
 LYHW_BOOL(menuTextCenterEnabled, menuTextCenterEnabled, NO)
 
 LYHW_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, NO)
-LYHW_BOOL(cardShadowEnabled, cardShadowEnabled, YES)
+LYHW_BOOL(cardShadowEnabled, cardShadowEnabled, NO)
 LYHW_DOUBLE(myPageCornerRadius, myPageCornerRadius, 24.0)
 LYHW_DOUBLE(myPageCornerMargin, myPageCornerMargin, 20.0)
 LYHW_DOUBLE(cardShadowStrength, cardShadowStrength, 0.12)
