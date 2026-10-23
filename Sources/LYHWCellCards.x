@@ -1017,17 +1017,28 @@ static void LYHWAnimateFlyCorner(UIView *v, BOOL toRound, CFTimeInterval dur) {
     LYHWAnimateFlyCorner(fly, NO, 0.28);
 }
 %end
+static void LYHWAnimateVideoFly(id vc, BOOL toRound) {
+    UIView *box = LYHWSafeView(vc, @"playerViewContainer");
+    LYHWAnimateFlyCorner(box, toRound, 0.28);
+    LYHWAnimateFlyCorner(LYHWSafeView(box, @"playerView"), toRound, 0.28);
+    LYHWAnimateFlyCorner(LYHWSafeView(vc, @"playerView"), toRound, 0.28);
+    LYHWAnimateFlyCorner(LYHWSafeView(vc, @"fullScreenContent"), toRound, 0.28);
+}
 %hook WCPlayerConfigFullScreenViewController
 - (void)showVCAnimation {
     %orig;
-    UIView *fly = LYHWSafeView(self, @"playerViewContainer");
-    LYHWAnimateFlyCorner(fly, NO, 0.28);
+    LYHWAnimateVideoFly(self, NO);
 }
 - (void)stopAndCloseFullScreenWindowAnimated:(BOOL)animated withCompletion:(id)completion {
-    if (animated) {
-        UIView *fly = LYHWSafeView(self, @"playerViewContainer");
-        LYHWAnimateFlyCorner(fly, YES, 0.28);
-    }
+    if (animated) LYHWAnimateVideoFly(self, YES);
+    %orig;
+}
+- (void)onFullScreenClose {
+    LYHWAnimateVideoFly(self, YES);
+    %orig;
+}
+- (void)onFullScreenDragEnd {
+    LYHWAnimateVideoFly(self, YES);
     %orig;
 }
 %end
@@ -1121,6 +1132,29 @@ static void LYHWStartTimelineSweep(UIViewController *vc, CFTimeInterval dur) {
         [h.link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
     }
 }
+
+// ===== 从朋友圈返回发现页/主页：cell 被复用，阴影宿主还是旧的（错位的第二层）；页面出现时统一重排 =====
+static void LYHWRestyleVisibleCells(UIView *root) {
+    NSMutableArray *tabs = [NSMutableArray array];
+    LYHWFindTables(root, tabs, 0);
+    for (UITableView *tv in tabs) {
+        [UIView performWithoutAnimation:^{
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            for (UITableViewCell *cell in tv.visibleCells) {
+                LYHWHideShadowHost(cell);
+                [cell setNeedsLayout];
+                [cell layoutIfNeeded];
+            }
+            [CATransaction commit];
+        }];
+    }
+}
+static void LYHWRestyleOnAppear(UIViewController *vc) {
+    if (!vc.isViewLoaded) return;
+    LYHWRestyleVisibleCells(vc.view);
+    dispatch_async(dispatch_get_main_queue(), ^{ LYHWRestyleVisibleCells(vc.view); });
+}
 %hook WCTimeLineViewController
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
@@ -1129,6 +1163,23 @@ static void LYHWStartTimelineSweep(UIViewController *vc, CFTimeInterval dur) {
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     LYHWStartTimelineSweep((UIViewController *)self, 0.6);
+}
+%end
+
+%hook UIViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    if (self.isViewLoaded) {
+        NSInteger k = LYHWPageKind(self.view);
+        if (k >= 1 && k <= 4) LYHWRestyleOnAppear((UIViewController *)self);
+    }
+}
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (self.isViewLoaded) {
+        NSInteger k = LYHWPageKind(self.view);
+        if (k >= 1 && k <= 4) LYHWRestyleOnAppear((UIViewController *)self);
+    }
 }
 %end
 
