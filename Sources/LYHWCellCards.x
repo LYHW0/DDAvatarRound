@@ -315,6 +315,9 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     CGFloat P = kLYHWShPad;
     CGRect hf = CGRectInset(cf, -P, -P);
     LYHWSetCardFrame(host, hf);   // 锁 frame：转场拉宽也会被纠正
+    // 阴影超出 cell 底边 16pt，cell 一旦裁剪就会把阴影齐边切掉（返回转场时会被打开裁剪）
+    if (cell.clipsToBounds) cell.clipsToBounds = NO;
+    if (cell.layer.masksToBounds) cell.layer.masksToBounds = NO;
     UIImage *img = LYHWShadowImage(card.layer.cornerRadius, st);
     CALayer *L = host.layer;
     if (L.contents != (__bridge id)img.CGImage) {
@@ -767,6 +770,10 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
 
 
 %hook UITableViewCell
+- (void)setClipsToBounds:(BOOL)clip {
+    if (clip && [(UIView *)self viewWithTag:0x574357]) clip = NO;
+    %orig(clip);
+}
 // 微信在转场开头会把 backgroundView / backgroundColor 重置回原生，卡片被换掉，前几帧就是直通白条。
 // 这里不让别人替换我们的卡片，并在被改背景色后立刻补回样式。
 - (void)setBackgroundView:(UIView *)v {
