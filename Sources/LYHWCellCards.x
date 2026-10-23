@@ -653,6 +653,10 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
 
 
 %hook UITableViewCell
+- (void)didMoveToWindow {
+    %orig;
+    if (self.window && LYHWAnyCardOn()) LYHWStyleCellCard((UITableViewCell *)self);
+}
 - (void)prepareForReuse {
     %orig;
     LYHWHideShadowHost((UITableViewCell *)self);
@@ -1143,9 +1147,9 @@ static void LYHWRestyleVisibleCells(UIView *root) {
             [CATransaction begin];
             [CATransaction setDisableActions:YES];
             for (UITableViewCell *cell in tv.visibleCells) {
-                LYHWHideShadowHost(cell);
                 [cell setNeedsLayout];
                 [cell layoutIfNeeded];
+                LYHWStyleCellCard(cell);   // 主动套一次，不依赖 layoutSubviews 是否被触发
             }
             [CATransaction commit];
         }];
@@ -1170,6 +1174,12 @@ static void LYHWRestyleOnAppear(UIViewController *vc) {
     if (!vc.isViewLoaded) return;
     gLYHWShadowQuietUntil = CACurrentMediaTime() + 0.45;
     LYHWRestyleVisibleCells(vc.view);
+    // 返回转场期间微信会反复重置 cell：在转场的每个阶段都重套一次卡片样式
+    double delays[] = {0.016, 0.04, 0.08, 0.14, 0.22, 0.32, 0.45};
+    for (int i = 0; i < 7; i++)
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delays[i] * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            LYHWRestyleVisibleCells(vc.view);
+        });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         LYHWFadeInShadows(vc.view);
     });
