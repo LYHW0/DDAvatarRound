@@ -496,7 +496,8 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
 }
 static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     if (!cell) return;
-    LYHWHideShadowHost(cell);
+    // 不在这里藏阴影宿主：转场期间每帧都会重套，cell 偶尔暂时查不到 indexPath 就会提前返回，
+    // 先藏后不显示 → 整块阴影逐帧闪。旧宿主由 prepareForReuse 负责藏，需要显示/隐藏由 Apply 决定。
     if (LYHWClassExcluded(NSStringFromClass([cell class]))) return;
     UITableView *tv = nil;
     for (UIView *v = cell.superview; v; v = v.superview)
