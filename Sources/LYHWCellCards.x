@@ -972,6 +972,58 @@ static void LYHWRoundTimelineTemplate(UIView *v) {
 }
 %end
 
+// ===== 预览返回：朋友圈页面出现的整个动画期间，每帧给可见 cell 里的媒体补圆角 =====
+static void LYHWFindTables(UIView *v, NSMutableArray *out, int depth) {
+    if (depth > 6) return;
+    if ([v isKindOfClass:[UITableView class]]) { [out addObject:v]; return; }
+    for (UIView *sv in v.subviews) LYHWFindTables(sv, out, depth + 1);
+}
+static void LYHWSweepTimelineMedia(UIView *root) {
+    LYHWConfig *c = LYHWCCfg();
+    if (!root || !c.timelineCornerEnabled || !c.timelineMediaCornerEnabled) return;
+    NSMutableArray *tabs = [NSMutableArray array];
+    LYHWFindTables(root, tabs, 0);
+    for (UITableView *tv in tabs) {
+        for (UITableViewCell *cell in tv.visibleCells) LYHWRoundMedia(cell, cell);
+    }
+}
+@interface LYHWTimelineLink : NSObject
+@property (nonatomic, weak) UIView *root;
+@property (nonatomic, strong) CADisplayLink *link;
+@property (nonatomic, assign) CFTimeInterval until;
+- (void)tick:(CADisplayLink *)l;
+@end
+@implementation LYHWTimelineLink
+- (void)tick:(CADisplayLink *)l {
+    UIView *r = self.root;
+    if (!r || CACurrentMediaTime() > self.until) { [l invalidate]; self.link = nil; return; }
+    [UIView performWithoutAnimation:^{ LYHWSweepTimelineMedia(r); }];
+}
+@end
+static void LYHWStartTimelineSweep(UIViewController *vc, CFTimeInterval dur) {
+    if (!vc.isViewLoaded) return;
+    static const void *kKey = &kKey;
+    LYHWTimelineLink *h = objc_getAssociatedObject(vc, kKey);
+    if (!h) { h = [LYHWTimelineLink new]; objc_setAssociatedObject(vc, kKey, h, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+    h.root = vc.view;
+    h.until = CACurrentMediaTime() + dur;
+    LYHWSweepTimelineMedia(vc.view);
+    if (!h.link) {
+        h.link = [CADisplayLink displayLinkWithTarget:h selector:@selector(tick:)];
+        [h.link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    }
+}
+%hook WCTimeLineViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    LYHWStartTimelineSweep((UIViewController *)self, 1.2);
+}
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    LYHWStartTimelineSweep((UIViewController *)self, 0.6);
+}
+%end
+
 static void LYHWClearTree(UIView *v) {
     v.backgroundColor = [UIColor clearColor];
     for (UIView *sv in v.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) LYHWClearTree(sv);
