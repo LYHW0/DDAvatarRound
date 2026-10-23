@@ -250,17 +250,18 @@ static UIImage *LYHWShadowImage(CGFloat rad, CGFloat strength) {
         [outside appendPath:shape];
         outside.usesEvenOddFillRule = YES;
         [outside addClip];
-        // ① 环境阴影：向下扩散、柔和
+        // 只用柔和扩散，不加「接触阴影」细线：
+        // 细线沿圆角会画出一圈偏移 16pt 的清晰轮廓，看起来像第二层圆角叠在卡片下沿。
         CGContextSaveGState(g);
-        CGContextSetShadowWithColor(g, CGSizeMake(0, 6), 12,
-            [UIColor colorWithWhite:0 alpha:MIN(1.0, a * 1.1)].CGColor);
+        CGContextSetShadowWithColor(g, CGSizeMake(0, 5), 14,
+            [UIColor colorWithWhite:0 alpha:MIN(1.0, a * 1.03)].CGColor);
         [[UIColor blackColor] setFill];
         [shape fill];
         CGContextRestoreGState(g);
-        // ② 接触阴影：贴着圆角边缘的细线，给出立体厚度
+        // 再叠一层更宽的淡影，让边缘过渡更自然
         CGContextSaveGState(g);
-        CGContextSetShadowWithColor(g, CGSizeMake(0, 1.5), 2.5,
-            [UIColor colorWithWhite:0 alpha:MIN(1.0, a * 0.9)].CGColor);
+        CGContextSetShadowWithColor(g, CGSizeMake(0, 8), 24,
+            [UIColor colorWithWhite:0 alpha:MIN(1.0, a * 0.45)].CGColor);
         [[UIColor blackColor] setFill];
         [shape fill];
         CGContextRestoreGState(g);
