@@ -258,19 +258,22 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
     CACornerMask m = cfg.topbarCornerTopFlatEnabled
         ? (kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner)
         : (kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner);
+    // 只改圆角，不改 frame / 颜色：原生 _UIBarBackground 自己的底色保持不变
     for (UIView *sv in bar.subviews) {
         if (![NSStringFromClass([sv class]) isEqualToString:@"_UIBarBackground"]) continue;
-        sv.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
         sv.layer.cornerRadius = r;
         sv.layer.maskedCorners = m;
         if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
-        sv.clipsToBounds = YES;
         sv.layer.masksToBounds = YES;
-        sv.hidden = NO;
-        sv.alpha = 1;
     }
 }
+
+%hook MMUINavigationBar
+- (void)layoutSubviews {
+    %orig;
+    WCRRoundCustomNavBar((UIView *)self, WCRCfgEx());
+}
+%end
 
 %hook UINavigationBar
 - (void)layoutSubviews {
