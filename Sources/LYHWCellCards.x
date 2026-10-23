@@ -936,22 +936,40 @@ static void LYHWRoundTimelineTemplate(UIView *v) {
     LYHWRoundMedia(v, v);
 }
 %hook WCSightView
-- (void)layoutSubviews { %orig; LYHWRoundTimelineMediaSelf((UIView *)self); }
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundTimelineMediaSelf((UIView *)self);
+}
 %end
 %hook SightView
-- (void)layoutSubviews { %orig; LYHWRoundTimelineMediaSelf((UIView *)self); }
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundTimelineMediaSelf((UIView *)self);
+}
 %end
 %hook WCContentItemViewTemplateGrid
-- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundTimelineTemplate((UIView *)self);
+}
 %end
 %hook WCContentItemViewTemplateClassic
-- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundTimelineTemplate((UIView *)self);
+}
 %end
 %hook WCContentItemViewTemplateVideo
-- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundTimelineTemplate((UIView *)self);
+}
 %end
 %hook WCContentItemViewTemplateNewSight
-- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundTimelineTemplate((UIView *)self);
+}
 %end
 
 static void LYHWClearTree(UIView *v) {
