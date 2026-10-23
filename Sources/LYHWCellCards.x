@@ -226,7 +226,7 @@ static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig 
     host.layer.shadowPath = path.CGPath;
 }
 
-// 左滑按钮条（原生 UISwipeActionPullView / 微信自绘的 *Swipe*/*Pull* 容器）：
+// 左滑按钮条（原生 UISwipeActionPullView / 微信自绘的 Swipe / Pull 容器）：
 //   · 原生是全通栏、直角、还带一层投影，左滑时看起来像「从屏幕最右边钻出来」，
 //     而且那层投影会压在白卡上，在按钮左侧留下一条黑色渐变块；
 //   · 这里把它整体收进卡片范围（右缘对齐卡片右缘）、按卡片圆角裁边、去掉投影，
