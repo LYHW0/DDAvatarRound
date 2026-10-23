@@ -101,6 +101,27 @@ static void LYHWRoundMedia(UIView *root, UIView *v) {
         LYHWRoundMedia(root, sv);
     }
 }
+// 左滑/编辑状态时，cell 会左右位移并露出操作按钮；
+// 此时分组阴影宿主会出现在按钮区域，看起来像一块黑底，因此临时隐藏它。
+static BOOL LYHWCellIsSwiped(UITableViewCell *cell) {
+    if (!cell) return NO;
+    if (@available(iOS 11.0, *)) {
+        if (cell.accessoryType != UITableViewCellAccessoryNone) {}
+    }
+    UIView *content = cell.contentView;
+    if (content.transform.tx != 0) return YES;
+    @try {
+        id state = [cell valueForKey:@"swipeState"];
+        if ([state respondsToSelector:@selector(unsignedIntegerValue)] &&
+            ((id (*)(id, SEL))objc_msgSend)(state, @selector(unsignedIntegerValue)) != 0) return YES;
+    } @catch (__unused id e) {}
+    for (UIView *sv in cell.subviews) {
+        NSString *cn = NSStringFromClass([sv class]);
+        if ([cn containsString:@"Swipe"] && !sv.hidden && sv.alpha > 0.01) return YES;
+    }
+    return NO;
+}
+
 // 给内容层套一个与卡片形状完全一致的裁剪遮罩，
 // 这样卡片圆角之外不可能再露出任何直角白块。
 static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
@@ -285,7 +306,8 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
         cell.multipleSelectionBackgroundView = nil;
     }
     LYHWHideLines(cell);
-    if (!timeline) LYHWClipToCard(cell, card);
+    if (!timeline && !LYHWCellIsSwiped(cell)) LYHWClipToCard(cell, card);
+    else if (timeline) { /* 朋友圈单独处理 */ }
     if (profileLike) {
         // 群聊页真实层级：cell 里有整屏宽（393）的白色视图（非卡片宿主 0x574352），
         // 它的直角会从卡片圆角外露出。这里把它们统一清透明，只保留卡片宿主。
@@ -402,6 +424,10 @@ static void LYHWUpdateGroupShadows(UITableView *tv) {
         [used addObject:k];
     }
     for (NSNumber *k in pool) if (![used containsObject:k]) ((UIView *)pool[k]).hidden = YES;
+    // 有 cell 处于左滑状态时，整组阴影全部隐藏，避免露出黑底
+    BOOL swiped = NO;
+    for (UITableViewCell *cell in [tv visibleCells]) { if (LYHWCellIsSwiped(cell)) { swiped = YES; break; } }
+    if (swiped) for (NSNumber *k in pool) ((UIView *)pool[k]).hidden = YES;
     [CATransaction commit];
 }
 
