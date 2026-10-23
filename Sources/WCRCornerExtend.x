@@ -278,7 +278,7 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
     WCRConfig *cfg = WCRCfgEx();
     UIView *bar = (UIView *)self;
     if ([NSStringFromClass([bar class]) isEqualToString:@"MMUINavigationBar"]) {
-        WCRRoundCustomNavBar(bar, cfg);
+        // 自绘顶栏（MMUINavigationBar）不再改动：此前的底色/圆角处理会产生多余的白色圆角块
         return;
     }
     UIView *mine = [bar viewWithTag:0x574E43];
