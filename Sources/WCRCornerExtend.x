@@ -415,3 +415,33 @@ static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
         NSLog(@"[WCCornerExtend] 系统组件: UIAlertController, MMEmojiView, EmoticonBoardView, UIMenuController, MMActionSheetView");
     }
 }
+
+#pragma mark - 聊天页顶栏（MMMsgContentNavBar 的灰色底层）
+
+// 真实层级：MMMsgContentNavBar (0,0,393x98)
+//   UIView (0,0,393x98)  ← 灰色底 + UIVisualEffectView（这一层才是可见的顶栏底）
+// 只圆化这个底视图，不改 frame 和颜色，按钮/标题不动。
+static void WCRRoundMsgNavBar(UIView *nav, WCRConfig *cfg) {
+    if (!cfg.topbarCornerEnabled) return;
+    CGFloat r = cfg.topbarCornerRadius;
+    CACornerMask m = cfg.topbarCornerTopFlatEnabled
+        ? (kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner)
+        : (kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner);
+    for (UIView *sv in nav.subviews) {
+        if (sv.bounds.size.width < nav.bounds.size.width - 1) continue;
+        if (sv.bounds.size.height < 40) continue;
+        if ([sv isKindOfClass:[UIButton class]] || [sv isKindOfClass:[UILabel class]]) continue;
+        sv.layer.cornerRadius = r;
+        sv.layer.maskedCorners = m;
+        if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
+        sv.layer.masksToBounds = YES;
+        sv.clipsToBounds = YES;
+    }
+}
+
+%hook MMMsgContentNavBar
+- (void)layoutSubviews {
+    %orig;
+    WCRRoundMsgNavBar((UIView *)self, WCRCfgEx());
+}
+%end
