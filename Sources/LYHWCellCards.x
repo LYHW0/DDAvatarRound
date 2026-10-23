@@ -136,8 +136,12 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
         mask.name = @"LYHWClipMask";
         host.mask = mask;
     }
-    CGRect r = [cell convertRect:card.frame fromView:card.superview];
+    // 遮罩路径必须在 contentView 自己的坐标系里算：转场/左滑时 contentView 相对 cell 有偏移，
+    // 按 cell 坐标算会让裁剪错位，露出一层比卡片更宽的白色内容层（截图里卡片左侧多出的外圈）。
+    CGRect r = [cell.contentView convertRect:card.frame fromView:card.superview];
     if (r.size.width < 1 || r.size.height < 1) { host.mask = nil; return; }
+    cell.contentView.backgroundColor = [UIColor clearColor];
+    cell.contentView.layer.backgroundColor = [UIColor clearColor].CGColor;
     CGFloat rad = card.layer.cornerRadius;
     CACornerMask cm = card.layer.maskedCorners;
     UIBezierPath *path = nil;
