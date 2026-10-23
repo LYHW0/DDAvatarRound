@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import "LYHWConfig.h"
@@ -307,6 +308,20 @@ static void LYHWScanSwipeViews(UIView *root, UIView *contentView,
     }
 }
 
+// 兜底：cell 里除内容层以外的任何兄弟视图，只要带投影就清掉。
+//   左滑按钮层在 contentView 之上，它的投影会直接压在白卡上变成一条黑边。
+//   这里不猜类名，凡是「盖在卡片上又带投影」的一律清掉（我们自己的阴影宿主 0x574357 除外）。
+static void LYHWSweepSiblingShadows(UITableViewCell *cell) {
+    if (!cell) return;
+    for (UIView *v in [cell.subviews copy]) {
+        if (v == cell.contentView || v == cell.backgroundView || v == cell.selectedBackgroundView) continue;
+        if (v.tag == 0x574352 || v.tag == 0x574353 || v.tag == 0x574357) continue;
+        if ([cell.contentView isDescendantOfView:v]) continue;   // 包着内容层的容器不动
+        CALayer *l = v.layer;
+        if (l.shadowOpacity > 0.001f || l.shadowPath) LYHWKillShadow(v);
+    }
+}
+
 static void LYHWConstrainSwipeViews(UITableViewCell *cell, UIView *card) {
     if (!cell || !card) return;
     CGRect cr = card.frame;
@@ -314,6 +329,24 @@ static void LYHWConstrainSwipeViews(UITableViewCell *cell, UIView *card) {
     LYHWScanSwipeViews(cell, cell.contentView,
                        CGRectGetMinX(cr), CGRectGetMaxX(cr),
                        card.layer.cornerRadius, card.layer.maskedCorners, 0);
+    LYHWSweepSiblingShadows(cell);
+}
+
+// 左滑按钮层是「开始滑动那一刻」才建出来的，cell 的 layoutSubviews 不一定再走一遍，
+// 所以滑动中补几次重扫（同一段滑动只排一次，靠时间戳节流）。
+static void LYHWScheduleSwipeRescan(UITableViewCell *cell, UIView *card) {
+    if (!cell || !card) return;
+    NSNumber *last = objc_getAssociatedObject(cell, @selector(LYHWScheduleSwipeRescan));
+    NSTimeInterval now = CACurrentMediaTime();
+    if (last && now - last.doubleValue < 0.4) return;
+    objc_setAssociatedObject(cell, @selector(LYHWScheduleSwipeRescan), @(now),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    for (NSNumber *d in @[@0.04, @0.18, @0.40]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(d.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            LYHWConstrainSwipeViews(cell, card);
+        });
+    }
 }
 
 static void LYHWStyleCellCard(UITableViewCell *cell) {
@@ -508,6 +541,7 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
     }
     LYHWApplyCardShadow(cell, card, c, isLastRow);
     LYHWConstrainSwipeViews(cell, card);
+    LYHWScheduleSwipeRescan(cell, card);
 }
 
 
