@@ -287,6 +287,30 @@ static void WCRStyleCellCard(UITableViewCell *cell) {
     WCRHideLines(cell);
     if (!timeline) WCRClipToCard(cell, card);
     if (profileLike) {
+        // 群聊页真实层级：cell 里有整屏宽（393）的白色视图（非卡片宿主 0x574352），
+        // 它的直角会从卡片圆角外露出。这里把它们统一清透明，只保留卡片宿主。
+        CGFloat fullW = cell.bounds.size.width;
+        NSMutableArray *st = [NSMutableArray arrayWithObject:cell.contentView];
+        while (st.count) {
+            UIView *v = st.lastObject; [st removeLastObject];
+            for (UIView *sv in v.subviews) {
+                if (sv == card || sv.tag == 0x574352 || sv.tag == 0x574353 || sv.tag == 0x574354 ||
+                    sv.tag == 0x574355 || sv.tag == 0x574356) continue;
+                if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] ||
+                    [sv isKindOfClass:[UIButton class]]) continue;
+                CGFloat w = 0, a = 0;
+                BOOL wide = sv.bounds.size.width >= fullW - 1.0 && sv.bounds.size.height > 4;
+                BOOL white = sv.backgroundColor && [sv.backgroundColor getWhite:&w alpha:&a] && a > 0.02 && w > 0.9;
+                if (wide && white) {
+                    sv.backgroundColor = [UIColor clearColor];
+                    sv.layer.backgroundColor = nil;
+                    sv.layer.cornerRadius = 0;
+                }
+                if (sv.subviews.count) [st addObject:sv];
+            }
+        }
+    }
+    if (profileLike) {
         // 资料页/群聊资料页：cell 的整块白底比卡片宽，左右两侧会露出直角白条，
         // 这里把 cell 本身的背景与 contentView 都收回到卡片宽度范围内。
         CGFloat mg = margin;

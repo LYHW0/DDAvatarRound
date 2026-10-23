@@ -247,36 +247,29 @@ static UIColor *WCRBarFill(void) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
 }
 
-// 聊天页等自绘导航栏（MMUINavigationBar）：底色可能嵌套在 navigationContentView / effectSubview 里，
-// 因此递归找出所有接近整条导航栏宽度的底色层，统一圆化，不裁剪按钮和标题。
-static void WCRRoundNavLayers(UIView *v, UIView *bar, CGFloat r, CACornerMask m, int depth) {
-    if (depth > 5) return;
-    for (UIView *sv in v.subviews) {
-        if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIButton class]] ||
-            [sv isKindOfClass:[UIImageView class]]) continue;
-        CGFloat w = 0, a = 0;
-        BOOL wide = sv.bounds.size.width >= bar.bounds.size.width * 0.9 && sv.bounds.size.height >= 20;
-        BOOL filled = sv.backgroundColor && [sv.backgroundColor getWhite:&w alpha:&a] && a > 0.02;
-        BOOL bgName = [NSStringFromClass([sv class]) containsString:@"Background"] ||
-                      [NSStringFromClass([sv class]) containsString:@"Effect"];
-        if (wide && (filled || bgName)) {
-            sv.layer.cornerRadius = r;
-            sv.layer.maskedCorners = m;
-            if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
-            sv.clipsToBounds = NO;
-            sv.layer.masksToBounds = YES;
-        }
-        WCRRoundNavLayers(sv, bar, r, m, depth + 1);
-    }
-}
-
+// 聊天页顶栏（MMUINavigationBar）的真实结构：
+//   MMUINavigationBar
+//     _UIBarBackground   （frame y=-59，高103，clip=1，是顶栏底色层，背景 nil）
+//     _UINavigationBarContentView （按钮/标题，不能裁剪）
+// 只圆化 _UIBarBackground 这一层，并用它自己的底色填充，不动内容层。
 static void WCRRoundCustomNavBar(UIView *bar, WCRConfig *cfg) {
     if (!cfg.topbarCornerEnabled) return;
     CGFloat r = cfg.topbarCornerRadius;
     CACornerMask m = cfg.topbarCornerTopFlatEnabled
         ? (kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner)
         : (kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner);
-    WCRRoundNavLayers(bar, bar, r, m, 0);
+    for (UIView *sv in bar.subviews) {
+        if (![NSStringFromClass([sv class]) isEqualToString:@"_UIBarBackground"]) continue;
+        sv.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
+        sv.layer.cornerRadius = r;
+        sv.layer.maskedCorners = m;
+        if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
+        sv.clipsToBounds = YES;
+        sv.layer.masksToBounds = YES;
+        sv.hidden = NO;
+        sv.alpha = 1;
+    }
 }
 
 %hook UINavigationBar
