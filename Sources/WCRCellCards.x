@@ -134,6 +134,25 @@ static void WCRClipToCard(UITableViewCell *cell, UIView *card) {
     [CATransaction begin]; [CATransaction setDisableActions:YES];
     mask.frame = host.bounds;
     mask.path = path.CGPath;
+    // 白底（backgroundView）不在 contentView 里，单独给它也套同样的遮罩
+    CALayer *bgHost = card.layer;
+    CAShapeLayer *bgMask = nil;
+    if ([bgHost.mask isKindOfClass:[CAShapeLayer class]] &&
+        [bgHost.mask.name isEqualToString:@"WCRBgMask"]) bgMask = (CAShapeLayer *)bgHost.mask;
+    if (!bgMask) { bgMask = [CAShapeLayer layer]; bgMask.name = @"WCRBgMask"; bgHost.mask = bgMask; }
+    bgMask.frame = bgHost.bounds;
+    CGRect local = card.bounds;
+    UIBezierPath *lp = nil;
+    if (rad < 0.5 || cm == 0) lp = [UIBezierPath bezierPathWithRect:local];
+    else {
+        UIRectCorner uc2 = 0;
+        if (cm & kCALayerMinXMinYCorner) uc2 |= UIRectCornerTopLeft;
+        if (cm & kCALayerMaxXMinYCorner) uc2 |= UIRectCornerTopRight;
+        if (cm & kCALayerMinXMaxYCorner) uc2 |= UIRectCornerBottomLeft;
+        if (cm & kCALayerMaxXMaxYCorner) uc2 |= UIRectCornerBottomRight;
+        lp = [UIBezierPath bezierPathWithRoundedRect:local byRoundingCorners:uc2 cornerRadii:CGSizeMake(rad, rad)];
+    }
+    bgMask.path = lp.CGPath;
     [CATransaction commit];
 }
 
