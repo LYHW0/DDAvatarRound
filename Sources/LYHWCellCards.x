@@ -93,7 +93,7 @@ static void LYHWRoundMedia(UIView *root, UIView *v) {
         CGSize z = sv.bounds.size;
         BOOL media = [cn rangeOfString:@"WebImageView"].location != NSNotFound || [cn rangeOfString:@"SightView"].location != NSNotFound ||
                      [cn rangeOfString:@"MediaItem"].location != NSNotFound || [cn rangeOfString:@"ImageView"].location != NSNotFound || [sv isKindOfClass:[UIImageView class]];
-        if (media && z.width >= 60 && z.height >= 60 && z.width < root.bounds.size.width - 40 && sv.layer.cornerRadius < 1) {
+        if (media && z.width >= 60 && z.height >= 60 && z.width < root.bounds.size.width - 40 && (sv.layer.cornerRadius < 1 || !sv.layer.masksToBounds)) {
             sv.layer.cornerRadius = LYHWCCfg().timelineMediaCornerRadius; sv.layer.masksToBounds = YES; sv.clipsToBounds = YES;
             if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
             continue;
@@ -184,7 +184,7 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
 //     卡片本身不透明、且压在阴影层上方，条带上半部分的阴影自然被盖住，
 //     露出来的只剩圆角板块底部那一圈；
 //   · 左滑时整行会移动，阴影留在原地会变成黑块，所以左滑中直接隐藏。
-static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
+static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
     if (!cell || !card) return;
     double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
     UIView *host = [cell viewWithTag:0x574357];
@@ -225,6 +225,28 @@ static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig 
     else path = [UIBezierPath bezierPathWithRoundedRect:band byRoundingCorners:uc
                                           cornerRadii:CGSizeMake(rad, rad)];
     host.layer.shadowPath = path.CGPath;
+}
+
+// 阴影宿主的所有改动都必须关掉隐式动画：
+//   · 返回(pop)动画期间 cell 会被重新布局，frame 随动画走、shadowPath 却是瞬跳，看起来「阴影在跳」；
+//   · 所以统一放进 performWithoutAnimation + CATransaction，frame/路径/透明度一次到位。
+static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    [UIView performWithoutAnimation:^{ LYHWApplyCardShadowImpl(cell, card, c, isBlockBottom); }];
+    [CATransaction commit];
+}
+
+// cell 被复用后，上一次的阴影宿主还留着旧 frame / 旧 shadowPath（上一行可能很矮），
+// 套到新的高行上就会在行首冒出一条黑色模糊带。每次重新样式化前先藏起来，需要时再由 Apply 显示。
+static void LYHWHideShadowHost(UITableViewCell *cell) {
+    if (!cell) return;
+    for (UIView *v in cell.subviews) {
+        if (v.tag == 0x574357 && !v.hidden) {
+            [UIView performWithoutAnimation:^{ v.hidden = YES; }];
+            return;
+        }
+    }
 }
 
 // 左滑按钮条（原生 UISwipeActionPullView / 微信自绘的 Swipe / Pull 容器）：
@@ -433,6 +455,7 @@ static void LYHWScheduleSwipeRescan(UITableViewCell *cell, UIView *card) {
 
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell) return;
+    LYHWHideShadowHost(cell);
     if (LYHWClassExcluded(NSStringFromClass([cell class]))) return;
     UITableView *tv = nil;
     for (UIView *v = cell.superview; v; v = v.superview)
@@ -629,6 +652,10 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
 
 
 %hook UITableViewCell
+- (void)prepareForReuse {
+    %orig;
+    LYHWHideShadowHost((UITableViewCell *)self);
+}
 - (void)layoutSubviews {
     %orig;
     if (!LYHWAnyCardOn()) return;
@@ -827,6 +854,28 @@ static void LYHWRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
     }
 }
 
+// 页脚（如通讯录底部「130 个朋友」）是不透明白底，会盖住列表灰底，
+// 还会把卡片底部阴影在页脚上缘处切断。把页脚里整宽的白底清成透明，露出列表灰。
+static void LYHWClearFooterTree(UIView *v, CGFloat W, int depth) {
+    if (!v || depth > 3) return;
+    for (UIView *sv in v.subviews) {
+        if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
+        if (sv.bounds.size.width >= W * 0.8) {
+            CGFloat w = 0, a = 0;
+            UIColor *c0 = sv.backgroundColor;
+            if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) { sv.backgroundColor = [UIColor clearColor]; sv.layer.backgroundColor = nil; }
+        }
+        LYHWClearFooterTree(sv, W, depth + 1);
+    }
+}
+static void LYHWPaintFooter(UITableView *tv) {
+    UIView *f = tv.tableFooterView;
+    if (!f || f.bounds.size.height < 1) return;
+    f.backgroundColor = [UIColor clearColor];
+    f.layer.backgroundColor = nil;
+    LYHWClearFooterTree(f, tv.bounds.size.width, 0);
+}
+
 %hook UITableView
 - (void)layoutSubviews {
     %orig;
@@ -836,6 +885,10 @@ static void LYHWRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
         if ((pk == 1 || pk == 2) && th) LYHWRoundHeaderSearch(th, ((UIView *)self).bounds.size.width, LYHWCCfg().searchCornerRadius, 0);
     }
     if (!LYHWAnyCardOn()) return;
+    {
+        NSInteger fk = LYHWPageKind(self);
+        if (fk == 1 || fk == 2 || fk == 4 || fk == 5 || fk == 6) LYHWPaintFooter((UITableView *)self);
+    }
     if (LYHWCCfg().myPageCornerEnabled && LYHWPageKind(self) == 3) {
         LYHWStyleMyHeader((UITableView *)self);
         UITableView *mtv = (UITableView *)self;
@@ -860,6 +913,45 @@ static void LYHWRoundHeaderSearch(UIView *v, CGFloat W, CGFloat r, int depth) {
     [objc_getAssociatedObject(self, @selector(LYHWGroupInfo)) removeAllObjects];
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) LYHWStyleCellCard(cell);
 }
+%end
+
+
+// ===== 朋友圈图片/视频圆角：视频播放/加载/预览回来时被 WeChat 重置，需要在媒体视图自己布局时补回 =====
+static void LYHWRoundTimelineMediaSelf(UIView *v) {
+    LYHWConfig *c = LYHWCCfg();
+    if (!c.timelineCornerEnabled || !c.timelineMediaCornerEnabled) return;
+    CGSize z = v.bounds.size;
+    if (z.width < 60 || z.height < 60 || z.width >= [UIScreen mainScreen].bounds.size.width - 40) return;
+    if (LYHWPageKind(v) != 5) return;
+    CALayer *l = v.layer;
+    if (l.cornerRadius < 1 || !l.masksToBounds) {
+        l.cornerRadius = c.timelineMediaCornerRadius; l.masksToBounds = YES; v.clipsToBounds = YES;
+        if (@available(iOS 13.0, *)) l.cornerCurve = kCACornerCurveContinuous;
+    }
+}
+static void LYHWRoundTimelineTemplate(UIView *v) {
+    LYHWConfig *c = LYHWCCfg();
+    if (!c.timelineCornerEnabled || !c.timelineMediaCornerEnabled) return;
+    if (LYHWPageKind(v) != 5) return;
+    LYHWRoundMedia(v, v);
+}
+%hook WCSightView
+- (void)layoutSubviews { %orig; LYHWRoundTimelineMediaSelf((UIView *)self); }
+%end
+%hook SightView
+- (void)layoutSubviews { %orig; LYHWRoundTimelineMediaSelf((UIView *)self); }
+%end
+%hook WCContentItemViewTemplateGrid
+- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
+%end
+%hook WCContentItemViewTemplateClassic
+- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
+%end
+%hook WCContentItemViewTemplateVideo
+- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
+%end
+%hook WCContentItemViewTemplateNewSight
+- (void)layoutSubviews { %orig; LYHWRoundTimelineTemplate((UIView *)self); }
 %end
 
 static void LYHWClearTree(UIView *v) {
