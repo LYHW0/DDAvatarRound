@@ -256,17 +256,6 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     CACornerMask cm = card.layer.maskedCorners;
     CGFloat w = host.bounds.size.width, h = host.bounds.size.height;
     if (w < 1 || h < 1) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
-    // 参数未变时跳过 shadowPath 重赋值，避免每帧写路径触发 CoreAnimation 重走模糊合成。
-    if ([objc_getAssociatedObject(host, @selector(LYHWShadowKeyRad)) isEqual:(id)@(rad)] &&
-        [objc_getAssociatedObject(host, @selector(LYHWShadowKeyCM)) isEqual:(id)@(cm)] &&
-        [objc_getAssociatedObject(host, @selector(LYHWShadowKeySt)) isEqual:(id)@(st)] &&
-        CGRectEqualToRect([((NSValue *)objc_getAssociatedObject(host, @selector(LYHWShadowKeyFrame))) CGRectValue], host.frame)) {
-        goto shadow_skip;
-    }
-    objc_setAssociatedObject(host, @selector(LYHWShadowKeyRad), @(rad), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(host, @selector(LYHWShadowKeyCM), @(cm), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(host, @selector(LYHWShadowKeySt), @(st), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(host, @selector(LYHWShadowKeyFrame), [NSValue valueWithCGRect:host.frame], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     CGFloat bandH = MIN(h, 28.0);
     CGRect band = CGRectMake(0, h - bandH, w, bandH);
     UIRectCorner uc = 0;
@@ -276,10 +265,14 @@ static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWCon
     if (rad < 0.5 || uc == 0) path = [UIBezierPath bezierPathWithRect:band];
     else path = [UIBezierPath bezierPathWithRoundedRect:band byRoundingCorners:uc
                                           cornerRadii:CGSizeMake(rad, rad)];
+    // 每次都把阴影参数写回：CALayer 默认 offset=(0,-3)、radius=3，一旦某一帧被复位，
+    // 就会画出「整体上移、边缘发硬」的阴影，所以不能只靠创建时设一次。
+    host.layer.shadowColor = [UIColor blackColor].CGColor;
+    host.layer.shadowRadius = 7;
+    host.layer.shadowOffset = CGSizeMake(0, 3);
     host.layer.shadowPath = path.CGPath;
     if (!host.layer.shadowPath) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
     host.layer.shadowOpacity = (float)st;   // 路径就绪后才开阴影，顺序不能反
-shadow_skip:
 }
 
 // 阴影宿主的所有改动都必须关掉隐式动画：
