@@ -436,6 +436,7 @@ static void LYHWRoundMsgNavBar(UIView *nav, LYHWConfig *cfg) {
         if (@available(iOS 13.0, *)) sv.layer.cornerCurve = kCACornerCurveContinuous;
         sv.layer.masksToBounds = YES;
         sv.clipsToBounds = YES;
+        sv.backgroundColor = [UIColor whiteColor];
         // 圆角面填纯白：毛玻璃层本身透明，给它的内容层铺白，模糊观感保留
         for (UIView *inner in sv.subviews) {
             NSString *cn = NSStringFromClass([inner class]);
