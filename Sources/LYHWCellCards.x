@@ -454,7 +454,15 @@ static void LYHWScheduleSwipeRescan(UITableViewCell *cell, UIView *card) {
     }
 }
 
+static BOOL gLYHWInStyle = NO;
+static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
+    if (!cell || gLYHWInStyle) return;
+    gLYHWInStyle = YES;
+    LYHWStyleCellCardInner(cell);
+    gLYHWInStyle = NO;
+}
+static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     if (!cell) return;
     LYHWHideShadowHost(cell);
     if (LYHWClassExcluded(NSStringFromClass([cell class]))) return;
@@ -653,6 +661,27 @@ static void LYHWStyleCellCard(UITableViewCell *cell) {
 
 
 %hook UITableViewCell
+// 微信在转场开头会把 backgroundView / backgroundColor 重置回原生，卡片被换掉，前几帧就是直通白条。
+// 这里不让别人替换我们的卡片，并在被改背景色后立刻补回样式。
+- (void)setBackgroundView:(UIView *)v {
+    if (!gLYHWInStyle) {
+        UIView *cur = [(UITableViewCell *)self backgroundView];
+        if (cur && cur.tag == 0x574352 && v != cur) return;
+    }
+    %orig;
+}
+- (void)setBackgroundColor:(UIColor *)c {
+    %orig;
+    if (gLYHWInStyle || !LYHWAnyCardOn()) return;
+    UIView *cur = [(UITableViewCell *)self backgroundView];
+    if (cur && cur.tag == 0x574352) LYHWStyleCellCard((UITableViewCell *)self);
+}
+- (void)setFrame:(CGRect)f {
+    %orig;
+    if (gLYHWInStyle || !LYHWAnyCardOn()) return;
+    UIView *cur = [(UITableViewCell *)self backgroundView];
+    if (cur && cur.tag == 0x574352 && !self.isHidden) LYHWStyleCellCard((UITableViewCell *)self);
+}
 - (void)didMoveToWindow {
     %orig;
     if (self.window && LYHWAnyCardOn()) LYHWStyleCellCard((UITableViewCell *)self);
