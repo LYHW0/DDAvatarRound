@@ -322,6 +322,87 @@ static void LYHWSweepSiblingShadows(UITableViewCell *cell) {
     }
 }
 
+// ===== 微信自绘左滑（实测转储）=====
+// cell 直接子视图：ColorGradientView(32x72，按钮左侧的黑色渐变) + 普通 UIView(装 MenuButton，右缘=屏幕边缘)。
+// 类名里没有 Swipe/Pull，所以按「含 MenuButton 子视图」「类名含 Gradient」识别。
+static BOOL LYHWIsMenuHost(UIView *v) {
+    for (UIView *sv in v.subviews) {
+        if ([NSStringFromClass([sv class]) rangeOfString:@"MenuButton"].location != NSNotFound) return YES;
+    }
+    return NO;
+}
+
+static UIRectCorner LYHWRectCornerFromMask(CACornerMask m) {
+    UIRectCorner r = 0;
+    if (m & kCALayerMinXMinYCorner) r |= UIRectCornerTopLeft;
+    if (m & kCALayerMaxXMinYCorner) r |= UIRectCornerTopRight;
+    if (m & kCALayerMinXMaxYCorner) r |= UIRectCornerBottomLeft;
+    if (m & kCALayerMaxXMaxYCorner) r |= UIRectCornerBottomRight;
+    return r;
+}
+
+static void LYHWClipMenuHost(UIView *host, UIView *cell, UIView *card) {
+    CGRect cr = [cell convertRect:card.frame toView:host];     // 卡片在按钮容器坐标系里的位置
+    CAShapeLayer *m = nil;
+    if ([host.layer.mask isKindOfClass:[CAShapeLayer class]] &&
+        [host.layer.mask.name isEqualToString:@"LYHWMenuMask"]) m = (CAShapeLayer *)host.layer.mask;
+    if (!m) { m = [CAShapeLayer layer]; m.name = @"LYHWMenuMask"; }
+    CGFloat rad = card.layer.cornerRadius;
+    UIRectCorner rc = LYHWRectCornerFromMask(card.layer.maskedCorners);
+    UIBezierPath *path = rad > 0.5
+        ? [UIBezierPath bezierPathWithRoundedRect:cr byRoundingCorners:rc cornerRadii:CGSizeMake(rad, rad)]
+        : [UIBezierPath bezierPathWithRect:cr];
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    m.frame = host.bounds;
+    m.path = path.CGPath;
+    host.layer.mask = m;
+    [CATransaction commit];
+}
+
+static BOOL LYHWTuneWeChatSwipe(UITableViewCell *cell, UIView *card) {
+    if (!cell || !card) return NO;
+    BOOL found = NO;
+    for (UIView *v in [cell.subviews copy]) {
+        if (v == cell.contentView || v == card) continue;
+        if (v.tag == 0x574352 || v.tag == 0x574353 || v.tag == 0x574357) continue;
+        NSString *cn = NSStringFromClass([v class]);
+        if ([cn rangeOfString:@"Gradient" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            v.hidden = YES; v.alpha = 0; LYHWKillShadow(v); found = YES;      // 黑色渐变块
+            continue;
+        }
+        if (LYHWIsMenuHost(v)) { LYHWClipMenuHost(v, cell, card); found = YES; }
+    }
+    return found;
+}
+
+@interface LYHWSwipeLink : NSObject
+@property (nonatomic, weak) UITableViewCell *cell;
+@property (nonatomic, weak) UIView *card;
+@property (nonatomic, strong) CADisplayLink *link;
+@property (nonatomic, assign) NSInteger idle;
+@end
+@implementation LYHWSwipeLink
+- (void)tick:(CADisplayLink *)l {
+    UITableViewCell *c = self.cell; UIView *card = self.card;
+    if (!c || !card || !c.window) { [self stop]; return; }
+    LYHWTuneWeChatSwipe(c, card);
+    BOOL moved = fabs(c.contentView.frame.origin.x) > 0.5 || fabs(c.contentView.transform.tx) > 0.5;
+    if (moved) self.idle = 0; else if (++self.idle > 30) [self stop];
+}
+- (void)stop { [self.link invalidate]; self.link = nil; if (self.cell) objc_setAssociatedObject(self.cell, @selector(tick:), nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+@end
+
+static void LYHWStartSwipeLink(UITableViewCell *cell, UIView *card) {
+    if (!cell || !card) return;
+    if (objc_getAssociatedObject(cell, @selector(tick:))) return;
+    LYHWSwipeLink *o = [LYHWSwipeLink new];
+    o.cell = cell; o.card = card;
+    o.link = [CADisplayLink displayLinkWithTarget:o selector:@selector(tick:)];
+    [o.link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    objc_setAssociatedObject(cell, @selector(tick:), o, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
 static void LYHWConstrainSwipeViews(UITableViewCell *cell, UIView *card) {
     if (!cell || !card) return;
     CGRect cr = card.frame;
@@ -330,6 +411,7 @@ static void LYHWConstrainSwipeViews(UITableViewCell *cell, UIView *card) {
                        CGRectGetMinX(cr), CGRectGetMaxX(cr),
                        card.layer.cornerRadius, card.layer.maskedCorners, 0);
     LYHWSweepSiblingShadows(cell);
+    if (LYHWTuneWeChatSwipe(cell, card)) LYHWStartSwipeLink(cell, card);
 }
 
 // 左滑按钮层是「开始滑动那一刻」才建出来的，cell 的 layoutSubviews 不一定再走一遍，
