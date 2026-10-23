@@ -211,68 +211,126 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
     [CATransaction commit];
 }
 
-// 板块阴影：只在**整块圆角板块的最下面**出一层阴影。
-//   · 逐行加阴影会在每两行之间多出一条横向暗带，看起来像一条条分割线（用户反馈「太别扭」）；
-//   · 现在只让板块最后一行挂阴影，并把阴影形状裁到卡片下缘一条带 ——
-//     卡片本身不透明、且压在阴影层上方，条带上半部分的阴影自然被盖住，
-//     露出来的只剩圆角板块底部那一圈；
-//   · 左滑时整行会移动，阴影留在原地会变成黑块，所以左滑中直接隐藏。
+// ===== 板块阴影（重写版）=====
+// 不再使用 CALayer 的 shadowOpacity/shadowPath/shadowRadius/shadowOffset：
+// 这些属性在 WeChat 返回转场的某一帧会被复位成默认值（上偏、发硬），表现为整块阴影闪一下。
+// 现在改为：用 CoreGraphics 预先渲染一张「圆角卡片底部柔和投影」的九宫格图片，
+// 直接作为宿主图层的 contents 显示。图片本身就是阴影，没有可被复位的阴影参数，也不会出现
+// 「有透明度没路径」的默认大阴影。
+//   · 只在每个圆角板块的最后一行显示（板块底部）；
+//   · 两层叠加：贴边的细接触阴影（立体感）+ 向下扩散的柔和环境阴影；
+//   · 左右两侧沿圆角弧度向上渐隐，圆角处有自然的包裹感。
+static const CGFloat kLYHWShPad = 16.0;   // 阴影图在卡片四周外扩的距离
+
+static UIImage *LYHWShadowImage(CGFloat rad, CGFloat strength) {
+    static NSCache *cache;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ cache = [NSCache new]; });
+    CGFloat r = MAX(0, MIN(rad, 40));
+    int sk = (int)lround(strength * 100);
+    NSString *key = [NSString stringWithFormat:@"%.1f_%d", r, sk];
+    UIImage *hit = [cache objectForKey:key];
+    if (hit) return hit;
+
+    CGFloat P = kLYHWShPad;
+    CGFloat capH = MAX(r, 6) + 2;                  // 卡片可拉伸区上下保留的高度
+    CGFloat cardW = r * 2 + 4, cardH = capH * 2 + 2;
+    CGSize sz = CGSizeMake(cardW + P * 2, cardH + P * 2);
+    UIGraphicsImageRendererFormat *fmt = [UIGraphicsImageRendererFormat preferredFormat];
+    fmt.opaque = NO;
+    UIGraphicsImageRenderer *rd = [[UIGraphicsImageRenderer alloc] initWithSize:sz format:fmt];
+    CGFloat a = MAX(0.0, MIN(1.0, strength));
+    UIImage *img = [rd imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        CGContextRef g = ctx.CGContext;
+        CGRect card = CGRectMake(P, P, cardW, cardH);
+        UIBezierPath *shape = [UIBezierPath bezierPathWithRoundedRect:card cornerRadius:r];
+        // 只保留卡片外面的区域：卡片本身之下的阴影会被白卡盖住，这里直接挖空，避免半透明叠色
+        CGContextSaveGState(g);
+        UIBezierPath *outside = [UIBezierPath bezierPathWithRect:CGRectMake(0, 0, sz.width, sz.height)];
+        [outside appendPath:shape];
+        outside.usesEvenOddFillRule = YES;
+        [outside addClip];
+        // ① 环境阴影：向下扩散、柔和
+        CGContextSaveGState(g);
+        CGContextSetShadowWithColor(g, CGSizeMake(0, 6), 12,
+            [UIColor colorWithWhite:0 alpha:MIN(1.0, a * 1.1)].CGColor);
+        [[UIColor blackColor] setFill];
+        [shape fill];
+        CGContextRestoreGState(g);
+        // ② 接触阴影：贴着圆角边缘的细线，给出立体厚度
+        CGContextSaveGState(g);
+        CGContextSetShadowWithColor(g, CGSizeMake(0, 1.5), 2.5,
+            [UIColor colorWithWhite:0 alpha:MIN(1.0, a * 0.9)].CGColor);
+        [[UIColor blackColor] setFill];
+        [shape fill];
+        CGContextRestoreGState(g);
+        CGContextRestoreGState(g);
+        // 只要板块下半部分的阴影：上半部分用渐变擦掉，左右两侧沿圆角向上淡出
+        CGFloat fadeTop = P + cardH - capH - 2;
+        CGContextSetBlendMode(g, kCGBlendModeDestinationOut);
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceGray();
+        CGFloat comps[] = {0, 1,  0, 0};
+        CGFloat locs[] = {0, 1};
+        CGGradientRef gr = CGGradientCreateWithColorComponents(cs, comps, locs, 2);
+        CGContextFillRect(g, CGRectMake(0, 0, sz.width, MAX(0, fadeTop - capH * 0.6)));
+        CGContextDrawLinearGradient(g, gr, CGPointMake(0, MAX(0, fadeTop - capH * 0.6)),
+                                    CGPointMake(0, fadeTop + capH * 0.6), 0);
+        CGGradientRelease(gr);
+        CGColorSpaceRelease(cs);
+    }];
+    // 可拉伸区留在卡片正中间（宽 cardW-2*(r+2)=0 时也至少 1pt）
+    CGFloat sideCap = P + r + 2, vCap = P + capH;
+    UIEdgeInsets caps = UIEdgeInsetsMake(vCap, sideCap, sz.height - vCap - 1, sz.width - sideCap - 1);
+    img = [img resizableImageWithCapInsets:caps resizingMode:UIImageResizingModeStretch];
+    [cache setObject:img forKey:key];
+    return img;
+}
+
 static void LYHWApplyCardShadowImpl(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
     if (!cell || !card) return;
     double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
     UIView *host = [cell viewWithTag:0x574357];
+    // 旧版宿主（普通 UIView / 带 shadow 属性）直接换掉
+    if (host && (![host isKindOfClass:[LYHWCardView class]] || !objc_getAssociatedObject(host, (const void *)&kLYHWShPad))) {
+        [host removeFromSuperview]; host = nil;
+    }
     if (st <= 0.001 || !isBlockBottom || LYHWCellIsSwiped(cell)) {
-        if (host) { host.hidden = YES; host.layer.shadowOpacity = 0; }
+        if (host) host.hidden = YES;
         return;
     }
-    if (!host || ![host isKindOfClass:[LYHWCardView class]]) {
-        // 用锁 frame 的子类做宿主：UIKit 转场里如果再把宿主拉到通栏，
-        // setFrame 会被纠正回 lockedFrame，shadowPath 和宿主尺寸不会脱节。
+    CGRect cf = card.frame;
+    if (cf.size.width < 1 || cf.size.height < 1) { if (host) host.hidden = YES; return; }
+    if (!host) {
         host = [LYHWCardView new];
         host.tag = 0x574357;
         host.userInteractionEnabled = NO;
         host.backgroundColor = [UIColor clearColor];
-        host.layer.shadowColor = [UIColor blackColor].CGColor;
-        host.layer.shadowRadius = 7;
-        host.layer.shadowOffset = CGSizeMake(0, 3);
-        host.layer.shadowPath = [UIBezierPath bezierPathWithRect:CGRectZero].CGPath;
-        host.layer.shadowOpacity = 0;
+        host.clipsToBounds = NO;
+        objc_setAssociatedObject(host, (const void *)&kLYHWShPad, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     if (host.superview != cell) [cell insertSubview:host atIndex:0];
     if (card.superview == cell && [cell.subviews indexOfObject:host] > [cell.subviews indexOfObject:card])
         [cell insertSubview:host belowSubview:card];
-    // 先校验尺寸，再显示/设不透明度：
-    // 转场那几帧 cell 尺寸可能是 0，以前会「先开阴影、再因尺寸不合法提前返回」，
-    // 结果 shadowPath 还是上一种形状（甚至是空的）→ 整圈又大又深的一片，闪一下就消失。
-    CGFloat cw = card.frame.size.width, ch = card.frame.size.height;
-    if (cw < 1 || ch < 1) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
+    // 阴影图比卡片大一圈：四周外扩 kLYHWShPad
+    CGFloat P = kLYHWShPad;
+    CGRect hf = CGRectInset(cf, -P, -P);
+    LYHWSetCardFrame(host, hf);   // 锁 frame：转场拉宽也会被纠正
+    UIImage *img = LYHWShadowImage(card.layer.cornerRadius, st);
+    CALayer *L = host.layer;
+    if (L.contents != (__bridge id)img.CGImage) {
+        L.contents = (__bridge id)img.CGImage;
+        L.contentsScale = img.scale;
+        CGSize isz = img.size;
+        UIEdgeInsets ci = img.capInsets;
+        // contentsCenter 用单位坐标：中间可拉伸区
+        L.contentsCenter = CGRectMake(ci.left / isz.width, ci.top / isz.height,
+                                      MAX(0.0, (isz.width - ci.left - ci.right) / isz.width),
+                                      MAX(0.0, (isz.height - ci.top - ci.bottom) / isz.height));
+        L.contentsGravity = kCAGravityResize;
+    }
+    L.shadowOpacity = 0;   // 新版不使用系统阴影
+    host.alpha = 1;
     host.hidden = NO;
-    LYHWSetCardFrame(host, card.frame);
-    host.layer.cornerRadius = card.layer.cornerRadius;
-    host.layer.maskedCorners = card.layer.maskedCorners;
-    if (@available(iOS 13.0, *)) host.layer.cornerCurve = kCACornerCurveContinuous;
-
-    CGFloat rad = card.layer.cornerRadius;
-    CACornerMask cm = card.layer.maskedCorners;
-    CGFloat w = host.bounds.size.width, h = host.bounds.size.height;
-    if (w < 1 || h < 1) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
-    CGFloat bandH = MIN(h, 28.0);
-    CGRect band = CGRectMake(0, h - bandH, w, bandH);
-    UIRectCorner uc = 0;
-    if (cm & kCALayerMinXMaxYCorner) uc |= UIRectCornerBottomLeft;
-    if (cm & kCALayerMaxXMaxYCorner) uc |= UIRectCornerBottomRight;
-    UIBezierPath *path = nil;
-    if (rad < 0.5 || uc == 0) path = [UIBezierPath bezierPathWithRect:band];
-    else path = [UIBezierPath bezierPathWithRoundedRect:band byRoundingCorners:uc
-                                          cornerRadii:CGSizeMake(rad, rad)];
-    // 每次都把阴影参数写回：CALayer 默认 offset=(0,-3)、radius=3，一旦某一帧被复位，
-    // 就会画出「整体上移、边缘发硬」的阴影，所以不能只靠创建时设一次。
-    host.layer.shadowColor = [UIColor blackColor].CGColor;
-    host.layer.shadowRadius = 7;
-    host.layer.shadowOffset = CGSizeMake(0, 3);
-    host.layer.shadowPath = path.CGPath;
-    if (!host.layer.shadowPath) { host.hidden = YES; host.layer.shadowOpacity = 0; return; }
-    host.layer.shadowOpacity = (float)st;   // 路径就绪后才开阴影，顺序不能反
 }
 
 // 阴影宿主的所有改动都必须关掉隐式动画：
@@ -291,7 +349,7 @@ static void LYHWHideShadowHost(UITableViewCell *cell) {
     if (!cell) return;
     for (UIView *v in cell.subviews) {
         if (v.tag == 0x574357 && !v.hidden) {
-            [UIView performWithoutAnimation:^{ v.hidden = YES; v.layer.shadowOpacity = 0; }];
+            [UIView performWithoutAnimation:^{ v.hidden = YES; }];
             return;
         }
     }
