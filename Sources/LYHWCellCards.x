@@ -123,6 +123,35 @@ static BOOL LYHWCellIsSwiped(UITableViewCell *cell) {
     return NO;
 }
 
+// 卡片视图：frame 锁定。
+// 转储证实：返回转场里 UIKit 会把 cell.backgroundView 重设成 cell 的 bounds（{0,0,393,56} 通栏），
+// 稳定后才被我们改回 {10,0,373,56}，中间那几帧就是直角白条。
+// 锁定后，任何人对 frame/bounds/center 的修改都会被纠正成我们要的矩形。
+@interface LYHWCardView : UIView
+@property (nonatomic, assign) CGRect lockedFrame;
+@property (nonatomic, assign) BOOL locked;
+@end
+@implementation LYHWCardView
+- (void)setFrame:(CGRect)f {
+    [super setFrame:self.locked ? self.lockedFrame : f];
+}
+- (void)setBounds:(CGRect)b {
+    if (self.locked) b = CGRectMake(0, 0, self.lockedFrame.size.width, self.lockedFrame.size.height);
+    [super setBounds:b];
+}
+- (void)setCenter:(CGPoint)c {
+    if (self.locked) c = CGPointMake(CGRectGetMidX(self.lockedFrame), CGRectGetMidY(self.lockedFrame));
+    [super setCenter:c];
+}
+@end
+static void LYHWSetCardFrame(UIView *card, CGRect r) {
+    if ([card isKindOfClass:[LYHWCardView class]]) {
+        LYHWCardView *cv = (LYHWCardView *)card;
+        cv.lockedFrame = r; cv.locked = YES;
+    }
+    card.frame = r;
+}
+
 // 给内容层套一个与卡片形状完全一致的裁剪遮罩，
 // 这样卡片圆角之外不可能再露出任何直角白块。
 static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
@@ -536,14 +565,14 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
         if (sv.bounds.size.height >= cell.bounds.size.height * 0.8) { sv.backgroundColor = [UIColor clearColor]; sv.layer.backgroundColor = [UIColor clearColor].CGColor; }
     }
     UIView *card = cell.backgroundView;
-    if (!card || card.tag != 0x574352) {
-        card = [UIView new];
+    if (!card || card.tag != 0x574352 || ![card isKindOfClass:[LYHWCardView class]]) {
+        card = [LYHWCardView new];
         card.tag = 0x574352;
         card.userInteractionEnabled = NO;
         cell.backgroundView = card;
     }
     // 同组整块：上下不留缝，只有首尾行有圆角
-    card.frame = CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height);
+    LYHWSetCardFrame(card, CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height));
     card.backgroundColor = LYHWCardFill();
     if (kind == 1 && !timeline) {
         card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
@@ -575,7 +604,7 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
         CGRect f = card.frame;
         CGFloat top = isFirstRow ? 6 : 0, bot = isLastRow ? 6 : 0;
         f.origin.y = top; f.size.height = cell.bounds.size.height - top - bot;
-        card.frame = f;
+        LYHWSetCardFrame(card, f);
         if (m == 0) card.layer.cornerRadius = 0;
     } else if (m == 0) card.layer.cornerRadius = 0;
     {
@@ -631,7 +660,7 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
         cell.clipsToBounds = NO;
         cell.backgroundColor = [UIColor clearColor];
         if (cf.origin.x != 0) cell.contentView.frame = CGRectMake(0, cf.origin.y, cell.bounds.size.width, cf.size.height);
-        card.frame = CGRectMake(mg, 0, cell.bounds.size.width - mg * 2, cell.bounds.size.height);
+        LYHWSetCardFrame(card, CGRectMake(mg, 0, cell.bounds.size.width - mg * 2, cell.bounds.size.height));
         for (UIView *sv in cell.subviews) {
             if (sv == cell.contentView || sv == card || sv.tag == 0x574353) continue;
             if (sv.bounds.size.width > cell.bounds.size.width - mg * 2 + 0.5 && sv.bounds.size.height > 4) {
