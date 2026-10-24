@@ -738,8 +738,7 @@ static BOOL gLYHWInStyle = NO;
 static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell || gLYHWInStyle) return;
-    // 液态底栏模式与卡片圆角互斥，避免底栏重排时反复触发 cell 样式
-    if (LYHWCCfg().liquidTabBarEnabled) return;
+    // 液态底栏只与“底栏圆角”互斥，主页卡片圆角仍正常生效。
     if (LYHWStyling(cell)) return;
     LYHWSetStyling(cell, YES);
     gLYHWInStyle = YES;
@@ -1395,9 +1394,6 @@ static void LYHWClearSectionBars(UITableView *tv) {
         if ((pk == 1 || pk == 2) && th) LYHWRoundHeaderSearch(th, ((UIView *)self).bounds.size.width, LYHWCCfg().searchCornerRadius, 0);
     }
     if (!LYHWAnyCardOn()) return;
-    // 液态底栏会重排底栏子视图并触发 trait 刷新；
-    // 这时再对表格做卡片样式会互相触发，直接跳过全部卡片处理。
-    if (LYHWCCfg().liquidTabBarEnabled) return;
     {
         NSInteger fk = LYHWPageKind(self);
         if (fk == 1 || fk == 2 || fk == 4 || fk == 5 || fk == 6) LYHWPaintFooter((UITableView *)self);
