@@ -7,6 +7,16 @@
 
 static inline LYHWConfig *LYHWCCfg(void) { return [LYHWConfig shared]; }
 
+// 最后一行的阴影挂在 cell.layer 上。微信长按时会先后调用 highlighted/selected，
+// 两个状态存在短暂交错；用独立按压标记把整段手势锁住，避免阴影在中途恢复后跟着 cell 动。
+static const void *kLYHWPressActiveKey = &kLYHWPressActiveKey;
+static BOOL LYHWPressActive(UITableViewCell *cell) {
+    return [objc_getAssociatedObject(cell, kLYHWPressActiveKey) boolValue];
+}
+static void LYHWSetPressActive(UITableViewCell *cell, BOOL active) {
+    objc_setAssociatedObject(cell, kLYHWPressActiveKey, @(active), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
 static UIColor *LYHWListGray(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark
@@ -271,7 +281,7 @@ static void LYHWSetSinkShadow(CALayer *L, CGRect cardFrame, CGFloat rad, CACorne
 static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
     if (!cell || !card) return;
     double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
-    BOOL on = (st > 0.001) && isBlockBottom && !LYHWCellIsSwiped(cell) && !cell.highlighted && !cell.selected;
+    BOOL on = (st > 0.001) && isBlockBottom && !LYHWPressActive(cell) && !LYHWCellIsSwiped(cell) && !cell.highlighted && !cell.selected;
     LYHWSetSinkShadow(cell.layer, card.frame, card.layer.cornerRadius, card.layer.maskedCorners, on ? st : 0);
 }
 
@@ -929,16 +939,19 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
             }
         }
     }
-    // 按下时收起阴影、松开时恢复：统一交给阴影函数按 highlighted/selected 判断
+    // 长按/选中期间锁定状态：不要让微信的中间态触发一次恢复阴影，
+    // 否则阴影挂在最后一行 cell.layer 上，会随那一行的高亮/菜单动画一起移动。
     {
+        BOOL pressed = cell.highlighted || cell.selected;
+        LYHWSetPressActive(cell, pressed);
         NSIndexPath *ip = nil;
         UITableView *tv = nil;
         for (UIView *v = cell.superview; v; v = v.superview) if ([v isKindOfClass:[UITableView class]]) { tv = (UITableView *)v; break; }
         if (tv) ip = [tv indexPathForCell:cell];
-        BOOL pressed = cell.highlighted || cell.selected;
         if (pressed) {
             [CATransaction begin]; [CATransaction setDisableActions:YES];
             cell.layer.shadowOpacity = 0;
+            cell.layer.shadowPath = NULL;
             [CATransaction commit];
         } else if (ip) {
             LYHWStyleCellCard(cell);
@@ -989,6 +1002,7 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
 - (void)prepareForReuse {
     %orig;
     UITableViewCell *cell = (UITableViewCell *)self;
+    LYHWSetPressActive(cell, NO);
     LYHWHideShadowHost(cell);
     [[cell viewWithTag:0x45e0] removeFromSuperview];
     if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"]) cell.contentView.layer.mask = nil;
