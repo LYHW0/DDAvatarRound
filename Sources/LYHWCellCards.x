@@ -861,17 +861,10 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     LYHWSetBackgroundIfChanged(card, (kind == 1 && !timeline) ? LYHWCachedPalette2() : LYHWCardFill());
     if (kind == 1 && !timeline) {
         tv.backgroundView = nil;
-        if (tv.superview) {
-            LYHWSetBackgroundIfChanged(tv.superview, bg);
-            NSMutableArray *cands = [NSMutableArray arrayWithArray:tv.superview.subviews];
-            [cands addObjectsFromArray:tv.subviews];
-            for (UIView *u in cands) {
-                if (u == tv || [u isKindOfClass:[UITableViewCell class]] || [u isKindOfClass:[UILabel class]]) continue;
-                if (u.bounds.size.width >= tv.bounds.size.width * 0.9 && u.bounds.size.height > 200 && u.subviews.count < 3) {
-                    LYHWSetBackgroundIfChanged(u, bg); u.layer.backgroundColor = bg.CGColor;
-                }
-            }
-        }
+        // Paint only the table's backing host. Full-screen children can be
+        // foreground UIKit scroll-edge/touch passthrough containers, not backdrops.
+        // Making those opaque hides every real conversation cell underneath.
+        if (tv.superview) LYHWSetBackgroundIfChanged(tv.superview, bg);
     }
     card.layer.cornerRadius = radius;
     card.layer.masksToBounds = !fancy;
