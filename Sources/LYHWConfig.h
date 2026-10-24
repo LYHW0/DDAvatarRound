@@ -40,14 +40,8 @@ extern NSString * const LYHWSettingsChangedNotification;
 #pragma mark - 原生悬浮底栏
 
 @property (nonatomic, assign) BOOL glassTabBarEnabled;
-@property (nonatomic, assign) BOOL glassDisableMask;
-@property (nonatomic, assign) BOOL glassStereo;
-@property (nonatomic, assign) BOOL glassGlow;
-@property (nonatomic, assign) BOOL glassLongPress;
-@property (nonatomic, assign) BOOL glassSlidingMask;
 @property (nonatomic, assign) BOOL glassHideRedDot;
 @property (nonatomic, assign) BOOL glassHideBadge;
-@property (nonatomic, assign) BOOL glassHideText;
 
 #pragma mark - 页面级圆角开关
 

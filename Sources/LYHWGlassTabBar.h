@@ -9,10 +9,8 @@
 // A per-bar coalesced async pass aligns exactly four direct MMTabBarItemViews
 // to the live platter grid, centering actual visible icon/title content. Unknown
 // hierarchies/nonfinite/transformed geometry fail closed; no native lens writes.
-// Fresh installs show only native selection. Explicit mask/sliding settings can
-// decorate providers without a live lens; a live lens always owns fill/slide.
-// Independent stereo/glow still respect their original switches. DisableMask
-// never disables the native liquid lens. No forced opaque white selection.
+// Only pure red dots and numeric/text badges are optional. No navigation hooks,
+// no custom selection/glow layers, gestures or title hiding.
 FOUNDATION_EXPORT BOOL LYHWGlassTabBarIsActive(void);
 // Corner engine must bypass only bottom-bar rounding, not navigation/cell/avatar handling.
 FOUNDATION_EXPORT BOOL LYHWGlassTabBarOwnsBottomBar(UIView *view);

@@ -49,7 +49,7 @@ class GlassAlignment(unittest.TestCase):
         self.assertIn('WCLGSchedulePass', layout)
 
     def test_native_lens_not_painted_over(self):
-        self.assertIn('BOOL hideMask = nativeLensFound ||', SOURCE)
+        self.assertNotIn('CAShapeLayer', SOURCE)
         self.assertNotIn('removeFromSuperview', SOURCE)
         self.assertNotIn('layoutIfNeeded', SOURCE.replace('// No layoutIfNeeded/setNeedsLayout', ''))
         self.assertIn('effect.tag != 102289', SOURCE)

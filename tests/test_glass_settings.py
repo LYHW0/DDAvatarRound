@@ -9,7 +9,7 @@ class SettingsWiring(unittest.TestCase):
         h=(ROOT/'Sources/LYHWConfig.h').read_text()
         m=(ROOT/'Sources/LYHWConfig.m').read_text()
         ui=(ROOT/'Sources/LYHWPluginUI.m').read_text()
-        keys=['glassTabBarEnabled','glassDisableMask','glassStereo','glassGlow','glassLongPress','glassSlidingMask','glassHideRedDot','glassHideBadge','glassHideText']
+        keys=['glassTabBarEnabled','glassHideRedDot','glassHideBadge']
         for k in keys:
             self.assertIn('BOOL '+k+';',h)
             self.assertIn('LYHW_BOOL('+k+',',m)

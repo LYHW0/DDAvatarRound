@@ -254,7 +254,8 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
     CGRect r;
     BOOL contactsCard = [NSStringFromClass(cell.class) isEqualToString:@"NewContactsItemCell"] &&
         [card isKindOfClass:[LYHWCardView class]];
-    if (contactsCard) {
+    BOOL discoveryCard = LYHWPageKind(cell) == 4 && [card isKindOfClass:LYHWCardView.class];
+    if (contactsCard || discoveryCard) {
         // backgroundView 的 lockedFrame 是 cell 坐标，不是 UIKit 临时背景宿主的坐标。
         // setBackgroundView:/复用期间 superview 可能尚未挂载；fromView:nil 会按窗口
         // 坐标解释 {10,0,w,h}，使下方行的内容 mask 整段落到负 y。勿缓存该结果。
@@ -605,13 +606,20 @@ static UITableView *LYHWAncestorTable(UIView *v) {
 
 static BOOL LYHWIsGroupInfoTable(UITableView *tv) {
     if (!tv) return NO;
-    UIViewController *vc = LYHWOwnerViewController(tv);
-    return [vc isKindOfClass:NSClassFromString(@"ChatRoomInfoViewController")];
+    Class detailClass = NSClassFromString(@"ChatRoomInfoViewController");
+    for (UIResponder *r = tv; r; r = r.nextResponder) {
+        if (![r isKindOfClass:UIViewController.class]) continue;
+        for (UIViewController *vc = (UIViewController *)r; vc; vc = vc.parentViewController)
+            if (detailClass && [vc isKindOfClass:detailClass]) return YES;
+    }
+    return NO;
 }
 
 static BOOL LYHWIsGroupRoomInfoTable(UITableView *tv) {
     if (!LYHWIsGroupInfoTable(tv)) return NO;
     UIViewController *vc = LYHWOwnerViewController(tv);
+    Class detailClass = NSClassFromString(@"ChatRoomInfoViewController");
+    while (vc && ![vc isKindOfClass:detailClass]) vc = vc.parentViewController;
     @try {
         id contact = [vc valueForKey:@"m_chatRoomContact"];
         NSString *userName = [contact valueForKey:@"userName"];
@@ -723,6 +731,22 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     if (!ip || cell.bounds.size.width < 1 || cell.bounds.size.height < 1) return;
 
     LYHWClearGroupInfoSurface(tv);
+    BOOL memberCell = NO;
+    NSMutableArray *memberViews = [NSMutableArray arrayWithObject:cell.contentView];
+    for (NSUInteger scan = 0; scan < memberViews.count && scan < 128; scan++) {
+        UIView *v = memberViews[scan];
+        NSString *name = NSStringFromClass(v.class);
+        if ([name containsString:@"ChatRoomMember"] || [name containsString:@"MemberGrid"]) { memberCell = YES; break; }
+        [memberViews addObjectsFromArray:v.subviews];
+    }
+    if (!isGroup && memberCell) {
+        [existing removeFromSuperview];
+        LYHWSetBackgroundIfChanged(cell, UIColor.clearColor);
+        LYHWSetBackgroundIfChanged(cell.contentView, UIColor.clearColor);
+        if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"])
+            cell.contentView.layer.mask = nil;
+        return;
+    }
     // 只清旧路径，复用本版本卡片，避免每次 layout 移除重建。
     for (UIView *v in [cell.subviews copy])
         if (v.tag == 0x574352 || v.tag == 0x574353) [v removeFromSuperview];
@@ -744,6 +768,14 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     LYHWHideLines(cell);
     // 用整个连续分组的路径裁每一行：短小的“更多群成员”行也不会被圆成一条白色梭形。
     CGRect block = LYHWGroupBlockRect(tv, ip);
+    if (!isGroup) {
+        block = [tv rectForRowAtIndexPath:ip];
+        NSInteger rowCount = [tv numberOfRowsInSection:ip.section];
+        for (NSInteger rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+            CGRect rr = [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:rowIndex inSection:ip.section]];
+            if (rr.size.height > 1) block = CGRectUnion(block, rr);
+        }
+    }
     LYHWCardView *card = [existing isKindOfClass:[LYHWCardView class]] ? (LYHWCardView *)existing : nil;
     if (!card) { [existing removeFromSuperview]; card = [LYHWCardView new]; card.tag = 0x45e0; card.userInteractionEnabled = NO; }
     CGFloat desired = MAX(0, configuredMargin);
@@ -766,8 +798,11 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     // 内容层按同一路径裁掉四周原生白底，保护文字/按钮的原有布局。
     CGRect blockInContent = CGRectMake(CGRectGetMinX(card.frame), blockY, card.bounds.size.width, block.size.height);
     UIBezierPath *clip = [UIBezierPath bezierPathWithRoundedRect:blockInContent cornerRadius:radius];
-    CAShapeLayer *cm = [CAShapeLayer layer]; cm.name = @"LYHWGroupClipMask";
-    cm.frame = cell.contentView.bounds; cm.path = clip.CGPath; cell.contentView.layer.mask = cm;
+    CAShapeLayer *cm = [cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"] &&
+        [cell.contentView.layer.mask isKindOfClass:CAShapeLayer.class] ? (CAShapeLayer *)cell.contentView.layer.mask : nil;
+    if (!cm) { cm = [CAShapeLayer layer]; cm.name = @"LYHWGroupClipMask"; cell.contentView.layer.mask = cm; }
+    if (!CGRectEqualToRect(cm.frame, cell.contentView.bounds)) cm.frame = cell.contentView.bounds;
+    if (!cm.path || !CGPathEqualToPath(cm.path, clip.CGPath)) cm.path = clip.CGPath;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     if (!cell.selectedBackgroundView || cell.selectedBackgroundView.tag != 0x45e1) {
         UIView *sel = [UIView new]; sel.tag = 0x45e1; LYHWSetBackgroundIfChanged(sel, UIColor.clearColor); cell.selectedBackgroundView = sel;
@@ -874,7 +909,11 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
         cell.backgroundView = card;
     }
     // 同组整块：上下不留缝，只有首尾行有圆角
-    LYHWSetCardFrame(card, CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height));
+    // First Discover card must begin below the navigation/scroll-edge boundary.
+    // Use in-row space, never feed contentInset/layout changes back into UIKit.
+    CGFloat discoverTop = (kind == 4 && !settingPage && !profileLike && ip.section == 0 && ip.row == 0)
+        ? MIN(10.0, cell.bounds.size.height * 0.15) : 0;
+    LYHWSetCardFrame(card, CGRectMake(margin, discoverTop, cell.bounds.size.width - margin * 2, cell.bounds.size.height - discoverTop));
     LYHWSetBackgroundIfChanged(card, (kind == 1 && !timeline) ? LYHWCachedPalette2() : LYHWCardFill());
     if (kind == 1 && !timeline) {
         tv.backgroundView = nil;
@@ -1890,6 +1929,32 @@ static void LYHWRoundCard(UIView *v, CGFloat r) {
         if (sv.bounds.size.height >= h * 0.8 && sv.bounds.size.width >= me.bounds.size.width * 0.8) {
             sv.layer.cornerRadius = h / 2; sv.clipsToBounds = YES;
         }
+    }
+}
+%end
+
+// Some detail cells override layout without passing the generic cell hook.
+%hook ChatRoomInfoViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    NSMutableArray *pending = [NSMutableArray arrayWithObject:((UIViewController *)self).view];
+    for (NSUInteger i = 0; i < pending.count && i < 512; i++) {
+        UIView *v = pending[i];
+        if ([v isKindOfClass:UITableView.class] && LYHWIsGroupInfoTable((UITableView *)v)) {
+            if (gLYHWInStyle) continue;
+            UITableView *table = (UITableView *)v;
+            LYHWConfig *cfg = LYHWCCfg();
+            NSMutableString *signature = [NSMutableString stringWithFormat:@"%d/%d/%.2f/%.2f/%.2f/%.2f/%@", cfg.chatDetailCornerEnabled, cfg.groupInfoCornerEnabled, cfg.chatDetailCornerRadius, cfg.chatDetailCornerMargin, cfg.groupInfoCornerRadius, cfg.groupInfoCornerMargin, NSStringFromCGRect(table.bounds)];
+            for (UITableViewCell *cell in table.visibleCells)
+                [signature appendFormat:@"/%p:%@:%@", cell, [table indexPathForCell:cell], NSStringFromCGRect(cell.frame)];
+            static const char detailPassKey;
+            if ([objc_getAssociatedObject(table, &detailPassKey) isEqual:signature]) continue;
+            objc_setAssociatedObject(table, &detailPassKey, [signature copy], OBJC_ASSOCIATION_COPY_NONATOMIC);
+            gLYHWInStyle = YES;
+            @try {
+                for (UITableViewCell *cell in table.visibleCells) LYHWStyleGroupInfoCell(cell);
+            } @finally { gLYHWInStyle = NO; }
+        } else [pending addObjectsFromArray:v.subviews];
     }
 }
 %end
