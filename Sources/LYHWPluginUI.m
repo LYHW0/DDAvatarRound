@@ -203,13 +203,15 @@ static NSDictionary<NSString *, NSArray *> *LYHWFloatTabDefaults(void) {
     return map;
 }
 static id LYHWFloatTabValue(NSString *key) {
-    id v = [[NSUserDefaults standardUserDefaults] objectForKey:key];
     NSArray *spec = LYHWFloatTabDefaults()[key];
-    return v ?: (spec ? spec[0] : nil);
+    id v = [[LYHWConfig shared] objectForKey:key def:nil];   // 和微信内模块读同一个 suite
+    if (v) return v;
+    return spec ? spec[0] : nil;
 }
 
 - (BOOL)boolValueForKey:(NSString *)key {
-    id floatValue = LYHWFloatTabValue(key);
+    id floatValue = nil;
+    if (LYHWFloatTabDefaults()[key]) floatValue = LYHWFloatTabValue(key);
     if (floatValue) return [floatValue boolValue];
     id value = nil;
     @try { value = [[LYHWConfig shared] valueForKey:key]; } @catch (__unused id e) {}
@@ -218,7 +220,7 @@ static id LYHWFloatTabValue(NSString *key) {
 }
 
 - (double)numberValueForKey:(NSString *)key item:(NSDictionary *)item {
-    id value = LYHWFloatTabValue(key);
+    id value = LYHWFloatTabDefaults()[key] ? LYHWFloatTabValue(key) : nil;
     if (value) {
         NSArray *spec = LYHWFloatTabDefaults()[key];
         double v = [value doubleValue];
@@ -243,18 +245,12 @@ static id LYHWFloatTabValue(NSString *key) {
         return;
     }
     [cfg setObject:value forKey:key];
-    // 两套底栏 hook 互斥；悬浮底栏配置写入主 bundle defaults，由下次重启安装。
+    // 两套底栏 hook 互斥：开一个就把另一个关掉（两个都写同一个 suite，避免读写不同源）
     if ([key isEqualToString:@"liquidTabBarEnabled"] && [value boolValue]) {
         cfg.floatingTabBarEnabled = NO;
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"wkkFloatTab"];
     } else if ([key isEqualToString:@"floatingTabBarEnabled"] && [value boolValue]) {
         cfg.liquidTabBarEnabled = NO;
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"liquidTabBarEnabled"];
     }
-    // 新悬浮底栏模块遵循原源码的标准 defaults 键。
-    if ([key isEqualToString:@"floatingTabBarEnabled"])
-        [[NSUserDefaults standardUserDefaults] setBool:[value boolValue] forKey:@"wkkFloatTab"];
-    [[NSUserDefaults standardUserDefaults] synchronize];
     [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification object:nil];
 }
 

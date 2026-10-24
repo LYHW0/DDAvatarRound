@@ -37,9 +37,9 @@ static UIColor *LYHWListGray(void) {
 
 static BOOL LYHWAnyCardOn(void) {
     LYHWConfig *c = LYHWCCfg();
-    // WXFloatingTabBar 在 table layout/trait 链中重排 MMTabBar 并触发 pockets 更新；
-    // 当前关闭冲突的主页卡片管线，避免启动期间 table→trait→layout 递归。
-    if (c.floatingTabBarEnabled) return NO;
+    // 两套底栏实现都会在 table layout/trait 链里重排 MMTabBar 并触发 pockets 更新；
+    // 底栏模块开着的时候关掉主页卡片管线，避免启动期间 table→trait→layout 递归。
+    if (c.floatingTabBarEnabled || c.liquidTabBarEnabled) return NO;
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
            c.discoverPageCornerEnabled || c.myPageCornerEnabled || c.settingPageCornerEnabled ||
            c.timelineCornerEnabled || c.profilePageCornerEnabled || c.chatDetailCornerEnabled ||

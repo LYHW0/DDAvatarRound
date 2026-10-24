@@ -1,14 +1,25 @@
 // ============================================================================
-//  WCLiquidTabBar.xm
-//  微信底栏「iOS 26 原生 Liquid Glass 浮动胶囊」还原实现
-//  逆向自 com.x.wctabbar v1.0.1（作者 Riee）的 wctabbar.dylib（arm64, 70KB）
+//  WCLiquidTabBar.x  —  微信底栏「iOS 26 原生 Liquid Glass 浮动胶囊」
+//  逆向自 com.x.wctabbar v1.0.1（作者 Riee）的 wctabbar.dylib，并按 8.0.80 /
+//  iOS 26 的实际结构重写了稳定性相关的部分。
 //  ---------------------------------------------------------------------------
-//  适用：微信 iOS 8.0.5x+ / iOS 26（SystemVersion.majorVersion >= 26）
-//  依赖：CydiaSubstrate / libsubstrate（MSHookMessageEx）
-//  编译：Theos，ARC 打开，arm64
-//  合并：把本文件丢进你的工程，加进 Makefile 的 FILES，或直接
-//        #include "WCLiquidTabBar.xm"，然后在你的 %ctor 里调
-//        ZKInstallLiquidTabBar()（定义 ZK_LIQUID_TABBAR_EXTERNAL_CTOR 可关掉本文件的 %ctor）
+//  这一版和原版的三处关键差别（都是闪退 / 卡顿的直接原因）：
+//
+//  1. 不再从底栏上 removeFromSuperview 任何系统视图。
+//     微信 8.0.80 会把底栏背景层缓存在自己的 ivar 里，视图被摘掉后内部还留着引用，
+//     下一次布局就是野指针 —— 表现正是"启动 1.5 秒后闪退"。
+//     这里改成 hidden / alpha=0 / 关交互，视觉一致，但不动视图持有关系。
+//
+//  2. 所有几何改动都不在 layoutSubviews 里当场做。
+//     原版在 layout 中途 setCenter / removeFromSuperview，会触发
+//     layout → 改动 → layout 的递归，轻则掉帧，重则主线程卡死。
+//     现在统一 dispatch 到下一轮主队列，同一个底栏只排一次。
+//
+//  3. 设计开关（UIDesignRequiresCompatibility）在 ctor 里就抹掉，
+//     而不是等 1.5 秒 —— 那时候 UIKit 早就把设计模式定死了，晚了不但没用，
+//     还给 NSBundle 挂上全局 hook，中途改 bundle 信息很容易出连锁问题。
+//
+//  编译：Theos，ARC，arm64。入口：ZKInstallLiquidCompatBypass() + ZKInstallLiquidTabBar()
 // ============================================================================
 
 #import <Foundation/Foundation.h>
@@ -17,18 +28,15 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import <objc/runtime.h>
-#import <os/lock.h>
 #import <substrate.h>
 #import "LYHWConfig.h"
 
+// 自己在 Tweak.x 里调安装，不生成 %ctor
 #define ZK_LIQUID_TABBAR_EXTERNAL_CTOR 1
 
 // ----------------------------------------------------------------------------
-// 0. 常量 / 开关
+// 0. 常量
 // ----------------------------------------------------------------------------
-
-// 总开关：NSUserDefaults key，缺省 = 开（有值且为 NO 时才关）
-static NSString *const kZKPlistKey     = @"wclg_native_tabbar_enabled";
 
 // Info.plist 里让 App 退回旧设计（非 Liquid Glass）的那把开关
 static NSString *const kZKCompatKey    = @"UIDesignRequiresCompatibility";
@@ -38,25 +46,21 @@ static NSString *const kZKEdgeSwift    = @"UIKit.ScrollEdgeEffectView";
 static NSString *const kZKEdgeMangled  = @"_TtC5UIKit20ScrollEdgeEffectView";
 
 // 子视图分类：靠类名子串识别，微信改类名时只需要改这里
-static NSString *const kZKNamePlatter  = @"Platter";        // 玻璃胶囊底板
-static NSString *const kZKNameItemView = @"MMTabBarItemView";// 每个 tab 的容器
-static NSString *const kZKNameKind3[]  = {                  // 胶囊里可点的按钮/图标
+static NSString *const kZKNamePlatter  = @"Platter";
+static NSString *const kZKNameItemView = @"MMTabBarItemView";
+static NSString *const kZKNameKind3[]  = {
     @"LiquidLens", @"TabBarButton", @"ItemView", @"Container", @"_UITabButton"
 };
 
-// 子视图种类
 enum {
-    ZKViewKindUnknown   = 0,   // 其它，不动
-    ZKViewKindPlatter   = 1,   // 玻璃底板：定位基准
-    ZKViewKindItem      = 2,   // tab item 容器：要重新均匀排布
-    ZKViewKindButton    = 3,   // 按钮 / 图标 / 高光镜片
-    ZKViewKindBackground= 4,   // 普通 UIView / UIVisualEffectView / 微信自己的视图：铺满就清掉
+    ZKViewKindUnknown    = 0,
+    ZKViewKindPlatter    = 1,   // 玻璃胶囊底板：定位基准
+    ZKViewKindItem       = 2,   // tab item 容器：要重新均匀排布
+    ZKViewKindButton     = 3,   // 按钮 / 图标 / 高光镜片
+    ZKViewKindBackground = 4    // 铺满整条 bar 的背景层：藏掉
 };
 
-// 透明度阈值（原版就是 0.01，别改大，改大了微信的浅色背景会被一起吞掉）
 static const CGFloat kZKAlphaEpsilon = 0.01;
-
-// 顶部判定余量：safeAreaInsets.top + 44（导航栏）+ 1
 static const CGFloat kZKTopBarHeight = 44.0;
 static const CGFloat kZKTopTolerance = 1.0;
 
@@ -64,25 +68,21 @@ static const CGFloat kZKTopTolerance = 1.0;
 // 1. 全局状态
 // ----------------------------------------------------------------------------
 
-static os_unfair_lock      gZKPlistLock  = OS_UNFAIR_LOCK_INIT;  // 原版 0xc300
-static NSDictionary       *gZKPlistSource;                       // 原版 0xc2f0（强引用上一次的原字典，objc_storeStrong）
-static NSDictionary       *gZKPlistCache;                        // 原版 0xc2f8（改好的副本）
+static NSMapTable    *gZKKindCache;
+static dispatch_once_t gZKKindOnce;
 
-static NSMapTable         *gZKKindCache;                         // 原版 0xc308 类名 -> 种类 缓存
-static dispatch_once_t     gZKKindOnce;                          // 原版 0xc310
+static NSHashTable   *gZKEdgeViews;
+static dispatch_once_t gZKEdgeOnce;
 
-static NSHashTable        *gZKEdgeViews;                         // 原版 0xc318 边缘效果视图弱表
-static dispatch_once_t     gZKEdgeOnce;                          // 原版 0xc320
-
-static BOOL                gZKInSetHidden = NO;                  // 原版 0xc328 防递归闸门
-
-static UIView *__weak      gZKLastBar;                           // 原版 0xc260 最近一条底栏
-
-// 关联对象 key（借用变量自身地址，保证全局唯一）
-static const void *const kZKEdgeHiddenKey = &kZKEdgeHiddenKey;   // 原版 0xc258
+static BOOL           gZKInSetHidden = NO;   // 防 setHidden: 递归
+static BOOL           gZKInRelayout  = NO;   // 防 layout 递归
+static UIView *__weak gZKLastBar;
+static char kZKEdgeHiddenAssociationKey;
+static const void *const kZKEdgeHiddenKey = &kZKEdgeHiddenAssociationKey;
+static char kZKPendingKey;                   // 本轮已排过 relayout
 
 // ----------------------------------------------------------------------------
-// 1.5 微信侧的类（运行时才有，这里只声明类型，方便编译器认方法）
+// 2. 微信侧的类
 // ----------------------------------------------------------------------------
 @interface MMTabBar : UITabBar @end
 @interface MMTabBarController : UIViewController
@@ -90,108 +90,133 @@ static const void *const kZKEdgeHiddenKey = &kZKEdgeHiddenKey;   // 原版 0xc25
 @end
 
 // ----------------------------------------------------------------------------
-// 2. hook 原函数指针（原版 0xc268 ~ 0xc2e8）
+// 3. 设计模式开关（ctor 期安装）
 // ----------------------------------------------------------------------------
 
 static id            (*zkOrig_objectForInfoDictionaryKey)(id, SEL, NSString *);
 static NSDictionary *(*zkOrig_infoDictionary)(id, SEL);
+static BOOL           sZKCompatInstalled = NO;
 
-static void (*zkOrig_bar_setStandardAppearance)(id, SEL, id);
-static void (*zkOrig_bar_setScrollEdgeAppearance)(id, SEL, id);
-static void (*zkOrig_bar_setBackgroundImage)(id, SEL, UIImage *);
-static void (*zkOrig_bar_setShadowImage)(id, SEL, UIImage *);
-static void (*zkOrig_bar_setBarTintColor)(id, SEL, UIColor *);
-static void (*zkOrig_bar_setBackgroundColor)(id, SEL, UIColor *);
-static void (*zkOrig_bar_layoutSubviews)(id, SEL);
-static void (*zkOrig_bar_didMoveToWindow)(id, SEL);
-static void (*zkOrig_bar_setHidden)(id, SEL, BOOL);
-static void (*zkOrig_bar_didMoveToSuperview)(id, SEL);
-static void (*zkOrig_bar_traitCollectionDidChange)(id, SEL, id);
-
-// 注意：原版这个参数在 hook 里原样透传，类型未知，用 void * 保证寄存器不被截断
-static void (*zkOrig_ctl_relayoutButtons)(id, SEL, void *);
-
-static void (*zkOrig_edge_setHidden)(id, SEL, BOOL);
-static void (*zkOrig_edge_layoutSubviews)(id, SEL);
-static void (*zkOrig_edge_didMoveToWindow)(id, SEL);
-
-// ----------------------------------------------------------------------------
-// 3. 小工具
-// ----------------------------------------------------------------------------
-
-// 原版 sub_490c：判断某个 "bundle 对象" 是不是主 bundle
-// 只有主 bundle 的 Info.plist 才需要动，其它（插件、框架、图片包）一律放行
-static BOOL ZKIsMainBundle(id bundle)
-{
-    return bundle == (id)[NSBundle mainBundle];
+static BOOL ZKIsMainBundle(id bundle) {
+    if (!bundle) return NO;
+    if (![bundle isKindOfClass:[NSBundle class]]) return NO;
+    return bundle == [NSBundle mainBundle];
 }
 
-// 原版 sub_5bfc：懒建「类名 -> 种类」缓存表
-static void ZKEnsureKindCache(void)
-{
+static id zk_objectForInfoDictionaryKey(id self, SEL _cmd, NSString *key) {
+    if (key && [key isEqualToString:kZKCompatKey] && ZKIsMainBundle(self)) {
+        return (__bridge id)kCFBooleanFalse;
+    }
+    return zkOrig_objectForInfoDictionaryKey ? zkOrig_objectForInfoDictionaryKey(self, _cmd, key) : nil;
+}
+
+// 只在主 bundle、且原字典里确实带这个键时才替换，并且只建一次副本。
+// 原版每次调用都 mutableCopy + 加锁，infoDictionary 是启动期极高频调用，
+// 那套写法既慢又容易在锁里撞上重入。
+static NSDictionary *zk_infoDictionary(id self, SEL _cmd) {
+    NSDictionary *dict = zkOrig_infoDictionary ? zkOrig_infoDictionary(self, _cmd) : nil;
+    if (![dict isKindOfClass:[NSDictionary class]]) return dict;
+    if (!ZKIsMainBundle(self)) return dict;
+    if (dict[kZKCompatKey] == nil) return dict;
+
+    static NSDictionary *sPatched = nil;
+    if (!sPatched) {
+        NSMutableDictionary *m = [dict mutableCopy];
+        if (m) {
+            m[kZKCompatKey] = @NO;
+            sPatched = [m copy];
+        }
+    }
+    return sPatched ?: dict;
+}
+
+void ZKInstallLiquidCompatBypass(void) {
+    if (sZKCompatInstalled) return;
+
+    // 低版本没有 Liquid Glass，别乱改设计开关
+    if ([[NSProcessInfo processInfo] operatingSystemVersion].majorVersion < 26) return;
+
+    // 只在液态底栏开启时才抹开关；关着就完全不碰 NSBundle
+    @try {
+        if (![LYHWConfig shared].liquidTabBarEnabled) return;
+    } @catch (__unused NSException *e) {
+        return;
+    }
+
+    sZKCompatInstalled = YES;
+
+    Class cls = objc_getClass("NSBundle");
+    if (!cls) return;
+
+    Method mKey = class_getInstanceMethod(cls, @selector(objectForInfoDictionaryKey:));
+    if (mKey) {
+        IMP old = method_setImplementation(mKey, (IMP)zk_objectForInfoDictionaryKey);
+        if (old && old != (IMP)zk_objectForInfoDictionaryKey) {
+            zkOrig_objectForInfoDictionaryKey = (id (*)(id, SEL, NSString *))old;
+        }
+    }
+    Method mDict = class_getInstanceMethod(cls, @selector(infoDictionary));
+    if (mDict) {
+        IMP old = method_setImplementation(mDict, (IMP)zk_infoDictionary);
+        if (old && old != (IMP)zk_infoDictionary) {
+            zkOrig_infoDictionary = (NSDictionary *(*)(id, SEL))old;
+        }
+    }
+    NSLog(@"[wctabbar] design compatibility bypass installed");
+}
+
+// ----------------------------------------------------------------------------
+// 4. 工具
+// ----------------------------------------------------------------------------
+
+static void ZKEnsureKindCache(void) {
     dispatch_once(&gZKKindOnce, ^{
         gZKKindCache = [NSMapTable strongToStrongObjectsMapTable];
     });
 }
 
-// 原版 sub_5c10 / sub_57e4：懒建「边缘效果视图」弱表
-static NSHashTable *ZKEdgeViewTable(void)
-{
+static NSHashTable *ZKEdgeViewTable(void) {
     dispatch_once(&gZKEdgeOnce, ^{
         gZKEdgeViews = [NSHashTable weakObjectsHashTable];
     });
     return gZKEdgeViews;
 }
 
-// ----------------------------------------------------------------------------
-// 4. Info.plist 改造：把 UIDesignRequiresCompatibility 抹成 NO
-//    （微信 iOS 26 版本会用它把自己锁在旧 UI，抹掉之后系统才给原生液态玻璃）
-// ----------------------------------------------------------------------------
-
-// 原版 0x4360
-static id zk_objectForInfoDictionaryKey(id self, SEL _cmd, NSString *key)
-{
-    if ([key isEqualToString:kZKCompatKey] && ZKIsMainBundle(self)) {
-        return (__bridge id)kCFBooleanFalse;
+// 这颗子树里是不是装着 tab 内容（底板 / item）。装着就绝不当背景处理。
+static BOOL ZKContainsTabContent(UIView *view) {
+    if (!view) return NO;
+    for (UIView *sub in view.subviews) {
+        NSString *name = NSStringFromClass([sub class]);
+        if ([name containsString:kZKNamePlatter] || [name containsString:kZKNameItemView]) return YES;
+        if (sub.subviews.count && ZKContainsTabContent(sub)) return YES;
     }
-    return zkOrig_objectForInfoDictionaryKey ? zkOrig_objectForInfoDictionaryKey(self, _cmd, key) : nil;
+    return NO;
 }
 
-// 原版 0x4400
-static NSDictionary *zk_infoDictionary(id self, SEL _cmd)
-{
-    NSDictionary *dict = zkOrig_infoDictionary ? zkOrig_infoDictionary(self, _cmd) : nil;
-    if (dict[kZKCompatKey] == nil) return dict;
-    if (!ZKIsMainBundle(self)) return dict;
-
-    os_unfair_lock_lock(&gZKPlistLock);
-    if (gZKPlistSource != dict) {
-        NSMutableDictionary *mutableDict = [dict mutableCopy];
-        if (mutableDict) {
-            mutableDict[kZKCompatKey] = @NO;
-            gZKPlistCache = [mutableDict copy];
-            gZKPlistSource = dict;
-        }
+// 背景层判定：只认「明显是背景」的类，不再用 bundleForClass 一刀切。
+// 原版把所有主包里的类都当背景，结果会误伤 item 容器以外的正常内容视图。
+static BOOL ZKLooksLikeBarBackground(UIView *view) {
+    if (!view) return NO;
+    NSString *name = NSStringFromClass([view class]);
+    static NSString *const marks[] = { @"Background", @"Shadow", @"Divider", @"Separator", @"HairLine" };
+    for (size_t i = 0; i < sizeof(marks) / sizeof(marks[0]); i++) {
+        if ([name containsString:marks[i]]) return YES;
     }
-    NSDictionary *result = gZKPlistCache ?: dict;
-    os_unfair_lock_unlock(&gZKPlistLock);
-    return result;
+    if ([view isKindOfClass:[UIVisualEffectView class]]) return YES;
+    if ([name isEqualToString:@"UIView"]) return YES;
+    return NO;
 }
 
 // ----------------------------------------------------------------------------
-// 5. 子视图分类（原版 sub_5350）
-//    带类名缓存，微信改类名时只需要改 kZKName* 常量
+// 5. 子视图分类（带缓存）
 // ----------------------------------------------------------------------------
 
-static NSUInteger ZKKindOfView(UIView *view)
-{
+static NSUInteger ZKKindOfView(UIView *view) {
     if (!view) return ZKViewKindUnknown;
-
     Class cls = [view class];
     if (!cls) return ZKViewKindUnknown;
 
     ZKEnsureKindCache();
-
     NSNumber *cached = [gZKKindCache objectForKey:cls];
     if (cached) return [cached unsignedIntegerValue];
 
@@ -207,16 +232,8 @@ static NSUInteger ZKKindOfView(UIView *view)
         for (size_t i = 0; i < sizeof(kZKNameKind3) / sizeof(kZKNameKind3[0]); i++) {
             if ([name containsString:kZKNameKind3[i]]) { isButton = YES; break; }
         }
-        if (isButton) {
-            kind = ZKViewKindButton;
-        } else if (cls == [UIView class] ||
-                   cls == [UIVisualEffectView class] ||
-                   [NSBundle bundleForClass:cls] == [NSBundle mainBundle]) {
-            // 系统 UIView / 毛玻璃底板 / 微信自己的视图 —— 都是「可能糊住胶囊的背景」
-            kind = ZKViewKindBackground;
-        } else {
-            kind = ZKViewKindUnknown;
-        }
+        if (isButton) kind = ZKViewKindButton;
+        else if (ZKLooksLikeBarBackground(view)) kind = ZKViewKindBackground;
     }
 
     [gZKKindCache setObject:@(kind) forKey:cls];
@@ -224,12 +241,10 @@ static NSUInteger ZKKindOfView(UIView *view)
 }
 
 // ----------------------------------------------------------------------------
-// 6. 把底栏本体做成全透明（原版 sub_50f8）
-//    不透明、有底色、有 layer 底色 的时候才动手；已经是全透明就直接返回
+// 6. 底栏本体做成全透明
 // ----------------------------------------------------------------------------
 
-static void ZKApplyTabBarTransparency(id object)
-{
+static void ZKApplyTabBarTransparency(id object) {
     if (!object) return;
     if (![object isKindOfClass:[UITabBar class]]) return;
     UITabBar *bar = (UITabBar *)object;
@@ -237,15 +252,13 @@ static void ZKApplyTabBarTransparency(id object)
     BOOL hasVisibleBackground = NO;
     UIColor *bg = bar.backgroundColor;
     if (bg) {
-        if (CGColorGetAlpha([bg CGColor]) > kZKAlphaEpsilon) hasVisibleBackground = YES;
+        CGColorRef c = [bg CGColor];
+        if (c && CGColorGetAlpha(c) > kZKAlphaEpsilon) hasVisibleBackground = YES;
     }
     if (!hasVisibleBackground) {
         CGColorRef layerColor = bar.layer.backgroundColor;
-        if (layerColor) {
-            if (CGColorGetAlpha(layerColor) > kZKAlphaEpsilon) hasVisibleBackground = YES;
-        }
+        if (layerColor && CGColorGetAlpha(layerColor) > kZKAlphaEpsilon) hasVisibleBackground = YES;
     }
-
     if (bar.isTranslucent && !bar.isOpaque && !hasVisibleBackground) return;
 
     [CATransaction begin];
@@ -258,270 +271,278 @@ static void ZKApplyTabBarTransparency(id object)
 }
 
 // ----------------------------------------------------------------------------
-// 7. 去掉铺满整条 bar 的背景层 + 把 tab item 均匀摆进玻璃胶囊（原版 sub_496c）
+// 7. 藏背景层 + 把 item 均匀摆进玻璃胶囊（不在 layout 里当场执行）
 // ----------------------------------------------------------------------------
 
-static NSInteger ZKCompareByFrameX(id a, id b)
-{
-    CGFloat ax = ((UIView *)a).frame.origin.x;
-    CGFloat bx = ((UIView *)b).frame.origin.x;
-    if (ax < bx) return -1;
-    return ax > bx ? 1 : 0;
-}
+static void ZKRelayoutTabBarNow(UIView *bar) {
+    if (!bar || gZKInRelayout) return;
+    if (![bar window]) return;                       // 已经离屏的底栏不处理
 
-static void ZKRelayoutTabBar(UIView *bar)
-{
-    if (!bar) return;
-
-    // ---- 7.1 清掉盖满整条 bar 的旧背景（原生分割线 / 背板），否则会挡住液态玻璃
-    BOOL removedAny = NO;
-    NSArray<UIView *> *snapshot = [[bar subviews] copy];
     CGRect barBounds = bar.bounds;
+    if (barBounds.size.width < 1.0 || barBounds.size.height < 1.0) return;
 
-    for (UIView *child in snapshot) {
-        if (ZKKindOfView(child) != ZKViewKindBackground) continue;
+    gZKInRelayout = YES;
+    @try {
+        // 7.1 藏掉铺满整条 bar 的背景层
+        BOOL hiddenAny = NO;
+        for (UIView *child in [bar.subviews copy]) {
+            if (!child || child.isHidden) continue;
+            NSUInteger kind = ZKKindOfView(child);
+            if (kind != ZKViewKindBackground) continue;
+            if (ZKContainsTabContent(child)) continue;          // 里面有 tab 内容，不能碰
+            CGSize fz = child.frame.size;
+            if (fz.height < barBounds.size.height - 1.0) continue;
+            if (fz.width  < barBounds.size.width  - 1.0) continue;
+            if (fz.height <= 1.0 || fz.width <= 1.0) continue;
+            child.hidden = YES;
+            child.alpha = 0;
+            child.userInteractionEnabled = NO;
+            hiddenAny = YES;
+        }
+        if (hiddenAny) ZKApplyTabBarTransparency(bar);
 
-        CGSize childSize = child.bounds.size;
-        if (childSize.height < barBounds.size.height - 1.0) continue;
-        if (childSize.width  < barBounds.size.width  - 1.0) continue;
+        // 7.2 找玻璃底板 + 全部 item
+        UIView *platter = nil;
+        NSMutableArray<UIView *> *items = [NSMutableArray array];
+        for (UIView *child in bar.subviews) {
+            NSUInteger kind = ZKKindOfView(child);
+            if (kind == ZKViewKindPlatter) {
+                if (!platter) platter = child;
+            } else if (kind == ZKViewKindItem) {
+                [items addObject:child];
+            }
+        }
+        if (!platter || items.count == 0) return;
 
-        CGSize childFrame = child.frame.size;
-        if (childFrame.height <= 1.0 || childFrame.width <= 1.0) continue;
+        CGRect platterFrame = platter.frame;
+        if (CGRectIsEmpty(platterFrame) || CGRectIsNull(platterFrame)) return;
+        if (platterFrame.size.width < 4.0 || platterFrame.size.height < 4.0) return;
 
-        [child removeFromSuperview];
-        removedAny = YES;
+        [items sortUsingComparator:^NSComparisonResult(id a, id b) {
+            CGFloat ax = ((UIView *)a).frame.origin.x, bx = ((UIView *)b).frame.origin.x;
+            if (ax < bx) return NSOrderedAscending;
+            return ax > bx ? NSOrderedDescending : NSOrderedSame;
+        }];
+
+        NSUInteger count = items.count;
+        if (count == 0) return;
+
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        for (NSUInteger i = 0; i < count; i++) {
+            UIView *item = items[i];
+            CGPoint center = item.center;
+
+            // item 内可见子视图的并集，用来做垂直居中
+            CGRect unionRect = CGRectNull;
+            for (UIView *sub in item.subviews) {
+                if (sub.isHidden) continue;
+                unionRect = CGRectUnion(unionRect, sub.frame);
+            }
+
+            CGFloat targetY = center.y;
+            if (!CGRectIsEmpty(unionRect)) {
+                CGFloat contentMidY = item.frame.origin.y + CGRectGetMidY(unionRect);
+                targetY = center.y + (CGRectGetMidY(platterFrame) - contentMidY);
+            }
+            CGFloat targetX = platterFrame.origin.x
+                            + ((CGFloat)i + 0.5) * platterFrame.size.width / (CGFloat)count;
+
+            if (fabs(center.x - targetX) >= 0.5 || fabs(center.y - targetY) >= 0.5) {
+                [item setCenter:CGPointMake(targetX, targetY)];
+            }
+        }
+        [CATransaction commit];
+    } @catch (NSException *e) {
+        NSLog(@"[wctabbar] relayout failed: %@", e);
+    } @finally {
+        gZKInRelayout = NO;
     }
-    if (removedAny) ZKApplyTabBarTransparency(bar);
+}
 
-    // ---- 7.2 找出玻璃底板（Platter）和全部 item，按 x 排序后等分
-    NSMutableArray<UIView *> *items = [NSMutableArray array];
-    __block UIView *platter = nil;
+// 从 layoutSubviews 里只排一次，真正的改动留到下一轮主队列
+static void ZKScheduleRelayout(UIView *bar) {
+    if (!bar) return;
+    if (objc_getAssociatedObject(bar, &kZKPendingKey)) return;
+    objc_setAssociatedObject(bar, &kZKPendingKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-    for (UIView *child in [bar subviews]) {
-        NSUInteger kind = ZKKindOfView(child);
-        if (kind == ZKViewKindPlatter) {
-            if (!platter) platter = child;
-        } else if (kind == ZKViewKindItem) {
-            [items addObject:child];
-        }
-    }
-
-    if (!platter || items.count == 0) return;
-
-    CGRect platterFrame = platter.frame;
-    if (CGRectIsEmpty(platterFrame) || CGRectIsNull(platterFrame)) return;
-
-    [items sortUsingComparator:^NSInteger(id a, id b) {
-        return ZKCompareByFrameX(a, b);
-    }];
-
-    NSUInteger count = items.count;
-    if (count == 0) return;
-
-    [CATransaction begin];
-    [CATransaction setDisableActions:YES];
-
-    for (NSUInteger i = 0; i < count; i++) {
-        UIView *item = items[i];
-
-        CGPoint center = item.center;
-
-        // 该 item 里所有可见子视图的并集，用来做垂直居中
-        CGRect unionRect = CGRectNull;
-        for (UIView *sub in [item subviews]) {
-            if (sub.isHidden) continue;
-            unionRect = CGRectUnion(unionRect, sub.frame);
-        }
-
-        CGFloat targetY = center.y;
-        if (!CGRectIsEmpty(unionRect)) {
-            CGFloat contentMidY = item.frame.origin.y + CGRectGetMidY(unionRect);
-            targetY = center.y + (CGRectGetMidY(platterFrame) - contentMidY);
-        }
-
-        CGFloat targetX = platterFrame.origin.x
-                        + ((CGFloat)i + 0.5) * platterFrame.size.width / (CGFloat)count;
-
-        if (fabs(center.x - targetX) >= 0.5 || fabs(center.y - targetY) >= 0.5) {
-            [item setCenter:CGPointMake(targetX, targetY)];
-        }
-    }
-
-    [CATransaction commit];
+    __weak UIView *weakBar = bar;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIView *b = weakBar;
+        if (!b) return;
+        objc_setAssociatedObject(b, &kZKPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        ZKRelayoutTabBarNow(b);
+    });
 }
 
 // ----------------------------------------------------------------------------
-// 8. 边缘效果视图（UIKit.ScrollEdgeEffectView）——原版 0x5900 / 0x5814 / 0x56a0 / 0x4780
+// 8. 边缘效果视图
 // ----------------------------------------------------------------------------
 
-// 原版 sub_5900：这条边缘模糊到底该不该藏
-static BOOL ZKEdgeShouldBeHidden(id edgeView)
-{
+static BOOL ZKEdgeShouldBeHidden(id edgeView) {
     if (!edgeView) return NO;
+    UIView *v = (UIView *)edgeView;
 
-    UIWindow *window = [edgeView window];
+    UIWindow *window = [v window];
     if (!window) return NO;
 
-    CGRect rectInWindow = [edgeView convertRect:[edgeView bounds] toView:window];
+    CGRect rectInWindow = [v convertRect:[v bounds] toView:window];
     if (!CGRectIsEmpty(rectInWindow)) {
         UIEdgeInsets inset = [window safeAreaInsets];
         CGFloat topLimit = inset.top + kZKTopBarHeight + kZKTopTolerance;
-        if (CGRectGetMinY(rectInWindow) <= topLimit) {
-            if (CGRectGetMaxY(rectInWindow) > 1.0) return YES;
-        }
+        if (CGRectGetMinY(rectInWindow) <= topLimit && CGRectGetMaxY(rectInWindow) > 1.0) return YES;
     }
 
     UIView *lastBar = gZKLastBar;
-    if (!lastBar) return NO;
-    if ([lastBar window] != window) return NO;
-    if ([lastBar isHidden]) return NO;
+    if (!lastBar || [lastBar window] != window || [lastBar isHidden]) return NO;
 
-    CGRect barRect  = [lastBar  convertRect:[lastBar  bounds] toView:window];
-    CGRect edgeRect = [edgeView convertRect:[edgeView bounds] toView:window];
+    CGRect barRect  = [lastBar convertRect:[lastBar bounds] toView:window];
+    CGRect edgeRect = [v convertRect:[v bounds] toView:window];
     CGRect overlap  = CGRectIntersection(barRect, edgeRect);
     if (CGRectIsNull(overlap)) return NO;
 
     return CGRectGetHeight(overlap) > 1.0 && CGRectGetWidth(overlap) > 1.0;
 }
 
-// 原版 sub_5814：重新算一次并同步到真实的 setHidden:
-static void ZKRefreshEdgeView(UIView *edgeView)
-{
+static void ZKRefreshEdgeView(UIView *edgeView) {
     if (!edgeView) return;
-
     NSNumber *requested = objc_getAssociatedObject(edgeView, kZKEdgeHiddenKey);
     BOOL want = [requested boolValue] ? YES : ZKEdgeShouldBeHidden(edgeView);
+    if (want == edgeView.isHidden) return;
 
-    if (want != edgeView.isHidden) {
-        gZKInSetHidden = YES;
-        [edgeView setHidden:want];
-        gZKInSetHidden = NO;
-    }
+    gZKInSetHidden = YES;
+    [edgeView setHidden:want];
+    gZKInSetHidden = NO;
 }
 
-// 原版 sub_56a0：把所有登记过的边缘效果视图刷一遍
-static void ZKRefreshAllEdgeViews(void)
-{
-    NSArray *all = [ZKEdgeViewTable() allObjects];
-    for (UIView *edgeView in all) {
+static void ZKRefreshAllEdgeViews(void) {
+    for (UIView *edgeView in [ZKEdgeViewTable() allObjects]) {
         ZKRefreshEdgeView(edgeView);
     }
 }
 
-// 原版 sub_506c：记录 / 注销「最近一条可见底栏」，并顺带触发一次全量刷新
-static void ZKTrackTabBar(UIView *bar)
-{
+static void ZKTrackTabBar(UIView *bar) {
     if (!bar) return;
-
-    if ([bar window]) {
-        gZKLastBar = bar;
-        return;
-    }
-
-    if (gZKLastBar == bar) {
-        gZKLastBar = nil;
-        return;
-    }
+    if ([bar window]) { gZKLastBar = bar; return; }
+    if (gZKLastBar == bar) { gZKLastBar = nil; return; }
     ZKRefreshAllEdgeViews();
 }
 
-// 原版 0x4780
-static void zk_edge_setHidden(id self, SEL _cmd, BOOL hidden)
-{
+// ----------------------------------------------------------------------------
+// 9. 原函数指针
+// ----------------------------------------------------------------------------
+
+static void (*zkOrig_bar_setStandardAppearance)(id, SEL, id);
+static void (*zkOrig_bar_setScrollEdgeAppearance)(id, SEL, id);
+static void (*zkOrig_bar_setBackgroundImage)(id, SEL, UIImage *);
+static void (*zkOrig_bar_setShadowImage)(id, SEL, UIImage *);
+static void (*zkOrig_bar_setBarTintColor)(id, SEL, UIColor *);
+static void (*zkOrig_bar_setBackgroundColor)(id, SEL, UIColor *);
+static void (*zkOrig_bar_layoutSubviews)(id, SEL);
+static void (*zkOrig_bar_didMoveToWindow)(id, SEL);
+static void (*zkOrig_bar_setHidden)(id, SEL, BOOL);
+static void (*zkOrig_bar_didMoveToSuperview)(id, SEL);
+static void (*zkOrig_bar_traitCollectionDidChange)(id, SEL, id);
+static void (*zkOrig_ctl_relayoutButtons)(id, SEL, void *);
+static void (*zkOrig_edge_setHidden)(id, SEL, BOOL);
+static void (*zkOrig_edge_layoutSubviews)(id, SEL);
+static void (*zkOrig_edge_didMoveToWindow)(id, SEL);
+
+// ----------------------------------------------------------------------------
+// 10. hook 实现
+// ----------------------------------------------------------------------------
+
+static void zk_bar_noop(id self, SEL _cmd, id arg) { (void)self; (void)_cmd; (void)arg; }
+
+static void zk_bar_setBackgroundColor(id self, SEL _cmd, UIColor *color) {
+    if (color) {
+        CGColorRef c = [color CGColor];
+        if (c && CGColorGetAlpha(c) > kZKAlphaEpsilon) return;   // 有颜色就别设了
+    }
+    if (zkOrig_bar_setBackgroundColor) zkOrig_bar_setBackgroundColor(self, _cmd, color);
+}
+
+static void zk_bar_layoutSubviews(id self, SEL _cmd) {
+    if (zkOrig_bar_layoutSubviews) zkOrig_bar_layoutSubviews(self, _cmd);
+    @try {
+        ZKScheduleRelayout((UIView *)self);
+        ZKTrackTabBar((UIView *)self);
+    } @catch (__unused NSException *e) {}
+}
+
+static void zk_bar_didMoveToWindow(id self, SEL _cmd) {
+    if (zkOrig_bar_didMoveToWindow) zkOrig_bar_didMoveToWindow(self, _cmd);
+    @try {
+        ZKApplyTabBarTransparency(self);
+        ZKTrackTabBar((UIView *)self);
+        ZKScheduleRelayout((UIView *)self);
+    } @catch (__unused NSException *e) {}
+}
+
+static void zk_bar_setHidden(id self, SEL _cmd, BOOL hidden) {
+    if (zkOrig_bar_setHidden) zkOrig_bar_setHidden(self, _cmd, hidden);
+    @try { ZKRefreshAllEdgeViews(); } @catch (__unused NSException *e) {}
+}
+
+static void zk_bar_didMoveToSuperview(id self, SEL _cmd) {
+    if (zkOrig_bar_didMoveToSuperview) zkOrig_bar_didMoveToSuperview(self, _cmd);
+    @try {
+        ZKApplyTabBarTransparency(self);
+        ZKTrackTabBar((UIView *)self);
+    } @catch (__unused NSException *e) {}
+}
+
+static void zk_bar_traitCollectionDidChange(id self, SEL _cmd, id previous) {
+    if (zkOrig_bar_traitCollectionDidChange) zkOrig_bar_traitCollectionDidChange(self, _cmd, previous);
+    @try { ZKApplyTabBarTransparency(self); } @catch (__unused NSException *e) {}
+}
+
+static void zk_ctl_relayoutButtons(id self, SEL _cmd, void *arg) {
+    if (zkOrig_ctl_relayoutButtons) zkOrig_ctl_relayoutButtons(self, _cmd, arg);
+
+    UIView *bar = nil;
+    @try {
+        if ([self respondsToSelector:@selector(tabBar)]) {
+            bar = (UIView *)[(MMTabBarController *)self tabBar];
+        } else {
+            id t = [self valueForKey:@"tabBar"];   // 老版本没有公开 getter，走 KVC
+            if ([t isKindOfClass:[UIView class]]) bar = t;
+        }
+    } @catch (__unused NSException *e) {
+        bar = nil;
+    }
+    if (!bar) return;
+
+    ZKApplyTabBarTransparency(bar);
+    ZKScheduleRelayout(bar);
+}
+
+static void zk_edge_setHidden(id self, SEL _cmd, BOOL hidden) {
     if (!gZKInSetHidden) {
-        objc_setAssociatedObject(self, kZKEdgeHiddenKey, @(hidden),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(self, kZKEdgeHiddenKey, @(hidden), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     BOOL value = hidden ? YES : ZKEdgeShouldBeHidden(self);
     if (zkOrig_edge_setHidden) zkOrig_edge_setHidden(self, _cmd, value);
 }
 
-// 原版 0x484c
-static void zk_edge_layoutSubviews(id self, SEL _cmd)
-{
+static void zk_edge_layoutSubviews(id self, SEL _cmd) {
     if (zkOrig_edge_layoutSubviews) zkOrig_edge_layoutSubviews(self, _cmd);
-    [ZKEdgeViewTable() addObject:self];
-    ZKRefreshEdgeView(self);
+    @try {
+        [ZKEdgeViewTable() addObject:self];
+        ZKRefreshEdgeView(self);
+    } @catch (__unused NSException *e) {}
 }
 
-// 原版 0x48ac
-static void zk_edge_didMoveToWindow(id self, SEL _cmd)
-{
+static void zk_edge_didMoveToWindow(id self, SEL _cmd) {
     if (zkOrig_edge_didMoveToWindow) zkOrig_edge_didMoveToWindow(self, _cmd);
-    [ZKEdgeViewTable() addObject:self];
-    ZKRefreshEdgeView(self);
+    @try {
+        [ZKEdgeViewTable() addObject:self];
+        ZKRefreshEdgeView(self);
+    } @catch (__unused NSException *e) {}
 }
 
 // ----------------------------------------------------------------------------
-// 9. MMTabBar / MMTabBarController 的 hook
-// ----------------------------------------------------------------------------
-
-// 原版 0x4568 / 0x456c / 0x4570 / 0x4574 / 0x4578：五个空实现
-// 微信自己会往 tabBar 上塞外观、背景图、阴影图、染色，全给它吞了，
-// 不然系统那层液态玻璃会被盖住。
-static void zk_bar_noop(id self, SEL _cmd, id arg) { (void)self; (void)_cmd; (void)arg; }
-
-// 原版 0x457c：只放行「透明」的 backgroundColor
-static void zk_bar_setBackgroundColor(id self, SEL _cmd, UIColor *color)
-{
-    if (color) {
-        CGFloat alpha = CGColorGetAlpha([color CGColor]);
-        if (alpha > kZKAlphaEpsilon) return;   // 有颜色就别设了
-    }
-    if (zkOrig_bar_setBackgroundColor) zkOrig_bar_setBackgroundColor(self, _cmd, color);
-}
-
-// 原版 0x4604
-static void zk_bar_layoutSubviews(id self, SEL _cmd)
-{
-    if (zkOrig_bar_layoutSubviews) zkOrig_bar_layoutSubviews(self, _cmd);
-    ZKRelayoutTabBar((UIView *)self);
-    ZKTrackTabBar((UIView *)self);
-}
-
-// 原版 0x4638
-static void zk_bar_didMoveToWindow(id self, SEL _cmd)
-{
-    if (zkOrig_bar_didMoveToWindow) zkOrig_bar_didMoveToWindow(self, _cmd);
-    ZKApplyTabBarTransparency(self);
-    ZKTrackTabBar((UIView *)self);
-}
-
-// 原版 0x466c
-static void zk_bar_setHidden(id self, SEL _cmd, BOOL hidden)
-{
-    if (zkOrig_bar_setHidden) zkOrig_bar_setHidden(self, _cmd, hidden);
-    ZKRefreshAllEdgeViews();
-}
-
-// 原版 0x4688
-static void zk_bar_didMoveToSuperview(id self, SEL _cmd)
-{
-    if (zkOrig_bar_didMoveToSuperview) zkOrig_bar_didMoveToSuperview(self, _cmd);
-    ZKApplyTabBarTransparency(self);
-    ZKTrackTabBar((UIView *)self);
-}
-
-// 原版 0x46b4
-static void zk_bar_traitCollectionDidChange(id self, SEL _cmd, id previous)
-{
-    if (zkOrig_bar_traitCollectionDidChange) zkOrig_bar_traitCollectionDidChange(self, _cmd, previous);
-    ZKApplyTabBarTransparency(self);
-}
-
-// 原版 0x4720
-static void zk_ctl_relayoutButtons(id self, SEL _cmd, void *arg)
-{
-    if (zkOrig_ctl_relayoutButtons) zkOrig_ctl_relayoutButtons(self, _cmd, arg);
-
-    UIView *bar = (UIView *)[(MMTabBarController *)self tabBar];
-    if (!bar) return;
-    ZKApplyTabBarTransparency(bar);
-    ZKRelayoutTabBar(bar);
-}
-
-// ----------------------------------------------------------------------------
-// 10. 安装（原版 0x4000）
+// 11. 安装
 // ----------------------------------------------------------------------------
 
 #define ZK_HOOK(cls, sel, repl, origp)                                  \
@@ -532,23 +553,26 @@ static void zk_ctl_relayoutButtons(id self, SEL _cmd, void *arg)
         }                                                               \
     } while (0)
 
-void ZKInstallLiquidTabBar(void)
-{
-    // 只在 iOS 26+ 上开，低版本没有 Liquid Glass，挂了反而把底栏搞坏
-    NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
-    if (version.majorVersion < 26) return;
+static BOOL sZKInstalled = NO;
 
-    // 统一由兰因后悟设置页控制；默认关闭，避免与原底栏圆角逻辑冲突。
-    if (![LYHWConfig shared].liquidTabBarEnabled || [LYHWConfig shared].floatingTabBarEnabled) return;
+void ZKInstallLiquidTabBar(void) {
+    if (sZKInstalled) return;
 
-    // 10.1 Info.plist：干掉「退回旧设计」的开关
-    Class bundleClass = objc_getClass("NSBundle");
-    ZK_HOOK(bundleClass, objectForInfoDictionaryKey:, zk_objectForInfoDictionaryKey,
-            &zkOrig_objectForInfoDictionaryKey);
-    ZK_HOOK(bundleClass, infoDictionary, zk_infoDictionary, &zkOrig_infoDictionary);
+    // 只在 iOS 26+ 上开，低版本没有 Liquid Glass
+    if ([[NSProcessInfo processInfo] operatingSystemVersion].majorVersion < 26) return;
 
-    // 10.2 底栏本体
+    // 统一由设置页控制；和悬浮底栏互斥
+    if (![LYHWConfig shared].liquidTabBarEnabled) return;
+    if ([LYHWConfig shared].floatingTabBarEnabled) return;
+
     Class barClass = objc_getClass("MMTabBar");
+    if (!barClass) {
+        NSLog(@"[wctabbar] MMTabBar not found, liquid tabbar skipped");
+        return;
+    }
+    sZKInstalled = YES;
+
+    // 11.1 底栏本体
     ZK_HOOK(barClass, setStandardAppearance:,     zk_bar_noop, &zkOrig_bar_setStandardAppearance);
     ZK_HOOK(barClass, setScrollEdgeAppearance:,   zk_bar_noop, &zkOrig_bar_setScrollEdgeAppearance);
     ZK_HOOK(barClass, setBackgroundImage:,        zk_bar_noop, &zkOrig_bar_setBackgroundImage);
@@ -561,30 +585,31 @@ void ZKInstallLiquidTabBar(void)
     ZK_HOOK(barClass, didMoveToSuperview,         zk_bar_didMoveToSuperview,&zkOrig_bar_didMoveToSuperview);
     ZK_HOOK(barClass, traitCollectionDidChange:,  zk_bar_traitCollectionDidChange, &zkOrig_bar_traitCollectionDidChange);
 
-    // 10.3 控制器：换 tab 时重新排一遍
-    Class controllerClass = objc_getClass("MMTabBarController");
-    ZK_HOOK(controllerClass, relayoutButtons:, zk_ctl_relayoutButtons, &zkOrig_ctl_relayoutButtons);
+    // 11.2 控制器：换 tab 时重排一遍
+    ZK_HOOK(objc_getClass("MMTabBarController"), relayoutButtons:,
+            zk_ctl_relayoutButtons, &zkOrig_ctl_relayoutButtons);
 
-    // 10.4 iOS 26 的滚动边缘效果视图（Swift 类，先按 ObjC 名找，再按 mangled 名找）
+    // 11.3 滚动边缘效果视图
     Class edgeClass = NSClassFromString(kZKEdgeSwift);
     if (!edgeClass) edgeClass = objc_getClass([kZKEdgeMangled UTF8String]);
     if (!edgeClass) {
         NSLog(@"[wctabbar] ScrollEdgeEffectView not found, edge effect stays on");
         return;
     }
-    ZK_HOOK(edgeClass, setHidden:,       zk_edge_setHidden,       &zkOrig_edge_setHidden);
-    ZK_HOOK(edgeClass, layoutSubviews,   zk_edge_layoutSubviews,  &zkOrig_edge_layoutSubviews);
-    ZK_HOOK(edgeClass, didMoveToWindow,  zk_edge_didMoveToWindow, &zkOrig_edge_didMoveToWindow);
+    ZK_HOOK(edgeClass, setHidden:,      zk_edge_setHidden,       &zkOrig_edge_setHidden);
+    ZK_HOOK(edgeClass, layoutSubviews,  zk_edge_layoutSubviews,  &zkOrig_edge_layoutSubviews);
+    ZK_HOOK(edgeClass, didMoveToWindow, zk_edge_didMoveToWindow, &zkOrig_edge_didMoveToWindow);
+
+    NSLog(@"[wctabbar] liquid tabbar installed");
 }
 
 // ----------------------------------------------------------------------------
-// 11. 入口
-//    合并到别人的工程时定义 ZK_LIQUID_TABBAR_EXTERNAL_CTOR，然后在自己的
-//    %ctor 里手动调 ZKInstallLiquidTabBar()
+// 12. 独立编译本文件时的入口（工程里由 Tweak.x 调用，这里不生成）
 // ----------------------------------------------------------------------------
 #ifndef ZK_LIQUID_TABBAR_EXTERNAL_CTOR
 %ctor {
     @autoreleasepool {
+        ZKInstallLiquidCompatBypass();
         ZKInstallLiquidTabBar();
     }
 }
