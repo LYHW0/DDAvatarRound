@@ -107,17 +107,11 @@ static void LYHWStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 %end
 
-%hook MainFrameTableView
+// MainFrameTableView surface is owned by LYHWCellCards.x.
+// Do not install a second layout hook that resets its gray surface to clear:
+// parent UITableView layout styles visible cards first, then this old override
+// used to undo their table background on every layout pass.
 
-- (void)layoutSubviews {
-    %orig;
-    if (!LYHWCfg().mainFrameCornerEnabled) return;
-    UITableView *tableView = (UITableView *)self;
-    tableView.backgroundColor = [UIColor clearColor];
-    tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-}
-
-%end
 
 %hook NewMainFrameCell
 
