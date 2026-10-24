@@ -13,6 +13,8 @@
 #import "LYHWConfig.h"
 #import "LYHWCommon.h"
 
+extern void LYHWApplySourceContactInfo(UIViewController *vc);
+
 static inline LYHWConfig *LYHWPCfg(void) { return [LYHWConfig shared]; }
 
 static const NSInteger kWCRProfileBackgroundTag = 0x57524350; // "WRCP"
@@ -132,6 +134,12 @@ static void LYHWApplyProfileColors(UIViewController *vc) {
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     LYHWApplyProfileBackground((UIViewController *)self);
+    LYHWApplySourceContactInfo((UIViewController *)self);
+}
+
+- (void)viewWillLayoutSubviews {
+    %orig;
+    LYHWApplySourceContactInfo((UIViewController *)self);
 }
 
 - (void)viewDidLayoutSubviews {
