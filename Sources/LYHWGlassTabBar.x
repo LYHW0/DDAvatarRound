@@ -77,6 +77,7 @@ static void WCLGTrackTabBar(UITabBar *bar) {
 @property(nonatomic) NSUInteger budgetUsed;
 @property(nonatomic) CGRect alignmentPlatter;
 @property(nonatomic) CGRect alignmentBounds;
+@property(nonatomic) BOOL alignmentEstablished;
 @property(nonatomic) CFTimeInterval alignmentWindow;
 @property(nonatomic) NSUInteger alignmentWrites;
 @property(nonatomic) BOOL alignmentSuspended;
@@ -427,6 +428,9 @@ static char kGlassState;
 @property(nonatomic, strong) NSMapTable<UIView *, NSNumber *> *hiddenValues;
 @property(nonatomic, strong) NSMapTable<UIView *, NSNumber *> *backgroundAlphas;
 @property(nonatomic, assign) CGRect selectedRect;
+@property(nonatomic) BOOL nativeProviderEstablished;
+@property(nonatomic, weak) UITabBarItem *selectionIdentity;
+@property(nonatomic) CFTimeInterval selectionChangedAt;
 - (void)longPress:(UILongPressGestureRecognizer *)gesture;
 @end
 
@@ -555,6 +559,15 @@ static void LYHWGlassAlignTabBarItems(UITabBar *bar) {
     CGRect pf = LYHWGlassPlatterRect(bar), bounds = bar.bounds;
     if (!WCLGFiniteRect(pf) || CGRectIsNull(pf) || CGRectIsEmpty(pf) ||
         !WCLGFiniteRect(bounds) || !CGRectContainsRect(bounds, pf)) return;
+    LYHWGlassPassState *pass = objc_getAssociatedObject(bar, &kWCLGPassStateKey);
+    if (!pass) return; // Geometry is only legal inside the scheduled pass.
+    // Selection/lens motion and sub-point platter shifts are not size changes.
+    // Once aligned, do not fight native relayout on every tab selection.
+    BOOL sizeChanged = fabs(pass.alignmentPlatter.size.width - pf.size.width) >= 0.5 ||
+        fabs(pass.alignmentPlatter.size.height - pf.size.height) >= 0.5 ||
+        fabs(pass.alignmentBounds.size.width - bounds.size.width) >= 0.5 ||
+        fabs(pass.alignmentBounds.size.height - bounds.size.height) >= 0.5;
+    if (pass.alignmentEstablished && !sizeChanged) return;
     NSMutableArray<UIView *> *items = [NSMutableArray array];
     for (UIView *sub in bar.subviews) {
         if (![NSStringFromClass(sub.class) containsString:@"MMTabBarItemView"]) continue;
@@ -582,8 +595,6 @@ static void LYHWGlassAlignTabBarItems(UITabBar *bar) {
         targets[i] = CGPointMake(item.center.x + dx, item.center.y + dy);
         if (!WCLGFinite(targets[i].x) || !WCLGFinite(targets[i].y)) return;
     }
-    LYHWGlassPassState *pass = objc_getAssociatedObject(bar, &kWCLGPassStateKey);
-    if (!pass) return; // Geometry is only legal inside the scheduled pass.
     CFTimeInterval now = CACurrentMediaTime();
     BOOL changed = !CGRectEqualToRect(pass.alignmentPlatter, pf) || !CGRectEqualToRect(pass.alignmentBounds, bounds);
     if (changed) {
@@ -611,6 +622,7 @@ static void LYHWGlassAlignTabBarItems(UITabBar *bar) {
             item.center = targets[i];
     }
     [CATransaction commit];
+    pass.alignmentEstablished = YES;
 }
 // WeChat items include the 40pt safe-area tail (90pt bounds, content ends at
 // y=50 in the dump). Use actual icon/title content, never that full-height box.
@@ -744,23 +756,58 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
         if (bar.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft && index < group.count) index = group.count - 1 - index;
         if (index < group.count) selected = LYHWGlassItemContentRect(group[index], bar);
     }
-    // UIKit's actual selected lens is authoritative. MMTabBarItemView remains
-    // 90pt tall and is laid out independently; even its content is only a
-    // fallback when the native provider has no live lens/button geometry.
-    BOOL nativeLensFound = NO;
+    CFTimeInterval now = CACurrentMediaTime();
+    if (state.selectionIdentity != bar.selectedItem) {
+        state.selectionIdentity = bar.selectedItem;
+        state.selectionChangedAt = now;
+        // One coalesced settling probe per identity change, not a polling chain.
+        __weak UITabBar *weakBar = bar;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.32 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            WCLGSchedulePass(weakBar);
+        });
+    }
+    BOOL selectionSettled = now - state.selectionChangedAt >= 0.30;
+    BOOL nativeLensFound = NO, nativeGeometryStable = NO;
+    CGRect nativeRect = CGRectNull;
     for (UIView *platter in bar.subviews) {
         if (![NSStringFromClass(platter.class) isEqualToString:@"UIKit._UITabBarPlatterView"]) continue;
+        // Provider existence is independent of transient lens hidden/alpha/frame.
+        // Latch for this bar's lifetime: provider replacement must not flash fallback.
+        state.nativeProviderEstablished = YES;
         for (UIView *lens in platter.subviews) {
-            if (![NSStringFromClass(lens.class) isEqualToString:@"_UILiquidLensView"] ||
-                lens.hidden || lens.alpha <= 0.01) continue;
-            CGRect r = [lens convertRect:lens.bounds toView:bar];
-            if (!WCLGFiniteRect(r) || CGRectIsEmpty(r)) continue;
-            r = CGRectIntersection(r, LYHWGlassPlatterRect(bar));
-            if (!CGRectIsEmpty(r) && !CGRectIsNull(r)) { selected = r; nativeLensFound = YES; break; }
+            if (![NSStringFromClass(lens.class) isEqualToString:@"_UILiquidLensView"]) continue;
+            nativeLensFound = YES;
+            if (platter.hidden || platter.alpha <= 0.01 || lens.hidden || lens.alpha <= 0.01) continue;
+            CGRect model = [lens convertRect:lens.bounds toView:bar];
+            CALayer *presentation = lens.layer.presentationLayer;
+            CALayer *barPresentation = bar.layer.presentationLayer;
+            // Compare in one presentation tree. Never use model's final rect while
+            // the visible lens is still at the previous slot or between slots.
+            CGRect visible = presentation && barPresentation ?
+                [presentation convertRect:presentation.bounds toLayer:barPresentation] : model;
+            if (!WCLGFiniteRect(model) || !WCLGFiniteRect(visible) || CGRectIsEmpty(visible)) continue;
+            BOOL atRest = fabs(CGRectGetMidX(visible) - CGRectGetMidX(model)) < 0.5 &&
+                fabs(CGRectGetMidY(visible) - CGRectGetMidY(model)) < 0.5 &&
+                fabs(visible.size.width - model.size.width) < 0.5 &&
+                fabs(visible.size.height - model.size.height) < 0.5;
+            CGRect grid = LYHWGlassPlatterRect(bar);
+            NSUInteger index = [bar.items indexOfObjectIdenticalTo:bar.selectedItem];
+            if (index >= bar.items.count || !bar.items.count) continue;
+            if (bar.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft)
+                index = bar.items.count - 1 - index;
+            CGFloat slot = grid.size.width / bar.items.count;
+            CGFloat targetX = CGRectGetMinX(grid) + slot * (index + 0.5);
+            // Fail closed if the old native lens is still parked on another tab.
+            if (!selectionSettled || !atRest || fabs(CGRectGetMidX(visible) - targetX) > slot * 0.25) continue;
+            nativeRect = CGRectIntersection(visible, grid);
+            nativeGeometryStable = WCLGFiniteRect(nativeRect) && !CGRectIsNull(nativeRect) && !CGRectIsEmpty(nativeRect);
+            if (nativeGeometryStable) break;
         }
-        if (nativeLensFound) break;
+        if (nativeGeometryStable) break;
     }
-    if (!nativeLensFound && bar.selectedItem && systemItems.count == bar.items.count) {
+    BOOL nativeOwnsSelection = state.nativeProviderEstablished || nativeLensFound;
+    if (nativeOwnsSelection) selected = nativeGeometryStable ? nativeRect : CGRectNull;
+    if (!nativeOwnsSelection && bar.selectedItem && systemItems.count == bar.items.count) {
         // Reuse the native button's visible content before the independently
         // positioned WeChat item. Duplicate provider copies fail closed here.
         [systemItems sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
@@ -780,7 +827,7 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
     BOOL moved = !CGRectEqualToRect(selected, state.selectedRect);
     CGPathRef oldPath = state.selection.presentationLayer ? ((CAShapeLayer *)state.selection.presentationLayer).path : state.selection.path;
     CABasicAnimation *slide = nil;
-    if (!nativeLensFound && moved && sSlidingMask && sCustomMaskRequested && oldPath && path && !UIAccessibilityIsReduceMotionEnabled()) {
+    if (!nativeOwnsSelection && moved && sSlidingMask && sCustomMaskRequested && oldPath && path && !UIAccessibilityIsReduceMotionEnabled()) {
         slide = [CABasicAnimation animationWithKeyPath:@"path"];
         slide.fromValue = (__bridge id)oldPath;
         slide.toValue = (__bridge id)path;
@@ -800,9 +847,13 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
     if (!state.selection.fillColor || !CGColorEqualToColor(state.selection.fillColor, fill)) state.selection.fillColor = fill;
     // Native lens owns selection/slide. Retain custom fill only as an opted-in
     // fallback on providers without a live lens; never whiten refractive glass.
-    BOOL hideMask = nativeLensFound || !sCustomMaskRequested || !valid;
+    BOOL hideMask = nativeLensFound || nativeOwnsSelection || !sCustomMaskRequested || !valid;
     if (state.selection.hidden != hideMask) state.selection.hidden = hideMask;
-    if (nativeLensFound || !sSlidingMask || !sCustomMaskRequested || !valid) [state.selection removeAnimationForKey:@"LYHW.slide"];
+    if (nativeOwnsSelection || !sSlidingMask || !sCustomMaskRequested || !valid) {
+        [state.selection removeAnimationForKey:@"LYHW.slide"];
+        [state.underlay removeAnimationForKey:@"LYHW.slide"];
+        [state.underlay removeAnimationForKey:@"LYHW.shadowSlide"];
+    }
     // Clip only our own decorative layers (including glow), never UIKit's lens
     // or any view. Decorations cannot protrude below the actual platter.
     CGRect platterRect = LYHWGlassPlatterRect(bar);
@@ -874,10 +925,13 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
 }
 @end
 
-#pragma mark - Right bar button shared background (not UINavigationItem)
+#pragma mark - Right bar button shared background (root navigation only)
 static NSMapTable<UIBarButtonItem *, NSNumber *> *sGlassNavOriginals;
 static NSHashTable<UINavigationBar *> *sGlassNavBars;
-static BOOL sGlassNavQueued;
+static NSHashTable<UINavigationItem *> *sGlassNavRoots;
+static NSMapTable<UIBarButtonItem *, UINavigationItem *> *sGlassNavOwners;
+static const char kGlassNavLayoutKey = 0;
+
 static void LYHWGlassSetSharedBackground(UIBarButtonItem *item, BOOL hide) {
     SEL setter = NSSelectorFromString(@"setHidesSharedBackground:");
     SEL getter = NSSelectorFromString(@"hidesSharedBackground");
@@ -889,54 +943,149 @@ static void LYHWGlassSetSharedBackground(UIBarButtonItem *item, BOOL hide) {
     if (current != target) ((void (*)(id, SEL, BOOL))objc_msgSend)(item, setter, target);
     if (!hide) [sGlassNavOriginals removeObjectForKey:item];
 }
-static void LYHWGlassScheduleNav(UINavigationBar *bar) {
+// A root is identified structurally, not by the currently visible tab/window.
+// This also works while the incoming tab is still detached from its window.
+static BOOL LYHWGlassIsRootController(UIViewController *vc) {
+    UINavigationController *nav = vc.navigationController;
+    UITabBarController *tabs = nav.tabBarController;
+    if (!nav || nav.viewControllers.firstObject != vc || !tabs) return NO;
+    Class cls = NSClassFromString(@"MMTabBarController");
+    if (!(cls && [tabs isKindOfClass:cls]) && !WCLGIsTabBarHookTarget(tabs.tabBar)) return NO;
+    return [tabs.viewControllers containsObject:nav];
+}
+static void LYHWGlassRememberRoot(UINavigationItem *item) {
+    if (!item) return;
+    if (!sGlassNavRoots) sGlassNavRoots = [NSHashTable weakObjectsHashTable];
+    [sGlassNavRoots addObject:item];
+    if (!sGlassNavOwners) sGlassNavOwners = [NSMapTable weakToWeakObjectsMapTable];
+    for (UIBarButtonItem *button in item.rightBarButtonItems) {
+        UINavigationItem *owner = [sGlassNavOwners objectForKey:button];
+        if (owner && owner != item) continue; // Explicit reuse wins over a stale root array.
+        [sGlassNavOwners setObject:item forKey:button];
+        LYHWGlassSetSharedBackground(button, YES);
+    }
+}
+static UINavigationController *LYHWGlassNavigationOwner(UINavigationBar *bar) {
+    UIResponder *responder = bar.nextResponder;
+    for (NSUInteger i = 0; responder && i < 32; i++, responder = responder.nextResponder) {
+        if ([responder isKindOfClass:UINavigationController.class]) return (id)responder;
+        if ([responder isKindOfClass:UIViewController.class]) {
+            UINavigationController *nav = ((UIViewController *)responder).navigationController;
+            if (nav) return nav;
+        }
+    }
+    return nil;
+}
+static void LYHWGlassPrepareNav(UINavigationBar *bar, NSArray<UINavigationItem *> *incoming) {
     if (!sWCLGEnabled || !bar) return;
     [sGlassNavBars addObject:bar];
-    if (sGlassNavQueued) return;
-    sGlassNavQueued = YES;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        sGlassNavQueued = NO;
-        if (sWCLGLayoutDepth > 0) { LYHWGlassScheduleNav(bar); return; }
-        NSHashTable *targets = [NSHashTable weakObjectsHashTable];
-        for (UINavigationBar *nav in sGlassNavBars) {
-            // Home tab's root navigation item only. Do not affect pushed chat/search pages.
-            if (!nav.window || nav.topItem != nav.items.firstObject) continue;
-            BOOL homeWindow = NO;
-            for (UITabBar *tab in sGlassBars) {
-                if (tab.window == nav.window && !tab.hidden) { homeWindow = YES; break; }
-            }
-            if (!homeWindow) continue;
-            for (UIBarButtonItem *item in nav.topItem.rightBarButtonItems) [targets addObject:item];
-        }
-        for (UIBarButtonItem *item in sGlassNavOriginals.keyEnumerator.allObjects) {
-            if (![targets containsObject:item]) LYHWGlassSetSharedBackground(item, NO);
-        }
-        for (UIBarButtonItem *item in targets) LYHWGlassSetSharedBackground(item, YES);
-    });
+    UINavigationController *nav = LYHWGlassNavigationOwner(bar);
+    UIViewController *root = nav.viewControllers.firstObject;
+    if (LYHWGlassIsRootController(root)) LYHWGlassRememberRoot(root.navigationItem);
+    // Never infer a root merely from a one-item stack in an arbitrary modal.
+    // Known roots remain marked across tab removal and push/pop transitions.
+    for (UINavigationItem *item in incoming) {
+        if ([sGlassNavRoots containsObject:item]) LYHWGlassRememberRoot(item);
+    }
 }
 static void LYHWGlassRefreshTrackedNavigation(void) {
-    for (UINavigationBar *bar in sGlassNavBars) LYHWGlassScheduleNav(bar);
+    if (!sWCLGEnabled) return;
+    for (UINavigationBar *bar in sGlassNavBars) LYHWGlassPrepareNav(bar, bar.items);
 }
-static WCLGObjIMP sGlassOrigNavLayout;
-static void LYHWGlassNavLayout(id self, SEL cmd) {
-    if ([objc_getAssociatedObject(self, &kWCLGLayoutActiveKey) boolValue]) return;
-    objc_setAssociatedObject(self, &kWCLGLayoutActiveKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    sWCLGLayoutDepth++;
-    @try { if (sGlassOrigNavLayout) sGlassOrigNavLayout(self, cmd); }
-    @finally {
-        sWCLGLayoutDepth--;
-        objc_setAssociatedObject(self, &kWCLGLayoutActiveKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+static void LYHWGlassScheduleNav(UINavigationBar *bar) {
+    // Kept as the refresh entry point; no timer and no visibility-driven restore.
+    LYHWGlassPrepareNav(bar, bar.items);
+}
+static BOOL LYHWGlassIsRootItem(UINavigationItem *item) {
+    return sWCLGEnabled && [sGlassNavRoots containsObject:item];
+}
+static void LYHWGlassPrepareButtons(UINavigationItem *owner, NSArray<UIBarButtonItem *> *buttons) {
+    if (!sWCLGEnabled) return;
+    BOOL root = LYHWGlassIsRootItem(owner);
+    if (!sGlassNavOwners) sGlassNavOwners = [NSMapTable weakToWeakObjectsMapTable];
+    for (UIBarButtonItem *button in buttons) {
+        if (root || [sGlassNavOriginals objectForKey:button])
+            [sGlassNavOwners setObject:owner forKey:button];
+        if (root) LYHWGlassSetSharedBackground(button, YES);
+        // Only explicit reuse by a different item restores our own mutation.
+        // An outgoing/hidden tab alone is NOT evidence that ownership changed.
+        else if ([sGlassNavOriginals objectForKey:button]) LYHWGlassSetSharedBackground(button, NO);
     }
-    LYHWGlassScheduleNav((UINavigationBar *)self);
+}
+
+typedef id (*LYHWGlassGetItemIMP)(id, SEL);
+typedef void (*LYHWGlassArrayAnimatedIMP)(id, SEL, id, BOOL);
+static LYHWGlassGetItemIMP sGlassOrigNavigationItem;
+static WCLGObj1IMP sGlassOrigRightItems, sGlassOrigRightItem, sGlassOrigNavItems;
+static LYHWGlassArrayAnimatedIMP sGlassOrigRightItemsAnimated, sGlassOrigRightItemAnimated;
+static LYHWGlassArrayAnimatedIMP sGlassOrigNavItemsAnimated, sGlassOrigNavPush;
+static WCLGObjIMP sGlassOrigNavLayout;
+
+static id LYHWGlassNavigationItem(id self, SEL cmd) {
+    UINavigationItem *item = sGlassOrigNavigationItem ? sGlassOrigNavigationItem(self, cmd) : nil;
+    if (sWCLGEnabled && LYHWGlassIsRootController(self)) LYHWGlassRememberRoot(item);
+    return item;
+}
+static void LYHWGlassRightItems(id self, SEL cmd, id items) {
+    LYHWGlassPrepareButtons(self, items);
+    if (sGlassOrigRightItems) sGlassOrigRightItems(self, cmd, items);
+}
+static void LYHWGlassRightItemsAnimated(id self, SEL cmd, id items, BOOL animated) {
+    LYHWGlassPrepareButtons(self, items);
+    if (sGlassOrigRightItemsAnimated) sGlassOrigRightItemsAnimated(self, cmd, items, animated);
+}
+static void LYHWGlassRightItem(id self, SEL cmd, id item) {
+    LYHWGlassPrepareButtons(self, item ? @[item] : nil);
+    if (sGlassOrigRightItem) sGlassOrigRightItem(self, cmd, item);
+}
+static void LYHWGlassRightItemAnimated(id self, SEL cmd, id item, BOOL animated) {
+    LYHWGlassPrepareButtons(self, item ? @[item] : nil);
+    if (sGlassOrigRightItemAnimated) sGlassOrigRightItemAnimated(self, cmd, item, animated);
+}
+static void LYHWGlassNavItems(id self, SEL cmd, id items) {
+    LYHWGlassPrepareNav(self, items);
+    if (sGlassOrigNavItems) sGlassOrigNavItems(self, cmd, items);
+}
+static void LYHWGlassNavItemsAnimated(id self, SEL cmd, id items, BOOL animated) {
+    LYHWGlassPrepareNav(self, items);
+    if (sGlassOrigNavItemsAnimated) sGlassOrigNavItemsAnimated(self, cmd, items, animated);
+}
+static void LYHWGlassNavPush(id self, SEL cmd, id item, BOOL animated) {
+    LYHWGlassPrepareNav(self, item ? @[item] : nil);
+    if (sGlassOrigNavPush) sGlassOrigNavPush(self, cmd, item, animated);
+}
+static void LYHWGlassNavLayout(id self, SEL cmd) {
+    if ([objc_getAssociatedObject(self, &kGlassNavLayoutKey) boolValue]) return;
+    objc_setAssociatedObject(self, &kGlassNavLayoutKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    sWCLGLayoutDepth++;
+    @try {
+        // UIKit must see the flag before it builds the shared background.
+        LYHWGlassPrepareNav(self, ((UINavigationBar *)self).items);
+        if (sGlassOrigNavLayout) sGlassOrigNavLayout(self, cmd);
+    } @finally {
+        sWCLGLayoutDepth--;
+        objc_setAssociatedObject(self, &kGlassNavLayoutKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
 }
 static BOOL LYHWGlassInstallNavigation(void) {
-    // Select exactly ONE concrete family; do not reuse an original IMP across classes.
+    // Independent original IMP per selector; helper makes retries idempotent.
     static Class installedClass;
-    if (installedClass) return YES;
-    Class cls = NSClassFromString(@"MMUINavigationBar");
+    Class cls = installedClass ?: NSClassFromString(@"MMUINavigationBar");
     if (!cls) cls = NSClassFromString(@"WCCustomNavigationBar");
-    BOOL ok = cls && WCLGHookInstanceMethod(cls, @selector(layoutSubviews), (IMP)LYHWGlassNavLayout, (IMP *)&sGlassOrigNavLayout);
-    if (ok) installedClass = cls;
+    if (!cls) return NO;
+    installedClass = cls;
+    BOOL ok = YES;
+#define LYHW_NAV_HOOK(c, sel, fn, orig) ok = WCLGHookInstanceMethod(c, @selector(sel), (IMP)fn, (IMP *)&orig) && ok
+    LYHW_NAV_HOOK(UIViewController.class, navigationItem, LYHWGlassNavigationItem, sGlassOrigNavigationItem);
+    LYHW_NAV_HOOK(UINavigationItem.class, setRightBarButtonItems:, LYHWGlassRightItems, sGlassOrigRightItems);
+    LYHW_NAV_HOOK(UINavigationItem.class, setRightBarButtonItems:animated:, LYHWGlassRightItemsAnimated, sGlassOrigRightItemsAnimated);
+    LYHW_NAV_HOOK(UINavigationItem.class, setRightBarButtonItem:, LYHWGlassRightItem, sGlassOrigRightItem);
+    LYHW_NAV_HOOK(UINavigationItem.class, setRightBarButtonItem:animated:, LYHWGlassRightItemAnimated, sGlassOrigRightItemAnimated);
+    LYHW_NAV_HOOK(cls, setItems:, LYHWGlassNavItems, sGlassOrigNavItems);
+    LYHW_NAV_HOOK(cls, setItems:animated:, LYHWGlassNavItemsAnimated, sGlassOrigNavItemsAnimated);
+    LYHW_NAV_HOOK(cls, pushNavigationItem:animated:, LYHWGlassNavPush, sGlassOrigNavPush);
+    LYHW_NAV_HOOK(cls, layoutSubviews, LYHWGlassNavLayout, sGlassOrigNavLayout);
+#undef LYHW_NAV_HOOK
     return ok;
 }
 void LYHWGlassTabBarRefresh(void) {
