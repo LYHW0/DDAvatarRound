@@ -37,11 +37,25 @@ extern NSString * const LYHWSettingsChangedNotification;
 @property (nonatomic, assign) BOOL globalCornerPinButtonV2;
 @property (nonatomic, copy) NSArray<NSString *> *globalCornerCustomExcludedVCClassNames;
 
+#pragma mark - 原生悬浮底栏
+
+@property (nonatomic, assign) BOOL glassTabBarEnabled;
+@property (nonatomic, assign) BOOL glassDisableMask;
+@property (nonatomic, assign) BOOL glassStereo;
+@property (nonatomic, assign) BOOL glassGlow;
+@property (nonatomic, assign) BOOL glassLongPress;
+@property (nonatomic, assign) BOOL glassSlidingMask;
+@property (nonatomic, assign) BOOL glassHideRedDot;
+@property (nonatomic, assign) BOOL glassHideBadge;
+@property (nonatomic, assign) BOOL glassHideText;
+
 #pragma mark - 页面级圆角开关
 
 @property (nonatomic, assign) BOOL homepageCornerEnabled;
 @property (nonatomic, assign) BOOL mainFrameCornerEnabled;
 @property (nonatomic, assign) BOOL settingPageCornerEnabled;
+@property (nonatomic, assign) double settingPageCornerRadius;
+@property (nonatomic, assign) double settingPageCornerMargin;
 @property (nonatomic, assign) BOOL discoverPageCornerEnabled;
 @property (nonatomic, assign) BOOL myPageCornerEnabled;
 @property (nonatomic, assign) BOOL friendProfileCornerEnabled;

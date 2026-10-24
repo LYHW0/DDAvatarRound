@@ -102,6 +102,18 @@ static NSString * const kWRCSuiteName = @"com.lyhw.LYHW";
 
 #pragma mark - LYHW 界面圆角板块完整还原（162 个配置键）
 
+LYHW_BOOL(glassTabBarEnabled, glassTabBarEnabled, NO)
+LYHW_BOOL(glassDisableMask, glassDisableMask, NO)
+LYHW_BOOL(glassStereo, glassStereo, NO)
+LYHW_BOOL(glassGlow, glassGlow, NO)
+LYHW_BOOL(glassLongPress, glassLongPress, NO)
+LYHW_BOOL(glassSlidingMask, glassSlidingMask, YES)
+LYHW_BOOL(glassHideRedDot, glassHideRedDot, NO)
+LYHW_BOOL(glassHideBadge, glassHideBadge, NO)
+LYHW_BOOL(glassHideText, glassHideText, NO)
+LYHW_DOUBLE(settingPageCornerRadius, settingPageCornerRadius, 24.0)
+LYHW_DOUBLE(settingPageCornerMargin, settingPageCornerMargin, 18.0)
+
 LYHW_BOOL(globalCornerEnabled, globalCornerEnabled, YES)
 LYHW_DOUBLE(globalCornerRadius, globalCornerRadius, 24.0)
 LYHW_DOUBLE(globalCornerMargin, globalCornerMargin, 18.0)

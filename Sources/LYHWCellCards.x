@@ -799,6 +799,7 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     if (kind == 7) { if (!c.profilePageCornerEnabled) return; kind = 6; }
     else if (kind == 6 && !c.settingPageCornerEnabled) return;
     BOOL settingPage = (kind == 6);
+    BOOL actualSettingsPage = settingPage && !profileLike;
     if (settingPage) kind = 4;
     BOOL timeline = (kind == 5);
     if (timeline && !c.timelineCornerEnabled) return;
@@ -809,6 +810,10 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
     if (kind == 7) { radius = c.profilePageCornerRadius > 0 ? c.profilePageCornerRadius : 24.0; margin = c.profilePageCornerMargin; }
+    if (actualSettingsPage) {
+        radius = MAX(0, MIN(60, c.settingPageCornerRadius));
+        margin = MAX(0, MIN(40, c.settingPageCornerMargin));
+    }
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
     NSInteger secFirst = ip.section, secLast = ip.section;

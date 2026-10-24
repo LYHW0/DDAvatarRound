@@ -19,6 +19,7 @@
 #import <objc/runtime.h>
 #import "LYHWConfig.h"
 #import "LYHWCommon.h"
+#import "LYHWGlassTabBar.h"
 
 %config(generator=MobileSubstrate)
 
@@ -353,7 +354,7 @@ static void LYHWRoundCustomNavBar(UIView *bar, LYHWConfig *cfg) {
 - (void)layoutSubviews {
     %orig;
     LYHWConfig *cfg = LYHWCfgEx();
-    if (!cfg.toolbarCornerEnabled) return;
+    if (LYHWGlassTabBarOwnsBottomBar((UIView *)self) || !cfg.toolbarCornerEnabled) return;
     UIView *bg = LYHWBarBackground((UIView *)self);
     if (bg) LYHWTopRound(bg, cfg.toolbarCornerRadius);
 }
@@ -363,7 +364,7 @@ static void LYHWRoundCustomNavBar(UIView *bar, LYHWConfig *cfg) {
 - (void)layoutSubviews {
     %orig;
     LYHWConfig *cfg = LYHWCfgEx();
-    if (!cfg.toolbarCornerEnabled) return;
+    if (LYHWGlassTabBarOwnsBottomBar((UIView *)self) || !cfg.toolbarCornerEnabled) return;
     UIView *me = (UIView *)self;
     UIView *bg = nil;
     if ([me respondsToSelector:@selector(backgroundView)]) bg = [me valueForKey:@"backgroundView"];

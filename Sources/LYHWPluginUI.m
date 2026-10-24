@@ -98,6 +98,15 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
     LYHWAddCornerGroup(service, @"服务页/钱包", @"serviceCorner", YES);
 
     NSArray *pages = @[
+        P(@"悬浮底栏", LYHWItem(@"启用悬浮底栏（重启生效）", @"glassTabBarEnabled", @"bool", 0, 1),
+                      LYHWItem(@"关闭遮罩", @"glassDisableMask", @"bool", 0, 1),
+                      LYHWItem(@"立体效果", @"glassStereo", @"bool", 0, 1),
+                      LYHWItem(@"遮罩发光", @"glassGlow", @"bool", 0, 1),
+                      LYHWItem(@"长按弹窗", @"glassLongPress", @"bool", 0, 1),
+                      LYHWItem(@"遮罩滑动", @"glassSlidingMask", @"bool", 0, 1),
+                      LYHWItem(@"隐藏红点", @"glassHideRedDot", @"bool", 0, 1),
+                      LYHWItem(@"隐藏角标", @"glassHideBadge", @"bool", 0, 1),
+                      LYHWItem(@"隐藏文字", @"glassHideText", @"bool", 0, 1)),
         P(@"微信主页", LYHWItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
                       LYHWItem(@"卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
                       LYHWItem(@"隐藏点击特效", @"cellTapEffectHidden", @"bool", 0, 1),
@@ -114,7 +123,9 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
                       LYHWItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
                       LYHWItem(@"服务页卡片圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
                       LYHWItem(@"服务页卡片半径", @"servicePageCornerRadius", @"num", 2, 40)),
-        P(@"微信设置页", LYHWItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
+        P(@"微信设置页", LYHWItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1),
+                        LYHWItem(@"圆角半径", @"settingPageCornerRadius", @"num", 0, 60),
+                        LYHWItem(@"左右留白", @"settingPageCornerMargin", @"num", 0, 40)),
         P(@"好友资料页", LYHWItem(@"好友资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1),
                        LYHWItem(@"圆角半径", @"profilePageCornerRadius", @"num", 0, 60),
                        LYHWItem(@"左右留白", @"profilePageCornerMargin", @"num", 0, 40)),
@@ -208,6 +219,12 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    if ([self.pageTitle isEqualToString:@"悬浮底栏"] && section == 0) {
+        return @"原生玻璃底栏仅支持 iOS 26 及以上；修改总开关后请完全退出并重启微信。此功能已内置，请移除单独注入的 DD，避免重复挂钩。";
+    }
+    if ([self.pageTitle isEqualToString:@"悬浮底栏"] && section == 1) {
+        return @"遮罩及其滑动开关控制本插件附加的选中效果，不关闭系统原生玻璃 Lens。";
+    }
     return nil;
 }
 
@@ -272,7 +289,15 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
     if ([item[@"kind"] isEqualToString:@"page"]) {
         LYHWPluginSettingsViewController *sub = [[LYHWPluginSettingsViewController alloc] init];
         sub.pageTitle = item[@"title"];
-        sub.sections = @[ @{ @"header": item[@"title"], @"items": item[@"items"] } ];
+        if ([item[@"title"] isEqualToString:@"悬浮底栏"]) {
+            NSArray *items = item[@"items"];
+            sub.sections = @[
+                @{ @"header": @"功能开关", @"items": @[items.firstObject] },
+                @{ @"header": @"功能开关", @"items": [items subarrayWithRange:NSMakeRange(1, items.count - 1)] }
+            ];
+        } else {
+            sub.sections = @[ @{ @"header": item[@"title"], @"items": item[@"items"] } ];
+        }
         [self.navigationController pushViewController:sub animated:YES];
         return;
     }
