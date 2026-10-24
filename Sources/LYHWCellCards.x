@@ -19,7 +19,7 @@ static BOOL LYHWAnyCardOn(void) {
     LYHWConfig *c = LYHWCCfg();
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
            c.discoverPageCornerEnabled || c.myPageCornerEnabled || c.settingPageCornerEnabled ||
-           c.timelineCornerEnabled || c.profilePageCornerEnabled ||
+           c.timelineCornerEnabled || c.profilePageCornerEnabled || c.chatDetailCornerEnabled ||
            c.servicePageCornerEnabled || c.groupInfoCornerEnabled;
 }
 
@@ -519,6 +519,25 @@ static BOOL LYHWIsGroupInfoTable(UITableView *tv) {
     return [vc isKindOfClass:NSClassFromString(@"ChatRoomInfoViewController")];
 }
 
+static BOOL LYHWIsGroupRoomInfoTable(UITableView *tv) {
+    if (!LYHWIsGroupInfoTable(tv)) return NO;
+    UIViewController *vc = LYHWOwnerViewController(tv);
+    @try {
+        id contact = [vc valueForKey:@"m_chatRoomContact"];
+        NSString *userName = [contact valueForKey:@"userName"];
+        if ([userName isKindOfClass:[NSString class]] && userName.length)
+            return [userName hasSuffix:@"@chatroom"];
+    } @catch (__unused NSException *e) {}
+    // 若 dump 上的联系人标识不可读，不根据人数猜测；默认当单聊详情，
+    // 避免把单聊误套成群聊页的启发式网格规则。
+    return NO;
+}
+
+static BOOL LYHWChatInfoStyleEnabled(UITableView *tv) {
+    if (LYHWIsGroupRoomInfoTable(tv)) return LYHWCCfg().groupInfoCornerEnabled;
+    return LYHWCCfg().chatDetailCornerEnabled;
+}
+
 static void LYHWClearGroupInfoSurface(UITableView *tv) {
     if (!tv || !LYHWIsGroupInfoTable(tv)) return;
     tv.backgroundColor = [UIColor clearColor];
@@ -600,8 +619,11 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     UITableView *tv = LYHWAncestorTable(cell);
     if (!cell || !LYHWIsGroupInfoTable(tv)) return;
     LYHWConfig *c = LYHWCCfg();
+    BOOL isGroup = LYHWIsGroupRoomInfoTable(tv);
+    CGFloat configuredRadius = isGroup ? c.groupInfoCornerRadius : c.chatDetailCornerRadius;
+    CGFloat configuredMargin = isGroup ? c.groupInfoCornerMargin : c.chatDetailCornerMargin;
     UIView *existing = [cell viewWithTag:0x45e0];
-    if (!c.groupInfoCornerEnabled) {
+    if (!LYHWChatInfoStyleEnabled(tv)) {
         [existing removeFromSuperview];
         if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"]) cell.contentView.layer.mask = nil;
         if (cell.selectedBackgroundView.tag == 0x45e1) cell.selectedBackgroundView = nil;
@@ -634,7 +656,7 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     CGRect block = LYHWGroupBlockRect(tv, ip);
     LYHWCardView *card = [existing isKindOfClass:[LYHWCardView class]] ? (LYHWCardView *)existing : nil;
     if (!card) { [existing removeFromSuperview]; card = [LYHWCardView new]; card.tag = 0x45e0; card.userInteractionEnabled = NO; }
-    CGFloat desired = MAX(0, c.groupInfoCornerMargin);
+    CGFloat desired = MAX(0, configuredMargin);
     // 如系统已内缩，不再重复叠加同一份边距。
     CGRect row = [tv convertRect:cell.bounds fromView:cell];
     CGFloat margin = MAX(0, desired - MAX(0, CGRectGetMinX(row)));
@@ -643,7 +665,7 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : UIColor.whiteColor;
     }];
-    CGFloat radius = MIN(MAX(0, c.groupInfoCornerRadius), card.bounds.size.width / 2);
+    CGFloat radius = MIN(MAX(0, configuredRadius), card.bounds.size.width / 2);
     CGFloat blockY = CGRectGetMinY(block) - CGRectGetMinY([tv rectForRowAtIndexPath:ip]);
     CGRect blockInCard = CGRectMake(0, blockY, card.bounds.size.width, block.size.height);
     UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:blockInCard cornerRadius:radius];
@@ -664,6 +686,7 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     }
 }
 
+
 static BOOL gLYHWInStyle = NO;
 static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
@@ -680,8 +703,8 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     UITableView *tv = nil;
     for (UIView *v = cell.superview; v; v = v.superview)
         if ([v isKindOfClass:[UITableView class]]) { tv = (UITableView *)v; break; }
-    if (!tv || LYHWInChatPage(tv)) return;
-    // 群聊资料页不再走旧的 kind=9 通用卡片路径，改走 ZiLiaoSheZhi 风格的逐行卡片。
+    if (!tv) return;
+    // 群聊资料页与单聊详情页由各自的开关驱动，同一条整块卡片路径。
     if (LYHWIsGroupInfoTable(tv)) {
         LYHWStyleGroupInfoCell(cell);
         return;
@@ -706,7 +729,7 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     BOOL fancy = (kind != 4);
         CGFloat radius = kind == 1 ? 22.0 : (kind == 3 ? (c.myPageCornerRadius > 0 ? c.myPageCornerRadius : 24.0) : fancy ? 24.0 : (c.globalCornerRadius > 0 ? c.globalCornerRadius : 28.0));
     CGFloat margin = kind == 1 ? 9.0 : (kind == 2 ? 10.0 : (kind == 3 ? (c.myPageCornerMargin > 0 ? c.myPageCornerMargin : 20.0) : fancy ? 20.0 : (c.globalCornerMargin > 0 ? c.globalCornerMargin : 18.0)));
-    if (profileLike) { radius = 24.0; margin = 10.0; }
+    if (kind == 7) { radius = c.profilePageCornerRadius > 0 ? c.profilePageCornerRadius : 24.0; margin = c.profilePageCornerMargin; }
     NSInteger rows = [tv numberOfRowsInSection:ip.section];
     // 分组范围：通讯录页把连续“无标题”的 section 合并成一块；其它页每个 section 一块
     NSInteger secFirst = ip.section, secLast = ip.section;
@@ -1130,19 +1153,22 @@ static void LYHWStyleInfoHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
     if (!h || h.bounds.size.width < 100 || h.bounds.size.height < 60) return;
     CGFloat W = h.bounds.size.width, H = h.bounds.size.height;
+    LYHWConfig *pc = LYHWCCfg();
+    CGFloat pm = MAX(0, MIN(pc.profilePageCornerMargin, W * 0.45));
+    CGFloat pr = pc.profilePageCornerRadius > 0 ? pc.profilePageCornerRadius : 24.0;
     UIView *card = [h viewWithTag:0x574355];
     if (!card) { card = [UIView new]; card.tag = 0x574355; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     CGFloat cardH = LYHWHeaderCardHeight(h, card, 4, H - 12);
-    card.frame = CGRectMake(10, 4, W - 20, cardH);
+    card.frame = CGRectMake(pm, 4, W - pm * 2, cardH);
     card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
-    card.layer.cornerRadius = 24;
+    card.layer.cornerRadius = pr;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     {
         double hst = LYHWCCfg().cardShadowEnabled ? MAX(0.0, MIN(1.0, LYHWCCfg().cardShadowStrength)) : 0.0;
         // 阴影画在头部视图图层上（卡片自己不裁剪也可以，但统一放到 h 上，与 cell 一致）
         h.clipsToBounds = NO;
-        LYHWSetSinkShadow(h.layer, card.frame, 24, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
+        LYHWSetSinkShadow(h.layer, card.frame, pr, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
     }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
@@ -1703,9 +1729,8 @@ static BOOL LYHWIsWhiteish(UIColor *c) {
 %hook NewChatRoomMemberContainView
 - (void)layoutSubviews {
     %orig;
-    if (!LYHWCCfg().groupInfoCornerEnabled) return;
     UITableView *tv = LYHWAncestorTable((UIView *)self);
-    if (!LYHWIsGroupInfoTable(tv)) return;
+    if (!LYHWIsGroupRoomInfoTable(tv) || !LYHWCCfg().groupInfoCornerEnabled) return;
     ((UIView *)self).backgroundColor = [UIColor clearColor];
     ((UIView *)self).layer.backgroundColor = nil;
     LYHWClearGroupInfoSurface(tv);
