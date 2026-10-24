@@ -17,11 +17,73 @@ static void LYHWSetPressActive(UITableViewCell *cell, BOOL active) {
     objc_setAssociatedObject(cell, kLYHWPressActiveKey, @(active), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static UIColor *LYHWListGray(void) {
-    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+static UIColor *LYHWCachedPalette0(void) {
+    static UIColor *color;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ color = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark
             ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1];
-    }];
+    }]; });
+    return color;
+}
+static UIColor *LYHWCachedPalette1(void) {
+    static UIColor *color;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ color = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : UIColor.whiteColor;
+    }]; });
+    return color;
+}
+static UIColor *LYHWCachedPalette2(void) {
+    static UIColor *color;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ color = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
+        }]; });
+    return color;
+}
+static UIColor *LYHWCachedPalette3(void) {
+    static UIColor *color;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ color = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+                return (t.userInterfaceStyle == UIUserInterfaceStyleDark
+                    ? [UIColor colorWithWhite:0.22 alpha:1] : [UIColor colorWithWhite:0.88 alpha:1]);
+            }]; });
+    return color;
+}
+static UIColor *LYHWCachedPalette4(void) {
+    static UIColor *color;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ color = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }]; });
+    return color;
+}
+static UIColor *LYHWCachedPalette5(void) {
+    static UIColor *color;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ color = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }]; });
+    return color;
+}
+static UIColor *LYHWCachedPalette6(void) {
+    static UIColor *color;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ color = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }]; });
+    return color;
+}
+
+// Local idempotent setter: never hook UIView globally. Compare UIColor objects,
+// not resolved CGColors, so dynamic light/dark behavior remains intact.
+static void LYHWSetBackgroundIfChanged(UIView *view, UIColor *color) {
+    if (!view) return;
+    UIColor *old = view.backgroundColor;
+    if (old == color || [old isEqual:color]) return;
+    view.backgroundColor = color;
+}
+
+static UIColor *LYHWListGray(void) {
+    return LYHWCachedPalette0();
 }
 
 
@@ -43,8 +105,14 @@ static BOOL LYHWClassExcluded(NSString *cls) {
 
 static UIColor *LYHWCardFill(void) {
     LYHWConfig *c = LYHWCCfg();
-    UIColor *u = LYHWColorForAppearance(c.globalCornerBackgroundColorLight,
-                                       c.globalCornerBackgroundColorDark);
+    static NSString *lastLight, *lastDark;
+    static UIColor *u;
+    NSString *light = c.globalCornerBackgroundColorLight ?: @"";
+    NSString *dark = c.globalCornerBackgroundColorDark ?: @"";
+    if (!u || ![lastLight isEqualToString:light] || ![lastDark isEqualToString:dark]) {
+        lastLight = [light copy]; lastDark = [dark copy];
+        u = LYHWColorForAppearance(lastLight, lastDark);
+    }
     if (!u) return [UIColor secondarySystemBackgroundColor];
     return u;
 }
@@ -185,7 +253,7 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
     // 按 cell 坐标算会让裁剪错位，露出一层比卡片更宽的白色内容层（截图里卡片左侧多出的外圈）。
     CGRect r = [cell.contentView convertRect:card.frame fromView:card.superview];
     if (r.size.width < 1 || r.size.height < 1) { host.mask = nil; return; }
-    cell.contentView.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(cell.contentView, [UIColor clearColor]);
     cell.contentView.layer.backgroundColor = [UIColor clearColor].CGColor;
     CGFloat rad = card.layer.cornerRadius;
     CACornerMask cm = card.layer.maskedCorners;
@@ -314,7 +382,7 @@ static void LYHWClearNearBlack(UIView *v) {
     UIColor *bgc = v.backgroundColor;
     CGFloat w = 0, a = 1;
     if (bgc && [bgc getWhite:&w alpha:&a] && a > 0.02 && w < 0.35) {
-        v.backgroundColor = [UIColor clearColor];
+        LYHWSetBackgroundIfChanged(v, [UIColor clearColor]);
         v.layer.backgroundColor = nil;
     }
 }
@@ -550,12 +618,12 @@ static BOOL LYHWChatInfoStyleEnabled(UITableView *tv) {
 
 static void LYHWClearGroupInfoSurface(UITableView *tv) {
     if (!tv || !LYHWIsGroupInfoTable(tv)) return;
-    tv.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(tv, [UIColor clearColor]);
     tv.layer.backgroundColor = nil;
     tv.backgroundView = nil;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
     UIView *host = tv.superview;
-    if (host && ![host isKindOfClass:[UITableViewCell class]]) host.backgroundColor = LYHWListGray();
+    if (host && ![host isKindOfClass:[UITableViewCell class]]) LYHWSetBackgroundIfChanged(host, LYHWListGray());
 
     // 对应原模块在 WCTableView 上清理整宽底板；不触碰文字、头像和按钮。
     for (UIView *v in [tv.subviews copy]) {
@@ -564,7 +632,7 @@ static void LYHWClearGroupInfoSurface(UITableView *tv) {
             [v isKindOfClass:[UIButton class]]) continue;
         CGFloat w = v.bounds.size.width, h = v.bounds.size.height;
         if (w >= tv.bounds.size.width * 0.82 && h > 4) {
-            v.backgroundColor = [UIColor clearColor];
+            LYHWSetBackgroundIfChanged(v, [UIColor clearColor]);
             v.layer.backgroundColor = nil;
         }
         if (h <= 1.5 && w >= tv.bounds.size.width * 0.4) v.hidden = YES;
@@ -583,7 +651,7 @@ static void LYHWClearGroupInfoContent(UIView *root, int depth) {
         // 与原模块一样清掉 contentView 内部的底色，但保留图文控件自身。
         if (![v isKindOfClass:[UILabel class]] && ![v isKindOfClass:[UIImageView class]] &&
             ![v isKindOfClass:[UIButton class]]) {
-            v.backgroundColor = [UIColor clearColor];
+            LYHWSetBackgroundIfChanged(v, [UIColor clearColor]);
             v.layer.backgroundColor = nil;
         }
         LYHWClearGroupInfoContent(v, depth + 1);
@@ -647,11 +715,11 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     for (UIView *v in [cell.subviews copy])
         if (v.tag == 0x574352 || v.tag == 0x574353) [v removeFromSuperview];
     cell.backgroundView = nil;
-    cell.backgroundColor = [UIColor clearColor]; cell.layer.backgroundColor = nil;
+    LYHWSetBackgroundIfChanged(cell, [UIColor clearColor]); cell.layer.backgroundColor = nil;
     cell.layer.cornerRadius = 0; cell.layer.mask = nil;
     cell.layer.shadowOpacity = 0; cell.layer.shadowPath = NULL;
     cell.contentView.frame = cell.bounds;
-    cell.contentView.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(cell.contentView, [UIColor clearColor]);
     cell.contentView.layer.backgroundColor = nil;
     cell.contentView.layer.cornerRadius = 0;
     LYHWClearGroupInfoContent(cell.contentView, 0);
@@ -659,7 +727,7 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     for (UIView *v in cell.subviews) {
         if (v == existing || v == cell.contentView || [v isKindOfClass:[UILabel class]] ||
             [v isKindOfClass:[UIImageView class]] || [v isKindOfClass:[UIButton class]]) continue;
-        v.backgroundColor = [UIColor clearColor]; v.layer.backgroundColor = nil;
+        LYHWSetBackgroundIfChanged(v, [UIColor clearColor]); v.layer.backgroundColor = nil;
     }
     LYHWHideLines(cell);
     // 用整个连续分组的路径裁每一行：短小的“更多群成员”行也不会被圆成一条白色梭形。
@@ -672,9 +740,7 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     CGFloat margin = MAX(0, desired - MAX(0, CGRectGetMinX(row)));
     margin = MIN(margin, cell.bounds.size.width * 0.45);
     LYHWSetCardFrame(card, CGRectInset(cell.bounds, margin, 0));
-    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : UIColor.whiteColor;
-    }];
+    LYHWSetBackgroundIfChanged(card, LYHWCachedPalette1());
     CGFloat radius = MIN(MAX(0, configuredRadius), card.bounds.size.width / 2);
     CGFloat blockY = CGRectGetMinY(block) - CGRectGetMinY([tv rectForRowAtIndexPath:ip]);
     CGRect blockInCard = CGRectMake(0, blockY, card.bounds.size.width, block.size.height);
@@ -692,7 +758,7 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     cm.frame = cell.contentView.bounds; cm.path = clip.CGPath; cell.contentView.layer.mask = cm;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     if (!cell.selectedBackgroundView || cell.selectedBackgroundView.tag != 0x45e1) {
-        UIView *sel = [UIView new]; sel.tag = 0x45e1; sel.backgroundColor = UIColor.clearColor; cell.selectedBackgroundView = sel;
+        UIView *sel = [UIView new]; sel.tag = 0x45e1; LYHWSetBackgroundIfChanged(sel, UIColor.clearColor); cell.selectedBackgroundView = sel;
     }
 }
 
@@ -702,8 +768,11 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell || gLYHWInStyle) return;
     gLYHWInStyle = YES;
-    LYHWStyleCellCardInner(cell);
-    gLYHWInStyle = NO;
+    @try {
+        LYHWStyleCellCardInner(cell);
+    } @finally {
+        gLYHWInStyle = NO;
+    }
 }
 static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     if (!cell) return;
@@ -756,9 +825,9 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     while (fr < lr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:fr inSection:ip.section]].size.height <= skipH) fr++;
     while (lr > fr && [tv rectForRowAtIndexPath:[NSIndexPath indexPathForRow:lr inSection:ip.section]].size.height <= skipH) lr--;
     if (timeline && ip.row > lr) {
-        cell.backgroundView = nil; cell.selectedBackgroundView = nil; cell.backgroundColor = [UIColor clearColor];
-        cell.contentView.backgroundColor = [UIColor clearColor];
-        for (UIView *sv in cell.contentView.subviews) { sv.backgroundColor = [UIColor clearColor]; sv.hidden = YES; }
+        cell.backgroundView = nil; cell.selectedBackgroundView = nil; LYHWSetBackgroundIfChanged(cell, [UIColor clearColor]);
+        LYHWSetBackgroundIfChanged(cell.contentView, [UIColor clearColor]);
+        for (UIView *sv in cell.contentView.subviews) { LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]); sv.hidden = YES; }
         return;
     }
     BOOL isFirstRow = (ip.section == secFirst && ip.row <= fr);
@@ -766,19 +835,19 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
 
     // 列表底色：浅灰，卡片为白
     UIColor *bg = LYHWListGray();
-    tv.backgroundColor = bg;
+    LYHWSetBackgroundIfChanged(tv, bg);
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
     tv.sectionIndexBackgroundColor = [UIColor clearColor];
     tv.sectionIndexTrackingBackgroundColor = [UIColor clearColor];
     if (fancy) tv.clipsToBounds = NO;
 
-    cell.backgroundColor = [UIColor clearColor];
-    cell.contentView.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(cell, [UIColor clearColor]);
+    LYHWSetBackgroundIfChanged(cell.contentView, [UIColor clearColor]);
     cell.layer.backgroundColor = [UIColor clearColor].CGColor;
     for (UIView *sv in cell.subviews) {
         if (sv == cell.contentView || sv == cell.backgroundView || sv == cell.selectedBackgroundView || sv.tag == 0x574353) continue;
         if ([NSStringFromClass([sv class]) rangeOfString:@"Separator"].location != NSNotFound) continue;
-        if (sv.bounds.size.height >= cell.bounds.size.height * 0.8) { sv.backgroundColor = [UIColor clearColor]; sv.layer.backgroundColor = [UIColor clearColor].CGColor; }
+        if (sv.bounds.size.height >= cell.bounds.size.height * 0.8) { LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]); sv.layer.backgroundColor = [UIColor clearColor].CGColor; }
     }
     UIView *card = cell.backgroundView;
     if (!card || card.tag != 0x574352 || ![card isKindOfClass:[LYHWCardView class]]) {
@@ -789,20 +858,17 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     }
     // 同组整块：上下不留缝，只有首尾行有圆角
     LYHWSetCardFrame(card, CGRectMake(margin, 0, cell.bounds.size.width - margin * 2, cell.bounds.size.height));
-    card.backgroundColor = LYHWCardFill();
+    LYHWSetBackgroundIfChanged(card, (kind == 1 && !timeline) ? LYHWCachedPalette2() : LYHWCardFill());
     if (kind == 1 && !timeline) {
-        card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-            return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
-        }];
         tv.backgroundView = nil;
         if (tv.superview) {
-            tv.superview.backgroundColor = bg;
+            LYHWSetBackgroundIfChanged(tv.superview, bg);
             NSMutableArray *cands = [NSMutableArray arrayWithArray:tv.superview.subviews];
             [cands addObjectsFromArray:tv.subviews];
             for (UIView *u in cands) {
                 if (u == tv || [u isKindOfClass:[UITableViewCell class]] || [u isKindOfClass:[UILabel class]]) continue;
                 if (u.bounds.size.width >= tv.bounds.size.width * 0.9 && u.bounds.size.height > 200 && u.subviews.count < 3) {
-                    u.backgroundColor = bg; u.layer.backgroundColor = bg.CGColor;
+                    LYHWSetBackgroundIfChanged(u, bg); u.layer.backgroundColor = bg.CGColor;
                 }
             }
         }
@@ -833,13 +899,10 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
         LYHWSetCardFrame(sel, card.frame);
         if (c.cellTapEffectHidden) {
             // 隐藏点击特效：选中背景全透明，点按时不出现任何灰底
-            sel.backgroundColor = [UIColor clearColor];
+            LYHWSetBackgroundIfChanged(sel, [UIColor clearColor]);
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
         } else {
-            sel.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-                return (t.userInterfaceStyle == UIUserInterfaceStyleDark
-                    ? [UIColor colorWithWhite:0.22 alpha:1] : [UIColor colorWithWhite:0.88 alpha:1]);
-            }];
+            LYHWSetBackgroundIfChanged(sel, LYHWCachedPalette3());
         }
         sel.layer.cornerRadius = card.layer.cornerRadius;
         sel.layer.maskedCorners = card.layer.maskedCorners;
@@ -866,7 +929,7 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
                 BOOL wide = sv.bounds.size.width >= fullW - 1.0 && sv.bounds.size.height > 4;
                 BOOL white = sv.backgroundColor && [sv.backgroundColor getWhite:&w alpha:&a] && a > 0.02 && w > 0.9;
                 if (wide && white) {
-                    sv.backgroundColor = [UIColor clearColor];
+                    LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
                     sv.layer.backgroundColor = nil;
                     sv.layer.cornerRadius = 0;
                 }
@@ -881,13 +944,13 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
         CGRect cf = cell.contentView.frame;
         cell.contentView.clipsToBounds = YES;
         cell.clipsToBounds = NO;
-        cell.backgroundColor = [UIColor clearColor];
+        LYHWSetBackgroundIfChanged(cell, [UIColor clearColor]);
         if (cf.origin.x != 0) cell.contentView.frame = CGRectMake(0, cf.origin.y, cell.bounds.size.width, cf.size.height);
         LYHWSetCardFrame(card, CGRectMake(mg, 0, cell.bounds.size.width - mg * 2, cell.bounds.size.height));
         for (UIView *sv in cell.subviews) {
             if (sv == cell.contentView || sv == card || sv.tag == 0x574353) continue;
             if (sv.bounds.size.width > cell.bounds.size.width - mg * 2 + 0.5 && sv.bounds.size.height > 4) {
-                sv.backgroundColor = [UIColor clearColor];
+                LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
                 sv.layer.backgroundColor = nil;
             }
         }
@@ -901,7 +964,7 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
             for (UIView *sv in v.subviews) {
                 if (sv.bounds.size.width >= cw * 0.8 && sv.backgroundColor) {
                     CGFloat w = 0, a = 0;
-                    if ([sv.backgroundColor getWhite:&w alpha:&a] && w > 0.97 && a > 0.5) sv.backgroundColor = [UIColor clearColor];
+                    if ([sv.backgroundColor getWhite:&w alpha:&a] && w > 0.97 && a > 0.5) LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
                 }
                 if (sv.bounds.size.width >= cw * 0.8) [st addObject:sv];
             }
@@ -923,7 +986,7 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
     UIView *sel = cell.selectedBackgroundView;
     if (sel && sel.tag == 0x574353) LYHWSetCardFrame(sel, card.frame);
     if (LYHWCCfg().cellTapEffectHidden) {
-        if (sel) sel.backgroundColor = [UIColor clearColor];
+        if (sel) LYHWSetBackgroundIfChanged(sel, [UIColor clearColor]);
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         // 微信有些 cell 自己画高亮底（按下时才出现），一并清掉
         for (UIView *sv in cell.subviews) {
@@ -934,7 +997,7 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
             CGFloat w = 0, a = 0;
             if ([bc getWhite:&w alpha:&a] && a > 0.02 && w < 0.97 &&
                 sv.bounds.size.height >= cell.bounds.size.height * 0.6) {
-                sv.backgroundColor = [UIColor clearColor];
+                LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
                 sv.layer.backgroundColor = nil;
             }
         }
@@ -962,7 +1025,7 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
         if (sv == cell.contentView || sv == card || sv == sel) continue;
         if (sv.tag == 0x574352 || sv.tag == 0x574353 || sv.tag == 0x574357) continue;
         if (sv.bounds.size.width > cw + 1 && sv.bounds.size.height >= cell.bounds.size.height * 0.8) {
-            sv.backgroundColor = [UIColor clearColor];
+            LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
             sv.layer.backgroundColor = nil;
         }
     }
@@ -1050,7 +1113,7 @@ static void LYHWClearBg(UIView *v, UIView *stop) {
         if (sv == stop || sv.tag == 0x574354 || sv.tag == 0x574355) continue;
         CGFloat sw = sv.bounds.size.width, sh = sv.bounds.size.height;
         if (sw >= stopW * 0.82 && sh >= 48) {
-            sv.backgroundColor = [UIColor clearColor];
+            LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
             sv.layer.backgroundColor = nil; sv.layer.cornerRadius = 0;
             if (([sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIVisualEffectView class]]) && sv.subviews.count == 0) { sv.hidden = YES; continue; }
         }
@@ -1060,11 +1123,11 @@ static void LYHWClearBg(UIView *v, UIView *stop) {
             CGFloat w = 0, a = 0;
             UIColor *c0 = sv.backgroundColor;
             if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) {
-                sv.backgroundColor = LYHWListGray();
+                LYHWSetBackgroundIfChanged(sv, LYHWListGray());
                 sv.layer.backgroundColor = nil;
             }
         }
-        if (sv.subviews.count > 0 && sv.bounds.size.height > 40) sv.backgroundColor = [UIColor clearColor];
+        if (sv.subviews.count > 0 && sv.bounds.size.height > 40) LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
         LYHWClearBg(sv, stop);
     }
 }
@@ -1073,7 +1136,7 @@ static void LYHWFlatWhite(UIView *v, UIColor *c, CGFloat W) {
     for (UIView *sv in v.subviews) {
         if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIButton class]]) continue;
         if (sv.bounds.size.width >= W * 0.85 && sv.bounds.size.height >= 60) {
-            sv.backgroundColor = c; sv.layer.cornerRadius = 0; sv.layer.backgroundColor = c.CGColor;
+            LYHWSetBackgroundIfChanged(sv, c); sv.layer.cornerRadius = 0; sv.layer.backgroundColor = c.CGColor;
         }
         LYHWFlatWhite(sv, c, W);
     }
@@ -1082,16 +1145,16 @@ static void LYHWFlatWhite(UIView *v, UIColor *c, CGFloat W) {
 // 不碰卡片、不碰 cell 内部的任何视图，避免把卡片本身清成透明/灰色。
 static void LYHWPaintListSurface(UITableView *tv, UIView *header) {
     UIColor *bg = LYHWListGray();
-    tv.backgroundColor = bg;
+    LYHWSetBackgroundIfChanged(tv, bg);
     tv.backgroundView = nil;
-    if (header) header.backgroundColor = bg;
+    if (header) LYHWSetBackgroundIfChanged(header, bg);
     UIView *host = tv.superview;
     if (host) {
         CGFloat w = 0, a = 0;
         UIColor *hc = host.backgroundColor;
         BOOL whiteish = NO;
         if (hc && [hc getWhite:&w alpha:&a]) whiteish = (a > 0.02 && w > 0.9);
-        if (whiteish) host.backgroundColor = bg;
+        if (whiteish) LYHWSetBackgroundIfChanged(host, bg);
     }
 }
 
@@ -1107,7 +1170,7 @@ static void LYHWClearWiderWhite(UIView *v, CGFloat cardW, UIView *card, int dept
             CGFloat w = 0, a = 0;
             UIColor *c0 = sv.backgroundColor;
             if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) {
-                sv.backgroundColor = [UIColor clearColor];
+                LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
                 sv.layer.backgroundColor = nil;
             }
         }
@@ -1174,8 +1237,7 @@ static void LYHWStyleInfoHeader(UITableView *tv) {
     if (!card) { card = [UIView new]; card.tag = 0x574355; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     CGFloat cardH = LYHWHeaderCardHeight(h, card, 4, H - 12);
     card.frame = CGRectMake(pm, 4, W - pm * 2, cardH);
-    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
+    LYHWSetBackgroundIfChanged(card, LYHWCachedPalette4());
     card.layer.cornerRadius = pr;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     {
@@ -1184,7 +1246,7 @@ static void LYHWStyleInfoHeader(UITableView *tv) {
         h.clipsToBounds = NO;
         LYHWSetSinkShadow(h.layer, card.frame, pr, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
     }
-    h.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(h, [UIColor clearColor]);
     stopW = W;
     LYHWClearBg(h, card);
     LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
@@ -1223,8 +1285,7 @@ static void LYHWStyleMyHeader(UITableView *tv) {
     UIView *card = [h viewWithTag:0x574354];
     if (!card) { card = [UIView new]; card.tag = 0x574354; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
     card.frame = CGRectMake(mx, cardTop, W - mx * 2, cardH);
-    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor]; }];
+    LYHWSetBackgroundIfChanged(card, LYHWCachedPalette5());
     card.layer.cornerRadius = 24;
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     {
@@ -1234,7 +1295,7 @@ static void LYHWStyleMyHeader(UITableView *tv) {
         card.clipsToBounds = NO;
         LYHWSetSinkShadow(card.layer, card.bounds, 24, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
     }
-    h.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(h, [UIColor clearColor]);
     stopW = W;
     LYHWClearBg(h, card);
     LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
@@ -1293,7 +1354,7 @@ static void LYHWClearFooterTree(UIView *v, CGFloat W, int depth) {
         if (sv.bounds.size.width >= W * 0.8) {
             CGFloat w = 0, a = 0;
             UIColor *c0 = sv.backgroundColor;
-            if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) { sv.backgroundColor = [UIColor clearColor]; sv.layer.backgroundColor = nil; }
+            if (c0 && [c0 getWhite:&w alpha:&a] && a > 0.02 && w > 0.9) { LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]); sv.layer.backgroundColor = nil; }
         }
         LYHWClearFooterTree(sv, W, depth + 1);
     }
@@ -1301,7 +1362,7 @@ static void LYHWClearFooterTree(UIView *v, CGFloat W, int depth) {
 static void LYHWPaintFooter(UITableView *tv) {
     UIView *f = tv.tableFooterView;
     if (!f || f.bounds.size.height < 1) return;
-    f.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(f, [UIColor clearColor]);
     f.layer.backgroundColor = nil;
     LYHWClearFooterTree(f, tv.bounds.size.width, 0);
 }
@@ -1309,12 +1370,12 @@ static void LYHWPaintFooter(UITableView *tv) {
 // 分组之间的头/尾视图默认是不透明的整宽灰底，层级在 cell 之上，
 // 会把上一张卡片的阴影齐刷刷切掉，留下一条条硬边的「小白条」。这里统一清成透明。
 static void LYHWClearHFView(UIView *v) {
-    v.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(v, [UIColor clearColor]);
     v.layer.backgroundColor = nil;
     if ([v isKindOfClass:[UITableViewHeaderFooterView class]]) {
         UITableViewHeaderFooterView *hf = (UITableViewHeaderFooterView *)v;
-        if (hf.backgroundView) { hf.backgroundView.backgroundColor = [UIColor clearColor]; hf.backgroundView.hidden = YES; }
-        hf.contentView.backgroundColor = [UIColor clearColor];
+        if (hf.backgroundView) { LYHWSetBackgroundIfChanged(hf.backgroundView, [UIColor clearColor]); hf.backgroundView.hidden = YES; }
+        LYHWSetBackgroundIfChanged(hf.contentView, [UIColor clearColor]);
         if (@available(iOS 14.0, *)) {
             UIBackgroundConfiguration *bc = [UIBackgroundConfiguration clearConfiguration];
             hf.backgroundConfiguration = bc;
@@ -1323,7 +1384,7 @@ static void LYHWClearHFView(UIView *v) {
     for (UIView *sv in v.subviews) {
         if ([sv isKindOfClass:[UILabel class]] || [sv isKindOfClass:[UIImageView class]] || [sv isKindOfClass:[UIButton class]]) continue;
         if (sv.bounds.size.width >= v.bounds.size.width * 0.9) {
-            sv.backgroundColor = [UIColor clearColor];
+            LYHWSetBackgroundIfChanged(sv, [UIColor clearColor]);
             sv.layer.backgroundColor = nil;
         }
     }
@@ -1611,10 +1672,7 @@ static void LYHWRestyleVisibleCells(UIView *root) {
         [UIView performWithoutAnimation:^{
             [CATransaction begin];
             [CATransaction setDisableActions:YES];
-            [tv layoutIfNeeded];
             for (UITableViewCell *cell in tv.visibleCells) {
-                [cell setNeedsLayout];
-                [cell layoutIfNeeded];
                 LYHWStyleCellCard(cell);   // 主动套一次，不依赖 layoutSubviews 是否被触发
             }
             [CATransaction commit];
@@ -1683,7 +1741,7 @@ static void LYHWRestyleOnAppear(UIViewController *vc) {
 %end
 
 static void LYHWClearTree(UIView *v) {
-    v.backgroundColor = [UIColor clearColor];
+    LYHWSetBackgroundIfChanged(v, [UIColor clearColor]);
     for (UIView *sv in v.subviews) if (![sv isKindOfClass:[UIImageView class]] && ![sv isKindOfClass:[UILabel class]]) LYHWClearTree(sv);
 }
 %hook ChatFoldCellView
@@ -1771,8 +1829,7 @@ static void LYHWRoundCard(UIView *v, CGFloat r) {
     UICollectionView *cv = (UICollectionView *)self;
     if (!LYHWInService(cv)) return;
     CGFloat W = cv.bounds.size.width, r = c.servicePageCornerRadius, m = 10;
-    cv.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.05 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1]; }];
+    LYHWSetBackgroundIfChanged(cv, LYHWCachedPalette6());
     for (UIView *sv in cv.subviews) {
         if ([sv isKindOfClass:[UICollectionViewCell class]] || [sv isKindOfClass:[UIImageView class]]) continue;
         if (![sv isKindOfClass:[UICollectionReusableView class]]) continue;
