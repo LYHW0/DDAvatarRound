@@ -489,6 +489,144 @@ static void LYHWScheduleSwipeRescan(UITableViewCell *cell, UIView *card) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────
+// 群聊资料页：按全局圆角插件的 ZiLiaoSheZhi 模块重建
+//
+// 原模块的可确认行为：
+//   1. 仅限 ChatRoomInfoViewController 的 UITableViewCell；
+//   2. cell/contentView/表格背景清透明，去掉原生分隔线；
+//   3. 按 section 首行/末行/单行插入 tag=0x45e0 的白色卡片，
+//      用 CAShapeLayer mask 只圆应圆的角；
+//   4. NewChatRoomMemberContainView 出现时，清理 WCTableView 的白底。
+// 原插件的 getYinHangKaImageStyle 函数体没有随反编译结果提供，
+// 因此半径/留白接入本插件自己的 groupInfoCorner* 配置。
+// ─────────────────────────────────────────────────────────────
+static UIViewController *LYHWOwnerViewController(UIView *v) {
+    for (UIResponder *r = v; r; r = r.nextResponder)
+        if ([r isKindOfClass:[UIViewController class]]) return (UIViewController *)r;
+    return nil;
+}
+
+static UITableView *LYHWAncestorTable(UIView *v) {
+    for (UIView *p = v; p; p = p.superview)
+        if ([p isKindOfClass:[UITableView class]]) return (UITableView *)p;
+    return nil;
+}
+
+static BOOL LYHWIsGroupInfoTable(UITableView *tv) {
+    if (!tv) return NO;
+    UIViewController *vc = LYHWOwnerViewController(tv);
+    return [vc isKindOfClass:NSClassFromString(@"ChatRoomInfoViewController")];
+}
+
+static void LYHWClearGroupInfoSurface(UITableView *tv) {
+    if (!tv || !LYHWIsGroupInfoTable(tv)) return;
+    tv.backgroundColor = [UIColor clearColor];
+    tv.layer.backgroundColor = nil;
+    tv.backgroundView = nil;
+    tv.separatorStyle = UITableViewCellSeparatorStyleNone;
+    UIView *host = tv.superview;
+    if (host && ![host isKindOfClass:[UITableViewCell class]]) host.backgroundColor = LYHWListGray();
+
+    // 对应原模块在 WCTableView 上清理整宽底板；不触碰文字、头像和按钮。
+    for (UIView *v in [tv.subviews copy]) {
+        if ([v isKindOfClass:[UITableViewCell class]] || v == tv.tableHeaderView ||
+            [v isKindOfClass:[UILabel class]] || [v isKindOfClass:[UIImageView class]] ||
+            [v isKindOfClass:[UIButton class]]) continue;
+        CGFloat w = v.bounds.size.width, h = v.bounds.size.height;
+        if (w >= tv.bounds.size.width * 0.82 && h > 4) {
+            v.backgroundColor = [UIColor clearColor];
+            v.layer.backgroundColor = nil;
+        }
+        if (h <= 1.5 && w >= tv.bounds.size.width * 0.4) v.hidden = YES;
+    }
+}
+
+static void LYHWClearGroupInfoContent(UIView *root, int depth) {
+    if (!root || depth > 5) return;
+    for (UIView *v in [root.subviews copy]) {
+        NSString *cn = NSStringFromClass([v class]);
+        if ([cn rangeOfString:@"Separator" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+            (v.bounds.size.height <= 1.5 && v.bounds.size.width >= root.bounds.size.width * 0.4)) {
+            v.hidden = YES;
+            continue;
+        }
+        // 与原模块一样清掉 contentView 内部的底色，但保留图文控件自身。
+        if (![v isKindOfClass:[UILabel class]] && ![v isKindOfClass:[UIImageView class]] &&
+            ![v isKindOfClass:[UIButton class]]) {
+            v.backgroundColor = [UIColor clearColor];
+            v.layer.backgroundColor = nil;
+        }
+        LYHWClearGroupInfoContent(v, depth + 1);
+    }
+}
+
+static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
+    if (!cell) return;
+    UITableView *tv = LYHWAncestorTable(cell);
+    if (!LYHWIsGroupInfoTable(tv)) return;
+    LYHWConfig *c = LYHWCCfg();
+
+    // 删除旧版本/旧路径的卡片和阴影，避免两套实现叠加。
+    for (UIView *v in [cell.subviews copy]) {
+        if (v.tag == 0x45e0 || v.tag == 0x574352 || v.tag == 0x574353) [v removeFromSuperview];
+    }
+    if (cell.backgroundView.tag == 0x45e0 || cell.backgroundView.tag == 0x574352) cell.backgroundView = nil;
+    if (cell.selectedBackgroundView.tag == 0x574353) cell.selectedBackgroundView = nil;
+    [CATransaction begin]; [CATransaction setDisableActions:YES];
+    cell.layer.shadowOpacity = 0; cell.layer.shadowPath = NULL;
+    [CATransaction commit];
+
+    if (!c.groupInfoCornerEnabled) {
+        cell.backgroundColor = [UIColor clearColor];
+        cell.contentView.backgroundColor = [UIColor clearColor];
+        return;
+    }
+
+    LYHWClearGroupInfoSurface(tv);
+    cell.backgroundColor = [UIColor clearColor];
+    cell.layer.backgroundColor = nil;
+    cell.backgroundView = nil;
+    cell.selectedBackgroundView = [UIView new];
+    cell.selectedBackgroundView.backgroundColor = [UIColor clearColor];
+    cell.contentView.backgroundColor = [UIColor clearColor];
+    cell.contentView.layer.backgroundColor = nil;
+    cell.contentView.frame = cell.bounds;
+    cell.contentView.clipsToBounds = NO;
+    LYHWClearGroupInfoContent(cell.contentView, 0);
+    LYHWHideLines(cell);
+
+    NSIndexPath *ip = [tv indexPathForCell:cell];
+    if (!ip) return;
+    NSInteger rows = [tv numberOfRowsInSection:ip.section];
+    BOOL first = (ip.row == 0), last = (ip.row == rows - 1), single = first && last;
+    UIRectCorner corners = 0;
+    if (single) corners = UIRectCornerAllCorners;
+    else {
+        if (first) corners |= UIRectCornerTopLeft | UIRectCornerTopRight;
+        if (last) corners |= UIRectCornerBottomLeft | UIRectCornerBottomRight;
+    }
+
+    LYHWCardView *card = nil;
+    for (UIView *v in cell.subviews) if (v.tag == 0x45e0 && [v isKindOfClass:[LYHWCardView class]]) card = (LYHWCardView *)v;
+    if (!card) { card = [LYHWCardView new]; card.tag = 0x45e0; card.userInteractionEnabled = NO; }
+    CGFloat margin = MAX(0.0, MIN(c.groupInfoCornerMargin, cell.bounds.size.width * 0.45));
+    CGRect frame = CGRectInset(cell.bounds, margin, 0);
+    LYHWSetCardFrame(card, frame);
+    card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
+    }];
+    CGFloat radius = MAX(0.0, c.groupInfoCornerRadius);
+    CAShapeLayer *mask = [CAShapeLayer layer];
+    mask.frame = card.bounds;
+    mask.path = [UIBezierPath bezierPathWithRoundedRect:card.bounds byRoundingCorners:corners
+                                            cornerRadii:CGSizeMake(radius, radius)].CGPath;
+    card.layer.mask = mask;
+    card.layer.cornerRadius = radius;
+    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    if (card.superview != cell) [cell insertSubview:card atIndex:0]; else [cell sendSubviewToBack:card];
+}
+
 static BOOL gLYHWInStyle = NO;
 static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
@@ -506,6 +644,11 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     for (UIView *v = cell.superview; v; v = v.superview)
         if ([v isKindOfClass:[UITableView class]]) { tv = (UITableView *)v; break; }
     if (!tv || LYHWInChatPage(tv)) return;
+    // 群聊资料页不再走旧的 kind=9 通用卡片路径，改走 ZiLiaoSheZhi 风格的逐行卡片。
+    if (LYHWIsGroupInfoTable(tv)) {
+        LYHWStyleGroupInfoCell(cell);
+        return;
+    }
     NSIndexPath *ip = [tv indexPathForCell:cell];
     if (!ip) return;
 
@@ -1151,7 +1294,9 @@ static void LYHWClearSectionBars(UITableView *tv) {
         }
         if (mtv.tableFooterView && mtv.tableFooterView.bounds.size.height > 1) { UIView *f = [UIView new]; f.frame = CGRectMake(0, 0, 1, 0.01); mtv.tableFooterView = f; }
     }
-    else if ((LYHWCCfg().profilePageCornerEnabled && LYHWPageKind(self) == 7) || (LYHWCCfg().groupInfoCornerEnabled && LYHWPageKind(self) == 9)) LYHWStyleInfoHeader((UITableView *)self);
+    // 好友资料页继续使用用户自己的头部实现；群聊资料页改走源码式逐行卡片，
+    // 不再套 LYHWStyleInfoHeader，避免与 NewChatRoomMemberContainView 清理逻辑叠加。
+    else if (LYHWCCfg().profilePageCornerEnabled && LYHWPageKind(self) == 7) LYHWStyleInfoHeader((UITableView *)self);
     [objc_getAssociatedObject(self, @selector(LYHWGroupInfo)) removeAllObjects];
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) LYHWStyleCellCard(cell);
     if (LYHWPageKind(self) != 0) LYHWClearSectionBars((UITableView *)self);
@@ -1509,6 +1654,22 @@ static BOOL LYHWIsWhiteish(UIColor *c) {
 }
 %end
 
+
+// 群成员网格：原 ZiLiaoSheZhiZiLiaoJieMianChuLi1 的背景清理。
+// 真实类名已由 WeChat 8.0.80 dump 确认；这里只清 WCTableView 的底板和细线，
+// 不删除头像、文字、按钮等内容视图。
+%hook NewChatRoomMemberContainView
+- (void)layoutSubviews {
+    %orig;
+    if (!LYHWCCfg().groupInfoCornerEnabled) return;
+    UITableView *tv = LYHWAncestorTable((UIView *)self);
+    if (!LYHWIsGroupInfoTable(tv)) return;
+    ((UIView *)self).backgroundColor = [UIColor clearColor];
+    ((UIView *)self).layer.backgroundColor = nil;
+    LYHWClearGroupInfoSurface(tv);
+    LYHWClearGroupInfoContent((UIView *)self, 0);
+}
+%end
 
 #pragma mark - 服务页（WCPayMainViewControllerV2）
 static BOOL LYHWInService(UIView *v) {

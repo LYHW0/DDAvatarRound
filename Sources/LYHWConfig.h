@@ -319,6 +319,8 @@ extern NSString * const LYHWSettingsChangedNotification;
 @property (nonatomic, assign) double forwardPickerCornerRadius;
 @property (nonatomic, assign) BOOL profilePageCornerEnabled;
 @property (nonatomic, assign) BOOL groupInfoCornerEnabled;
+@property (nonatomic, assign) double groupInfoCornerRadius;
+@property (nonatomic, assign) double groupInfoCornerMargin;
 @property (nonatomic, assign) BOOL servicePageCornerEnabled;
 @property (nonatomic, assign) double servicePageCornerRadius;
 

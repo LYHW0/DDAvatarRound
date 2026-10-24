@@ -346,6 +346,8 @@ LYHW_BOOL(forwardPickerCornerEnabled, forwardPickerCornerEnabled, YES)
 LYHW_DOUBLE(forwardPickerCornerRadius, forwardPickerCornerRadius, 24.0)
 LYHW_BOOL(profilePageCornerEnabled, profilePageCornerEnabled, YES)
 LYHW_BOOL(groupInfoCornerEnabled, groupInfoCornerEnabled, YES)
+LYHW_DOUBLE(groupInfoCornerRadius, groupInfoCornerRadius, 24.0)
+LYHW_DOUBLE(groupInfoCornerMargin, groupInfoCornerMargin, 10.0)
 LYHW_BOOL(servicePageCornerEnabled, servicePageCornerEnabled, YES)
 LYHW_DOUBLE(servicePageCornerRadius, servicePageCornerRadius, 24.0)
 

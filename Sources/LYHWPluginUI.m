@@ -23,6 +23,17 @@ static NSDictionary *LYHWItem(NSString *title, NSString *key, NSString *kind,
               @"min": @(minValue), @"max": @(maxValue) };
 }
 
+// 按图1的“页面入口 → 页面设置”组织重复的开关/半径/边框项目。
+static void LYHWAddCornerGroup(NSMutableArray *a, NSString *title, NSString *prefix, BOOL border) {
+    [a addObject:LYHWItem([title stringByAppendingString:@"圆角"], [prefix stringByAppendingString:@"Enabled"], @"bool", 0, 1)];
+    [a addObject:LYHWItem([title stringByAppendingString:@"半径"], [prefix stringByAppendingString:@"Radius"], @"num", 0, 60)];
+    if (border) [a addObject:LYHWItem([title stringByAppendingString:@"边框"], [prefix stringByAppendingString:@"BorderSize"], @"num", 0, 6)];
+}
+
+static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
+    return LYHWPage(title, items);
+}
+
 @interface LYHWPluginSettingsViewController ()
 @property (nonatomic, strong) NSArray<NSDictionary *> *sections;
 @property (nonatomic, copy) NSString *pageTitle;
@@ -51,107 +62,73 @@ static NSDictionary *LYHWItem(NSString *title, NSString *key, NSString *kind,
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
 
     if (self.sections) return;
-    #define P(t, ...) LYHWPage(t, @[__VA_ARGS__])
+    // 一级菜单按页面分类，结构仿照用户提供的图1；你的页脚和配置管理保留。
+    #define P(t, ...) LYHWPageWithItems(t, @[__VA_ARGS__])
+    NSMutableArray *chat = [NSMutableArray array];
+    [chat addObject:LYHWItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1)];
+    [chat addObject:LYHWItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30)];
+    [chat addObject:LYHWItem(@"聊天顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1)];
+    [chat addObject:LYHWItem(@"聊天顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 80)];
+    [chat addObject:LYHWItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1)];
+    [chat addObject:LYHWItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40)];
+    LYHWAddCornerGroup(chat, @"聊天图片/视频", @"chatImageCorner", YES);
+    LYHWAddCornerGroup(chat, @"聊天表情", @"emojiCorner", YES);
+    LYHWAddCornerGroup(chat, @"聊天时间条", @"chatTimeRoundCorner", YES);
+    LYHWAddCornerGroup(chat, @"引用消息", @"msgReferCorner", YES);
+    LYHWAddCornerGroup(chat, @"位置卡片", @"chatLocationCorner", YES);
+    LYHWAddCornerGroup(chat, @"文件卡片", @"chatFileCorner", YES);
+    LYHWAddCornerGroup(chat, @"音乐卡片", @"chatMusicCorner", YES);
+    LYHWAddCornerGroup(chat, @"名片卡片", @"chatCardCorner", YES);
+    LYHWAddCornerGroup(chat, @"红包/转账", @"chatRedPacketCorner", YES);
+    LYHWAddCornerGroup(chat, @"收藏转发", @"chatFavoriteCorner", YES);
+    LYHWAddCornerGroup(chat, @"公众号文章", @"chatArticleCorner", YES);
+    LYHWAddCornerGroup(chat, @"聊天记录", @"chatHistoryCorner", YES);
+    LYHWAddCornerGroup(chat, @"小程序", @"chatMiniProgramCorner", YES);
+    LYHWAddCornerGroup(chat, @"群置顶提示", @"chatPinTipsCorner", YES);
+
+    NSMutableArray *content = [NSMutableArray array];
+    LYHWAddCornerGroup(content, @"视频号", @"finderCorner", YES);
+    LYHWAddCornerGroup(content, @"收藏页", @"favoriteCorner", YES);
+    LYHWAddCornerGroup(content, @"相册选图", @"photoAlbumCorner", YES);
+    LYHWAddCornerGroup(content, @"搜索缩略图", @"chatSearchThumbCorner", YES);
+    LYHWAddCornerGroup(content, @"文件浏览", @"fileBrowseCorner", YES);
+
+    NSMutableArray *service = [NSMutableArray array];
+    LYHWAddCornerGroup(service, @"服务页/钱包", @"serviceCorner", YES);
+
     NSArray *pages = @[
         P(@"微信主页", LYHWItem(@"卡片圆角", @"mainFrameCornerEnabled", @"bool", 0, 1),
                       LYHWItem(@"卡片阴影", @"cardShadowEnabled", @"bool", 0, 1),
                       LYHWItem(@"隐藏点击特效", @"cellTapEffectHidden", @"bool", 0, 1),
                       LYHWItem(@"阴影强度(0~1)", @"cardShadowStrength", @"num", 0, 1),
-                      LYHWItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100),
                       LYHWItem(@"搜索框圆角", @"searchCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30),
-                      LYHWItem(@"输入框圆角", @"inputCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"输入框圆角半径", @"inputCornerRadius", @"num", 0, 30),
-                      LYHWItem(@"顶栏圆角", @"topbarCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"顶栏圆角半径", @"topbarCornerRadius", @"num", 0, 80),
-                      LYHWItem(@"底栏圆角", @"toolbarCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"底栏圆角半径", @"toolbarCornerRadius", @"num", 0, 40)),
+                      LYHWItem(@"搜索框圆角半径", @"searchCornerRadius", @"num", 0, 30)),
         P(@"通讯录页", LYHWItem(@"卡片圆角", @"homepageCornerEnabled", @"bool", 0, 1)),
         P(@"发现页", LYHWItem(@"卡片圆角", @"discoverPageCornerEnabled", @"bool", 0, 1),
                      LYHWItem(@"圆角半径", @"globalCornerRadius", @"num", 2, 30),
                      LYHWItem(@"左右留白", @"globalCornerMargin", @"num", 0, 30),
-                     LYHWItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
-                     LYHWItem(@"朋友圈卡片圆角半径", @"timelineCornerRadius", @"num", 2, 40),
-                     LYHWItem(@"朋友圈图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
-                     LYHWItem(@"图片/视频圆角半径", @"timelineMediaCornerRadius", @"num", 2, 40),
-                     LYHWItem(@"朋友圈评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
-                     LYHWItem(@"评论圆角半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
+                     LYHWItem(@"视频号圆角入口", @"finderCornerEnabled", @"bool", 0, 1)),
         P(@"我的页面", LYHWItem(@"卡片圆角", @"myPageCornerEnabled", @"bool", 0, 1),
                       LYHWItem(@"圆角半径", @"myPageCornerRadius", @"num", 2, 40),
                       LYHWItem(@"左右留白", @"myPageCornerMargin", @"num", 0, 40),
-                      LYHWItem(@"服务页圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"服务页圆角半径", @"servicePageCornerRadius", @"num", 2, 40)),
+                      LYHWItem(@"服务页卡片圆角", @"servicePageCornerEnabled", @"bool", 0, 1),
+                      LYHWItem(@"服务页卡片半径", @"servicePageCornerRadius", @"num", 2, 40)),
         P(@"微信设置页", LYHWItem(@"卡片圆角", @"settingPageCornerEnabled", @"bool", 0, 1)),
-        P(@"资料页圆角", LYHWItem(@"好友资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1),
-                       LYHWItem(@"群聊资料页圆角", @"groupInfoCornerEnabled", @"bool", 0, 1)),
-        P(@"聊天消息圆角",
-                      LYHWItem(@"聊天图片/视频圆角", @"chatImageCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"聊天图片/视频半径", @"chatImageCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"聊天图片/视频边框", @"chatImageCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"聊天表情圆角", @"emojiCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"聊天表情半径", @"emojiCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"聊天表情边框", @"emojiCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"聊天时间条圆角", @"chatTimeRoundCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"聊天时间条半径", @"chatTimeRoundCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"聊天时间条边框", @"chatTimeRoundCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"引用消息圆角", @"msgReferCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"引用消息半径", @"msgReferCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"引用消息边框", @"msgReferCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"位置卡片圆角", @"chatLocationCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"位置卡片半径", @"chatLocationCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"位置卡片边框", @"chatLocationCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"文件卡片圆角", @"chatFileCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"文件卡片半径", @"chatFileCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"文件卡片边框", @"chatFileCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"音乐卡片圆角", @"chatMusicCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"音乐卡片半径", @"chatMusicCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"音乐卡片边框", @"chatMusicCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"名片卡片圆角", @"chatCardCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"名片卡片半径", @"chatCardCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"名片卡片边框", @"chatCardCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"红包/转账圆角", @"chatRedPacketCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"红包/转账半径", @"chatRedPacketCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"红包/转账边框", @"chatRedPacketCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"收藏转发圆角", @"chatFavoriteCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"收藏转发半径", @"chatFavoriteCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"收藏转发边框", @"chatFavoriteCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"公众号文章圆角", @"chatArticleCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"公众号文章半径", @"chatArticleCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"公众号文章边框", @"chatArticleCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"聊天记录圆角", @"chatHistoryCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"聊天记录半径", @"chatHistoryCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"聊天记录边框", @"chatHistoryCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"小程序圆角", @"chatMiniProgramCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"小程序半径", @"chatMiniProgramCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"小程序边框", @"chatMiniProgramCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"群置顶提示圆角", @"chatPinTipsCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"群置顶提示半径", @"chatPinTipsCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"群置顶提示边框", @"chatPinTipsCornerBorderSize", @"num", 0, 6)),
-        P(@"动态与内容圆角",
-                      LYHWItem(@"朋友圈图片/视频圆角", @"momentCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"朋友圈图片/视频半径", @"momentCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"朋友圈图片/视频边框", @"momentCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"视频号圆角", @"finderCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"视频号半径", @"finderCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"视频号边框", @"finderCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"收藏页圆角", @"favoriteCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"收藏页半径", @"favoriteCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"收藏页边框", @"favoriteCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"相册选图圆角", @"photoAlbumCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"相册选图半径", @"photoAlbumCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"相册选图边框", @"photoAlbumCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"搜索缩略图圆角", @"chatSearchThumbCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"搜索缩略图半径", @"chatSearchThumbCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"搜索缩略图边框", @"chatSearchThumbCornerBorderSize", @"num", 0, 6),
-                      LYHWItem(@"文件浏览圆角", @"fileBrowseCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"文件浏览半径", @"fileBrowseCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"文件浏览边框", @"fileBrowseCornerBorderSize", @"num", 0, 6)),
-        P(@"服务页圆角",
-                      LYHWItem(@"服务页/钱包圆角", @"serviceCornerEnabled", @"bool", 0, 1),
-                      LYHWItem(@"服务页/钱包半径", @"serviceCornerRadius", @"num", 0, 60),
-                      LYHWItem(@"服务页/钱包边框", @"serviceCornerBorderSize", @"num", 0, 6)),
-        @{ @"title": @"自定义界面速度", @"kind": @"speed", @"key": @"editUiWindowsSpeed" },
+        P(@"好友资料页", LYHWItem(@"好友资料页圆角", @"profilePageCornerEnabled", @"bool", 0, 1)),
+        P(@"群聊资料页", LYHWItem(@"群聊资料页圆角", @"groupInfoCornerEnabled", @"bool", 0, 1),
+                         LYHWItem(@"圆角半径", @"groupInfoCornerRadius", @"num", 0, 60),
+                         LYHWItem(@"左右留白", @"groupInfoCornerMargin", @"num", 0, 40)),
+        LYHWPageWithItems(@"聊天页圆角", chat),
+        P(@"朋友圈圆角", LYHWItem(@"朋友圈卡片圆角", @"timelineCornerEnabled", @"bool", 0, 1),
+                       LYHWItem(@"朋友圈卡片半径", @"timelineCornerRadius", @"num", 2, 40),
+                       LYHWItem(@"朋友圈图片/视频圆角", @"timelineMediaCornerEnabled", @"bool", 0, 1),
+                       LYHWItem(@"图片/视频半径", @"timelineMediaCornerRadius", @"num", 2, 40),
+                       LYHWItem(@"朋友圈评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
+                       LYHWItem(@"评论半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
+        P(@"内容页圆角", content),
+        P(@"服务页圆角", service),
+        P(@"头像圆角", LYHWItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
+                     LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100))
     ];
     #undef P
     self.sections = @[ @{ @"header": @"兰因后悟", @"items": pages },
