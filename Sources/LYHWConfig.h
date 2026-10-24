@@ -322,6 +322,77 @@ extern NSString * const LYHWSettingsChangedNotification;
 @property (nonatomic, assign) BOOL servicePageCornerEnabled;
 @property (nonatomic, assign) double servicePageCornerRadius;
 
+
+#pragma mark - 全局圆角移植（规则表，68 项）
+@property (nonatomic, assign) BOOL chatArticleCornerEnabled;
+@property (nonatomic, assign) double chatArticleCornerRadius;
+@property (nonatomic, assign) double chatArticleCornerBorderSize;
+@property (nonatomic, copy) NSString *chatArticleCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatArticleCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatCardCornerEnabled;
+@property (nonatomic, assign) double chatCardCornerRadius;
+@property (nonatomic, assign) double chatCardCornerBorderSize;
+@property (nonatomic, copy) NSString *chatCardCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatCardCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatFavoriteCornerEnabled;
+@property (nonatomic, assign) double chatFavoriteCornerRadius;
+@property (nonatomic, assign) double chatFavoriteCornerBorderSize;
+@property (nonatomic, copy) NSString *chatFavoriteCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatFavoriteCornerBorderColorDark;
+@property (nonatomic, assign) double chatFileCornerRadius;
+@property (nonatomic, assign) double chatFileCornerBorderSize;
+@property (nonatomic, copy) NSString *chatFileCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatFileCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatHistoryCornerEnabled;
+@property (nonatomic, assign) double chatHistoryCornerRadius;
+@property (nonatomic, assign) double chatHistoryCornerBorderSize;
+@property (nonatomic, copy) NSString *chatHistoryCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatHistoryCornerBorderColorDark;
+@property (nonatomic, assign) double chatLocationCornerRadius;
+@property (nonatomic, assign) double chatLocationCornerBorderSize;
+@property (nonatomic, copy) NSString *chatLocationCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatLocationCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatMiniProgramCornerEnabled;
+@property (nonatomic, assign) double chatMiniProgramCornerRadius;
+@property (nonatomic, assign) double chatMiniProgramCornerBorderSize;
+@property (nonatomic, copy) NSString *chatMiniProgramCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatMiniProgramCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatMusicCornerEnabled;
+@property (nonatomic, assign) double chatMusicCornerRadius;
+@property (nonatomic, assign) double chatMusicCornerBorderSize;
+@property (nonatomic, copy) NSString *chatMusicCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatMusicCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatPinTipsCornerEnabled;
+@property (nonatomic, assign) double chatPinTipsCornerRadius;
+@property (nonatomic, assign) double chatPinTipsCornerBorderSize;
+@property (nonatomic, copy) NSString *chatPinTipsCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatPinTipsCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatRedPacketCornerEnabled;
+@property (nonatomic, assign) double chatRedPacketCornerRadius;
+@property (nonatomic, assign) double chatRedPacketCornerBorderSize;
+@property (nonatomic, copy) NSString *chatRedPacketCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatRedPacketCornerBorderColorDark;
+@property (nonatomic, assign) BOOL chatSearchThumbCornerEnabled;
+@property (nonatomic, assign) double chatSearchThumbCornerRadius;
+@property (nonatomic, assign) double chatSearchThumbCornerBorderSize;
+@property (nonatomic, copy) NSString *chatSearchThumbCornerBorderColorLight;
+@property (nonatomic, copy) NSString *chatSearchThumbCornerBorderColorDark;
+@property (nonatomic, assign) BOOL favoriteCornerEnabled;
+@property (nonatomic, assign) double favoriteCornerRadius;
+@property (nonatomic, assign) double favoriteCornerBorderSize;
+@property (nonatomic, copy) NSString *favoriteCornerBorderColorLight;
+@property (nonatomic, copy) NSString *favoriteCornerBorderColorDark;
+@property (nonatomic, assign) BOOL fileBrowseCornerEnabled;
+@property (nonatomic, assign) double fileBrowseCornerRadius;
+@property (nonatomic, assign) double fileBrowseCornerBorderSize;
+@property (nonatomic, copy) NSString *fileBrowseCornerBorderColorLight;
+@property (nonatomic, copy) NSString *fileBrowseCornerBorderColorDark;
+@property (nonatomic, assign) BOOL photoAlbumCornerEnabled;
+@property (nonatomic, assign) double photoAlbumCornerRadius;
+@property (nonatomic, assign) double photoAlbumCornerBorderSize;
+@property (nonatomic, copy) NSString *photoAlbumCornerBorderColorLight;
+@property (nonatomic, copy) NSString *photoAlbumCornerBorderColorDark;
+
 @end
 
 NS_ASSUME_NONNULL_END
