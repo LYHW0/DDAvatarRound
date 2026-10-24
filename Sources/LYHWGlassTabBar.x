@@ -1,5 +1,7 @@
 // LYHW integrated native glass tab bar, adapted from DD runtime engine.
-// No global UIView/UITabBar hooks, no chrome/container stripping, no geometry takeover.
+// No global UIView/UITabBar hooks, no container stripping, no geometry takeover.
+// Only the dump-confirmed MMTabBar > UIView > UIVisualEffectView(tag 102289)
+// background is reversibly neutralized; native platter/lens/portal trees stay intact.
 #import <UIKit/UIKit.h>
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
@@ -42,6 +44,7 @@ BOOL LYHWGlassTabBarOwnsBottomBar(UIView *view) {
 }
 static NSUserDefaults *sGlassDefaults;
 static BOOL sDisableMask, sStereo, sGlow, sLongPress, sSlidingMask, sHideRedDot, sHideBadge, sHideText;
+static BOOL sCustomMaskRequested;
 static void LYHWGlassReadFeatures(void) {
     sDisableMask = [sGlassDefaults boolForKey:@"glassDisableMask"];
     sStereo = [sGlassDefaults boolForKey:@"glassStereo"];
@@ -51,6 +54,12 @@ static void LYHWGlassReadFeatures(void) {
     sHideRedDot = [sGlassDefaults boolForKey:@"glassHideRedDot"];
     sHideBadge = [sGlassDefaults boolForKey:@"glassHideBadge"];
     sHideText = [sGlassDefaults boolForKey:@"glassHideText"];
+    // Preserve existing switch semantics: an explicitly saved DisableMask=NO
+    // opts into our mask; DisableMask=YES always wins. Fresh installs leave the
+    // native liquid lens alone, even though sliding defaults to YES in config.
+    sCustomMaskRequested = !sDisableMask &&
+        (([sGlassDefaults objectForKey:@"glassDisableMask"] != nil) || sStereo || sGlow ||
+         ([sGlassDefaults objectForKey:@"glassSlidingMask"] != nil && sSlidingMask));
 }
 static NSHashTable<UITabBar *> *sGlassBars;
 static void LYHWGlassApplyFeatures(UITabBar *bar);
@@ -440,6 +449,7 @@ static char kGlassState;
 @property(nonatomic, strong) CAShapeLayer *underlay;
 @property(nonatomic, strong) UILongPressGestureRecognizer *press;
 @property(nonatomic, strong) NSMapTable<UIView *, NSNumber *> *hiddenValues;
+@property(nonatomic, strong) NSMapTable<UIView *, NSNumber *> *backgroundAlphas;
 @property(nonatomic, assign) CGRect selectedRect;
 - (void)longPress:(UILongPressGestureRecognizer *)gesture;
 @end
@@ -454,6 +464,102 @@ static void LYHWGlassCollectItems(UIView *view, NSMutableArray<UIView *> *items,
         if (target) [items addObject:sub];
         else LYHWGlassCollectItems(sub, items, depth + 1);
     }
+}
+// Fail closed: this is a structural fingerprint from the supplied dump, not
+// DD's broad class-name/full-width heuristic. Never inspect a list or window.
+static BOOL LYHWGlassMatchesBarRect(UIView *view, UITabBar *bar) {
+    CGRect r = view.frame, b = bar.bounds;
+    return WCLGFiniteRect(r) && WCLGFiniteRect(b) && b.size.width > 1 && b.size.height > 1 &&
+        fabs(r.origin.x - b.origin.x) < 1 && fabs(r.origin.y - b.origin.y) < 1 &&
+        fabs(r.size.width - b.size.width) < 1 && fabs(r.size.height - b.size.height) < 1;
+}
+static UIVisualEffectView *LYHWGlassConfirmedBackground(UITabBar *bar, UIView *host) {
+    if (host.superview != bar || host.class != UIView.class ||
+        !LYHWGlassMatchesBarRect(host, bar) || host.subviews.count != 1 ||
+        host.layer.mask || !WCLGFinite(host.layer.cornerRadius) || host.layer.cornerRadius > 0.5) return nil;
+    UIView *effect = host.subviews.firstObject;
+    if (effect.class != UIVisualEffectView.class || effect.tag != 102289 ||
+        !LYHWGlassMatchesBarRect(effect, bar) || effect.layer.mask ||
+        !WCLGFinite(effect.layer.cornerRadius) || effect.layer.cornerRadius > 0.5) return nil;
+    // Allow only the three effect internals actually present in the dump.
+    // Anything else (item, portal, offscreen source, plugin wrapper) disqualifies
+    // the entire candidate; no ancestor containing native content is faded.
+    NSSet *allowed = [NSSet setWithArray:@[@"_UIVisualEffectBackdropView",
+        @"_UIVisualEffectSubview", @"_UIVisualEffectContentView"]];
+    if (effect.subviews.count != 3) return nil;
+    NSMutableSet *seen = [NSMutableSet set];
+    for (UIView *child in effect.subviews) {
+        NSString *name = NSStringFromClass(child.class);
+        if (![allowed containsObject:name] || [seen containsObject:name] || child.subviews.count ||
+            !LYHWGlassMatchesBarRect(child, bar)) return nil;
+        [seen addObject:name];
+    }
+    return (UIVisualEffectView *)effect;
+}
+static void LYHWGlassRestoreBackground(LYHWGlassBarState *state, UIView *view) {
+    NSNumber *alpha = [state.backgroundAlphas objectForKey:view];
+    if (!alpha) return;
+    // Do not overwrite a newer explicit alpha supplied by WeChat/another plugin.
+    if (view.alpha == 0) view.alpha = alpha.doubleValue;
+    [state.backgroundAlphas removeObjectForKey:view];
+}
+static void LYHWGlassApplyBackground(UITabBar *bar, LYHWGlassBarState *state) {
+    NSMutableSet<UIView *> *targets = [NSMutableSet set];
+    // Require the real floating platter before suppressing WeChat's fallback.
+    BOOL hasPlatter = NO;
+    for (UIView *sub in bar.subviews) {
+        if ([NSStringFromClass(sub.class) isEqualToString:@"UIKit._UITabBarPlatterView"] &&
+            WCLGFiniteRect(sub.frame) && !CGRectIsEmpty(sub.frame)) { hasPlatter = YES; break; }
+    }
+    if (WCLGIsTabBarHookTarget(bar) && bar.window && !bar.hidden && hasPlatter) {
+        for (UIView *sub in bar.subviews) {
+            UIVisualEffectView *target = LYHWGlassConfirmedBackground(bar, sub);
+            if (target) [targets addObject:target];
+        }
+    }
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    for (UIView *old in state.backgroundAlphas.keyEnumerator.allObjects) {
+        if (![targets containsObject:old]) LYHWGlassRestoreBackground(state, old);
+    }
+    for (UIView *target in targets) {
+        if (![state.backgroundAlphas objectForKey:target])
+            [state.backgroundAlphas setObject:@(target.alpha) forKey:target];
+        if (target.alpha != 0) target.alpha = 0;
+    }
+    [CATransaction commit];
+}
+static CGRect LYHWGlassPlatterRect(UITabBar *bar) {
+    for (UIView *sub in bar.subviews) {
+        if (![NSStringFromClass(sub.class) isEqualToString:@"UIKit._UITabBarPlatterView"]) continue;
+        CGRect r = [sub convertRect:sub.bounds toView:bar];
+        if (WCLGFiniteRect(r) && !CGRectIsEmpty(r)) return CGRectIntersection(r, bar.bounds);
+    }
+    return CGRectNull;
+}
+// WeChat items include the 40pt safe-area tail (90pt bounds, content ends at
+// y=50 in the dump). Use actual icon/title content, never that full-height box.
+static CGRect LYHWGlassItemContentRect(UIView *item, UITabBar *bar) {
+    CGRect content = CGRectNull;
+    CGRect itemRect = [item convertRect:item.bounds toView:bar];
+    if (!WCLGFiniteRect(itemRect)) return CGRectNull;
+    for (UIView *child in item.subviews) {
+        if (child.hidden || child.alpha <= 0.01) continue;
+        if (![child isKindOfClass:UIImageView.class] && ![child isKindOfClass:UILabel.class]) continue;
+        CGRect r = [child convertRect:child.bounds toView:bar];
+        if (!WCLGFiniteRect(r) || r.size.width < 2 || r.size.height < 2) continue;
+        r = CGRectIntersection(r, itemRect);
+        if (!CGRectIsNull(r) && !CGRectIsEmpty(r)) content = CGRectUnion(content, r);
+    }
+    // Broken native placeholder labels in this dump are at y=142, outside
+    // their 61pt button. Intersect first; if no content remains, use the native
+    // button's box only (never MMTabBarItemView's safe-area-height box).
+    content = CGRectIntersection(content, itemRect);
+    if (CGRectIsNull(content) || CGRectIsEmpty(content)) {
+        if ([NSStringFromClass(item.class) containsString:@"MMTabBarItemView"]) return CGRectNull;
+        content = itemRect;
+    } else content = CGRectIntersection(CGRectInset(content, -6, -4), itemRect);
+    return CGRectIntersection(content, LYHWGlassPlatterRect(bar));
 }
 static BOOL LYHWGlassBadgeName(NSString *name) {
     NSString *lower = name.lowercaseString;
@@ -506,12 +612,20 @@ static BOOL LYHWGlassItemSelected(UIView *item) {
     return NO;
 }
 static void LYHWGlassApplyFeatures(UITabBar *bar) {
-    if (!bar.window || !WCLGEnabled()) return;
     LYHWGlassBarState *state = objc_getAssociatedObject(bar, &kGlassState);
+    if (!bar.window || bar.hidden || !WCLGEnabled()) {
+        for (UIView *view in state.backgroundAlphas.keyEnumerator.allObjects)
+            LYHWGlassRestoreBackground(state, view);
+        LYHWGlassRestore(state);
+        state.selection.hidden = YES;
+        state.underlay.hidden = YES;
+        return;
+    }
     if (!state) {
         state = [LYHWGlassBarState new];
         state.bar = bar;
         state.hiddenValues = [NSMapTable weakToStrongObjectsMapTable];
+        state.backgroundAlphas = [NSMapTable weakToStrongObjectsMapTable];
         state.selection = [CAShapeLayer layer];
         state.selection.name = @"LYHWGlassSelection";
         state.underlay = [CAShapeLayer layer];
@@ -521,6 +635,7 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
         [bar.layer insertSublayer:state.selection above:state.underlay];
         objc_setAssociatedObject(bar, &kGlassState, state, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    LYHWGlassApplyBackground(bar, state);
     NSMutableArray<UIView *> *items = [NSMutableArray array];
     LYHWGlassCollectItems(bar, items, 0);
     // Items may be replaced or reparented by UIKit. Release our mutations on obsolete views.
@@ -532,7 +647,10 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
     CGRect selected = CGRectNull;
     for (UIView *item in items) {
         LYHWGlassStyleItem(state, item, 0);
-        if (LYHWGlassItemSelected(item)) selected = [item convertRect:item.bounds toView:bar];
+        if (LYHWGlassItemSelected(item)) {
+            CGRect candidate = LYHWGlassItemContentRect(item, bar);
+            if (WCLGFiniteRect(candidate) && !CGRectIsEmpty(candidate)) selected = candidate;
+        }
     }
     NSMutableArray *systemItems = [NSMutableArray array], *wechatItems = [NSMutableArray array];
     for (UIView *item in items) {
@@ -548,7 +666,36 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
         }];
         NSUInteger index = [bar.items indexOfObjectIdenticalTo:bar.selectedItem];
         if (bar.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft && index < group.count) index = group.count - 1 - index;
-        if (index < group.count) selected = [group[index] convertRect:group[index].bounds toView:bar];
+        if (index < group.count) selected = LYHWGlassItemContentRect(group[index], bar);
+    }
+    // UIKit's actual selected lens is authoritative. MMTabBarItemView remains
+    // 90pt tall and is laid out independently; even its content is only a
+    // fallback when the native provider has no live lens/button geometry.
+    BOOL nativeLensFound = NO;
+    for (UIView *platter in bar.subviews) {
+        if (![NSStringFromClass(platter.class) isEqualToString:@"UIKit._UITabBarPlatterView"]) continue;
+        for (UIView *lens in platter.subviews) {
+            if (![NSStringFromClass(lens.class) isEqualToString:@"_UILiquidLensView"] ||
+                lens.hidden || lens.alpha <= 0.01) continue;
+            CGRect r = [lens convertRect:lens.bounds toView:bar];
+            if (!WCLGFiniteRect(r) || CGRectIsEmpty(r)) continue;
+            r = CGRectIntersection(r, LYHWGlassPlatterRect(bar));
+            if (!CGRectIsEmpty(r) && !CGRectIsNull(r)) { selected = r; nativeLensFound = YES; break; }
+        }
+        if (nativeLensFound) break;
+    }
+    if (!nativeLensFound && bar.selectedItem && systemItems.count == bar.items.count) {
+        // Reuse the native button's visible content before the independently
+        // positioned WeChat item. Duplicate provider copies fail closed here.
+        [systemItems sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+            CGFloat ax = [a convertPoint:CGPointZero toView:bar].x;
+            CGFloat bx = [b convertPoint:CGPointZero toView:bar].x;
+            return ax < bx ? NSOrderedAscending : ax > bx ? NSOrderedDescending : NSOrderedSame;
+        }];
+        NSUInteger index = [bar.items indexOfObjectIdenticalTo:bar.selectedItem];
+        if (bar.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft && index < systemItems.count)
+            index = systemItems.count - 1 - index;
+        if (index < systemItems.count) selected = LYHWGlassItemContentRect(systemItems[index], bar);
     }
     BOOL valid = WCLGFiniteRect(selected) && !CGRectIsEmpty(selected) &&
         CGRectContainsRect(CGRectInset(bar.bounds, -1, -1), selected);
@@ -557,7 +704,7 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
     BOOL moved = !CGRectEqualToRect(selected, state.selectedRect);
     CGPathRef oldPath = state.selection.presentationLayer ? ((CAShapeLayer *)state.selection.presentationLayer).path : state.selection.path;
     CABasicAnimation *slide = nil;
-    if (moved && sSlidingMask && !sDisableMask && oldPath && path && !UIAccessibilityIsReduceMotionEnabled()) {
+    if (moved && sSlidingMask && sCustomMaskRequested && oldPath && path && !UIAccessibilityIsReduceMotionEnabled()) {
         slide = [CABasicAnimation animationWithKeyPath:@"path"];
         slide.fromValue = (__bridge id)oldPath;
         slide.toValue = (__bridge id)path;
@@ -575,9 +722,18 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
     UIColor *tint = bar.tintColor ?: UIColor.systemGreenColor;
     CGColorRef fill = [tint colorWithAlphaComponent:0.045].CGColor;
     if (!state.selection.fillColor || !CGColorEqualToColor(state.selection.fillColor, fill)) state.selection.fillColor = fill;
-    BOOL hideMask = sDisableMask || !valid;
+    BOOL hideMask = !sCustomMaskRequested || !valid;
     if (state.selection.hidden != hideMask) state.selection.hidden = hideMask;
-    if (!sSlidingMask || sDisableMask) [state.selection removeAnimationForKey:@"LYHW.slide"];
+    if (!sSlidingMask || !sCustomMaskRequested || !valid) [state.selection removeAnimationForKey:@"LYHW.slide"];
+    // Clip only our own decorative layers (including glow), never UIKit's lens
+    // or any view. Decorations cannot protrude below the actual platter.
+    CGRect platterRect = LYHWGlassPlatterRect(bar);
+    for (CAShapeLayer *layer in @[state.selection, state.underlay]) {
+        CAShapeLayer *clip = (CAShapeLayer *)layer.mask;
+        if (!clip) { clip = [CAShapeLayer layer]; layer.mask = clip; }
+        clip.path = valid ? [UIBezierPath bezierPathWithRoundedRect:platterRect
+            cornerRadius:platterRect.size.height / 2].CGPath : NULL;
+    }
     BOOL hideUnderlay = (!sStereo && !sGlow) || !valid;
     if (state.underlay.hidden != hideUnderlay) state.underlay.hidden = hideUnderlay;
     CGColorRef base = [UIColor.clearColor colorWithAlphaComponent:0].CGColor;

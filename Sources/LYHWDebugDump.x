@@ -6,6 +6,48 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
+
+static NSString *LYHWDumpTransform(CATransform3D t) {
+    return [NSString stringWithFormat:@"[%.4g,%.4g,%.4g,%.4g;%.4g,%.4g,%.4g,%.4g;%.4g,%.4g,%.4g,%.4g;%.4g,%.4g,%.4g,%.4g]",
+        t.m11,t.m12,t.m13,t.m14,t.m21,t.m22,t.m23,t.m24,
+        t.m31,t.m32,t.m33,t.m34,t.m41,t.m42,t.m43,t.m44];
+}
+
+static void LYHWDumpPathElement(void *info, const CGPathElement *element) {
+    NSMutableString *out = (__bridge NSMutableString *)info;
+    if (out.length > 200000) return;
+    NSUInteger n = element->type == kCGPathElementAddCurveToPoint ? 3 :
+        element->type == kCGPathElementAddQuadCurveToPoint ? 2 :
+        element->type == kCGPathElementCloseSubpath ? 0 : 1;
+    [out appendFormat:@" %ld", (long)element->type];
+    for (NSUInteger i = 0; i < n; i++)
+        [out appendFormat:@"%@", NSStringFromCGPoint(element->points[i])];
+}
+
+static void LYHWDumpMask(UIView *v, NSMutableString *out, int depth) {
+    CALayer *layer = v.layer;
+    [out appendFormat:@"%*slayer opacity=%.3f zPosition=%.3f hidden=%d bounds=%@ transform=%@ sublayerTransform=%@\n",
+        depth * 2 + 2, "", layer.opacity, layer.zPosition, layer.hidden,
+        NSStringFromCGRect(layer.bounds), LYHWDumpTransform(layer.transform), LYHWDumpTransform(layer.sublayerTransform)];
+    CALayer *mask = layer.mask;
+    if (!mask) {
+        [out appendFormat:@"%*slayerMask=nil\n", depth * 2 + 2, ""];
+        return;
+    }
+    [out appendFormat:@"%*slayerMask name=%@ class=%@ viewBounds=%@ frame=%@ bounds=%@ position=%@ opacity=%.2f hidden=%d transformIdentity=%d",
+        depth * 2 + 2, "", mask.name, NSStringFromClass(mask.class),
+        NSStringFromCGRect(v.bounds), NSStringFromCGRect(mask.frame), NSStringFromCGRect(mask.bounds),
+        NSStringFromCGPoint(mask.position), mask.opacity, mask.hidden, CATransform3DIsIdentity(mask.transform)];
+    if ([mask isKindOfClass:CAShapeLayer.class]) {
+        CAShapeLayer *shape = (CAShapeLayer *)mask;
+        [out appendFormat:@" fillAlpha=%.2f fillRule=%@ pathBBox=%@ path=",
+            shape.fillColor ? CGColorGetAlpha(shape.fillColor) : 0, shape.fillRule,
+            shape.path ? NSStringFromCGRect(CGPathGetPathBoundingBox(shape.path)) : @"nil"];
+        if (shape.path) CGPathApply(shape.path, (__bridge void *)out, LYHWDumpPathElement);
+    }
+    [out appendString:@"\n"];
+}
 
 %config(generator=MobileSubstrate)
 
@@ -20,11 +62,22 @@ static NSString *LYHWDumpColor(UIColor *c) {
 }
 
 static void LYHWDumpWalk(UIView *v, NSMutableString *out, int depth) {
-    if (depth > 32 || out.length > 200000) return;
+    if (depth > 32 || out.length > 1000000) return;
     [out appendFormat:@"%*s%@ tag=%ld frame=%@ bg=%@ hidden=%d alpha=%.2f clip=%d radius=%.1f mask=%u\n",
         depth * 2, "", NSStringFromClass([v class]), (long)v.tag, NSStringFromCGRect(v.frame),
         LYHWDumpColor(v.backgroundColor), v.hidden, v.alpha, v.clipsToBounds,
         v.layer.cornerRadius, (unsigned int)v.layer.maskedCorners];
+    LYHWDumpMask(v, out, depth);
+    if ([v isKindOfClass:UITableViewCell.class]) {
+        UITableViewCell *cell = (UITableViewCell *)v;
+        UIView *card = cell.backgroundView;
+        if (card && [NSStringFromClass(v.class) isEqualToString:@"NewContactsItemCell"]) {
+            [out appendFormat:@"%*scardHost=%@ cellRect=%@ hostRect=%@\n", depth * 2 + 2, "",
+                NSStringFromClass(card.superview.class),
+                NSStringFromCGRect([cell.contentView convertRect:card.frame fromView:cell]),
+                NSStringFromCGRect([cell.contentView convertRect:card.frame fromView:card.superview])];
+        }
+    }
     for (UIView *sv in v.subviews) LYHWDumpWalk(sv, out, depth + 1);
 }
 

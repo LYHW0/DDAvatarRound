@@ -251,8 +251,20 @@ static void LYHWClipToCard(UITableViewCell *cell, UIView *card) {
     }
     // 遮罩路径必须在 contentView 自己的坐标系里算：转场/左滑时 contentView 相对 cell 有偏移，
     // 按 cell 坐标算会让裁剪错位，露出一层比卡片更宽的白色内容层（截图里卡片左侧多出的外圈）。
-    CGRect r = [cell.contentView convertRect:card.frame fromView:card.superview];
-    if (r.size.width < 1 || r.size.height < 1) { host.mask = nil; return; }
+    CGRect r;
+    BOOL contactsCard = [NSStringFromClass(cell.class) isEqualToString:@"NewContactsItemCell"] &&
+        [card isKindOfClass:[LYHWCardView class]];
+    if (contactsCard) {
+        // backgroundView 的 lockedFrame 是 cell 坐标，不是 UIKit 临时背景宿主的坐标。
+        // setBackgroundView:/复用期间 superview 可能尚未挂载；fromView:nil 会按窗口
+        // 坐标解释 {10,0,w,h}，使下方行的内容 mask 整段落到负 y。勿缓存该结果。
+        r = [cell.contentView convertRect:((LYHWCardView *)card).lockedFrame fromView:cell];
+    } else {
+        r = [cell.contentView convertRect:card.frame fromView:card.superview];
+    }
+    if (r.size.width < 1 || r.size.height < 1 ||
+        (contactsCard && (CGRectIsNull(r) || CGRectIsInfinite(r) ||
+                         !CGRectIntersectsRect(r, host.bounds)))) { host.mask = nil; return; }
     LYHWSetBackgroundIfChanged(cell.contentView, [UIColor clearColor]);
     cell.contentView.layer.backgroundColor = [UIColor clearColor].CGColor;
     CGFloat rad = card.layer.cornerRadius;
@@ -1065,6 +1077,10 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
     UITableViewCell *cell = (UITableViewCell *)self;
     LYHWSetPressActive(cell, NO);
     LYHWHideShadowHost(cell);
+    // 普通卡片 mask 也会跨复用保留；indexPath 暂不可用时不能带着旧裁剪显示通讯录。
+    if ([NSStringFromClass(cell.class) isEqualToString:@"NewContactsItemCell"] &&
+        [cell.contentView.layer.mask.name isEqualToString:@"LYHWClipMask"])
+        cell.contentView.layer.mask = nil;
     [[cell viewWithTag:0x45e0] removeFromSuperview];
     if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"]) cell.contentView.layer.mask = nil;
     if (cell.selectedBackgroundView.tag == 0x45e1) cell.selectedBackgroundView = nil;
