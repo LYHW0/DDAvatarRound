@@ -1,5 +1,6 @@
 // LYHW integrated native glass tab bar, adapted from DD runtime engine.
-// No global UIView/UITabBar hooks, no container stripping, no geometry takeover.
+// No global UIView/UITabBar hooks or container stripping. Only real WeChat
+// item centers are aligned asynchronously to the native platter's four slots.
 // Only the dump-confirmed MMTabBar > UIView > UIVisualEffectView(tag 102289)
 // background is reversibly neutralized; native platter/lens/portal trees stay intact.
 #import <UIKit/UIKit.h>
@@ -34,8 +35,6 @@ static CGFloat WCLGColorAlpha(UIColor *c) { return c ? CGColorGetAlpha(c.CGColor
 static BOOL WCLGIsIOS26OrLater(void) {
     return [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){26,0,0}];
 }
-// The integrated LYHW engine is always a coexisting corner engine. Never move items.
-static BOOL WCLGDetectCoexistPlugins(void) { return YES; }
 BOOL LYHWGlassTabBarIsActive(void) { return sWCLGEnabled; }
 BOOL LYHWGlassTabBarOwnsBottomBar(UIView *view) {
     if (!sWCLGEnabled) return NO;
@@ -69,74 +68,51 @@ static void WCLGTrackTabBar(UITabBar *bar) {
     if (bar) [sGlassBars addObject:bar];
     LYHWGlassRefreshTrackedNavigation();
 }
-static __weak UITabBar *sWCLGPendingBar = nil;
-static BOOL sWCLGPassQueued = NO;
-static BOOL sWCLGPassAgain  = NO;
-static CFTimeInterval sWCLGLastPassTime = 0;
-
-static BOOL sWCLGInPass = NO;              // 重入闸
-static CFTimeInterval sWCLGBudgetStart = 0; // 预算窗口
-static NSUInteger sWCLGBudgetUsed = 0;
-
-static BOOL WCLGRunPass(UITabBar *bar);
-
+// Per-object coalescing: one bar must not evict another bar's pending work.
+@interface LYHWGlassPassState : NSObject
+@property(nonatomic) BOOL queued;
+@property(nonatomic) BOOL inPass;
+@property(nonatomic) CFTimeInterval lastPass;
+@property(nonatomic) CFTimeInterval budgetStart;
+@property(nonatomic) NSUInteger budgetUsed;
+@property(nonatomic) CGRect alignmentPlatter;
+@property(nonatomic) CGRect alignmentBounds;
+@property(nonatomic) CFTimeInterval alignmentWindow;
+@property(nonatomic) NSUInteger alignmentWrites;
+@property(nonatomic) BOOL alignmentSuspended;
+@end
+@implementation LYHWGlassPassState
+@end
+static const char kWCLGPassStateKey = 0;
 static void WCLGSchedulePass(UITabBar *bar) {
-	if (!bar || !WCLGEnabled() || sWCLGInPass) return;
-
-	sWCLGPendingBar = bar;
-	if (sWCLGPassQueued) {
-		sWCLGPassAgain = YES;
-		return;
-	}
-	sWCLGPassQueued = YES;
-	sWCLGPassAgain = NO;
-
-	CFTimeInterval now = CACurrentMediaTime();
-	CFTimeInterval wait = kWCLGMinPassInterval - (now - sWCLGLastPassTime);
-	if (!WCLGFinite(wait) || wait < 0) wait = 0;
-
-	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait * NSEC_PER_SEC)),
-				   dispatch_get_main_queue(), ^{
-		sWCLGPassQueued = NO;
-		UITabBar *b = sWCLGPendingBar;
-		sWCLGPendingBar = nil;
-		BOOL again = sWCLGPassAgain;
-		sWCLGPassAgain = NO;
-		sWCLGLastPassTime = CACurrentMediaTime();
-		if (!b) return;
-		BOOL needMore = WCLGRunPass(b);
-		if ((again || needMore) && b) WCLGSchedulePass(b);
-	});
-}
-
-static BOOL WCLGRunPass(UITabBar *bar) {
-	if (!bar || !WCLGEnabled()) return NO;
-	if (sWCLGInPass) return NO;
-
-	// 每秒预算：超了就退避到下一窗口，绝不让主线程被我们占满
-	CFTimeInterval now = CACurrentMediaTime();
-	if (now - sWCLGBudgetStart > 1.0) {
-		sWCLGBudgetStart = now;
-		sWCLGBudgetUsed = 0;
-	}
-	if (sWCLGBudgetUsed >= kWCLGMaxPassesPerSecond) {
-		WCLGLog(@"pass 预算用尽，退避一帧");
-		return NO;
-	}
-	sWCLGBudgetUsed++;
-	sWCLGInPass = YES;
-
-	BOOL needMore = NO;
-	@try {
-        // LYHW is necessarily present: no geometry writes, no system container writes.
-        if (sWCLGLayoutDepth > 0) needMore = YES;
-        else LYHWGlassApplyFeatures(bar);
-	} @catch (NSException *e) {
-		WCLGLog(@"pass exception: %@", e);
-	} @finally {
-		sWCLGInPass = NO;
-	}
-	return needMore;
+    if (!bar || !WCLGEnabled()) return;
+    LYHWGlassPassState *pass = objc_getAssociatedObject(bar, &kWCLGPassStateKey);
+    if (!pass) {
+        pass = [LYHWGlassPassState new];
+        objc_setAssociatedObject(bar, &kWCLGPassStateKey, pass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    // Writes made by this pass cannot recursively enqueue another pass.
+    if (pass.queued || pass.inPass) return;
+    pass.queued = YES;
+    CFTimeInterval wait = MAX(0, kWCLGMinPassInterval - (CACurrentMediaTime() - pass.lastPass));
+    if (!WCLGFinite(wait)) wait = kWCLGMinPassInterval;
+    __weak UITabBar *weakBar = bar;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        pass.queued = NO;
+        UITabBar *b = weakBar;
+        if (!b || !WCLGEnabled() || pass.inPass) return;
+        CFTimeInterval now = CACurrentMediaTime();
+        if (now - pass.budgetStart >= 1.0) { pass.budgetStart = now; pass.budgetUsed = 0; }
+        // No self-sustaining retry chain when budget is exhausted.
+        if (pass.budgetUsed >= kWCLGMaxPassesPerSecond) return;
+        pass.budgetUsed++;
+        pass.lastPass = now;
+        if (sWCLGLayoutDepth > 0) { WCLGSchedulePass(b); return; }
+        pass.inPass = YES;
+        @try { LYHWGlassApplyFeatures(b); }
+        @catch (NSException *e) { WCLGLog(@"pass exception: %@", e); }
+        @finally { pass.inPass = NO; }
+    });
 }
 
 typedef void (*WCLGObjIMP)(id, SEL);
@@ -537,6 +513,105 @@ static CGRect LYHWGlassPlatterRect(UITabBar *bar) {
     }
     return CGRectNull;
 }
+// Adopted from uploaded wctabbar: use the live platter grid, not screen width.
+// Fail closed on unknown hierarchies/transforms; never move platter/lens/buttons.
+static BOOL LYHWGlassBadgeName(NSString *name);
+static CGRect LYHWGlassVisibleContent(UIView *root, UIView *item, NSUInteger depth) {
+    if (depth > 6) return CGRectNull;
+    CGRect result = CGRectNull;
+    for (UIView *child in root.subviews) {
+        if (child.hidden || child.alpha <= 0.01 || LYHWGlassBadgeName(NSStringFromClass(child.class))) continue;
+        CGRect r = CGRectNull;
+        BOOL label = [child isKindOfClass:UILabel.class];
+        BOOL icon = [child isKindOfClass:UIImageView.class] ||
+            [NSStringFromClass(child.class) isEqualToString:@"MMWebImageView"];
+        if (icon || label) {
+            CGRect ink = child.bounds;
+            if (label) {
+                // WeChat's label is 98pt wide even when its title is only 24pt.
+                // textRect respects alignment/line count and measures actual ink.
+                UILabel *title = (UILabel *)child;
+                if (!title.text.length && !title.attributedText.length) continue;
+                ink = [title textRectForBounds:title.bounds limitedToNumberOfLines:title.numberOfLines];
+            }
+            r = [child convertRect:ink toView:item];
+            if (!WCLGFiniteRect(r) || CGRectIsEmpty(r) || !CGRectContainsRect(item.bounds, r)) continue;
+        } else r = LYHWGlassVisibleContent(child, item, depth + 1);
+        if (!CGRectIsNull(r) && !CGRectIsEmpty(r)) result = CGRectUnion(result, r);
+    }
+    return result;
+}
+static void LYHWGlassResetBarChrome(UITabBar *bar) {
+    // Source's reset, with difference checks on every setter, only on MMTabBar.
+    if (!bar.translucent) bar.translucent = YES;
+    if (bar.opaque) bar.opaque = NO;
+    if (WCLGColorAlpha(bar.backgroundColor) > 0.01) bar.backgroundColor = UIColor.clearColor;
+    if (bar.layer.backgroundColor && CGColorGetAlpha(bar.layer.backgroundColor) > 0.01)
+        bar.layer.backgroundColor = UIColor.clearColor.CGColor;
+}
+static void LYHWGlassAlignTabBarItems(UITabBar *bar) {
+    if (!WCLGIsTabBarHookTarget(bar) || !bar.window || bar.hidden || sWCLGLayoutDepth > 0 ||
+        !CGAffineTransformIsIdentity(bar.transform)) return;
+    CGRect pf = LYHWGlassPlatterRect(bar), bounds = bar.bounds;
+    if (!WCLGFiniteRect(pf) || CGRectIsNull(pf) || CGRectIsEmpty(pf) ||
+        !WCLGFiniteRect(bounds) || !CGRectContainsRect(bounds, pf)) return;
+    NSMutableArray<UIView *> *items = [NSMutableArray array];
+    for (UIView *sub in bar.subviews) {
+        if (![NSStringFromClass(sub.class) containsString:@"MMTabBarItemView"]) continue;
+        if (!CGAffineTransformIsIdentity(sub.transform) || sub.hidden ||
+            !WCLGFiniteRect(sub.frame) || CGRectIsEmpty(sub.frame)) return;
+        [items addObject:sub];
+    }
+    // Four real WeChat entries only; duplicates/partial transitions are not guessed.
+    if (items.count != 4 || (bar.items.count && bar.items.count != items.count)) return;
+    [items sortUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
+        return a.center.x < b.center.x ? NSOrderedAscending : a.center.x > b.center.x ? NSOrderedDescending : NSOrderedSame;
+    }];
+    CGPoint targets[4];
+    for (NSUInteger i = 0; i < items.count; i++) {
+        UIView *item = items[i];
+        CGRect content = LYHWGlassVisibleContent(item, item, 0);
+        if (CGRectIsNull(content) || CGRectIsEmpty(content) || !WCLGFiniteRect(content)) return;
+        CGFloat slot = pf.size.width / items.count;
+        if (content.size.width > slot || content.size.height > pf.size.height) return;
+        CGPoint current = [item convertPoint:CGPointMake(CGRectGetMidX(item.bounds), CGRectGetMidY(content)) toView:bar];
+        CGPoint target = CGPointMake(CGRectGetMinX(pf) + slot * (i + 0.5), CGRectGetMidY(pf));
+        CGFloat dx = target.x - current.x, dy = target.y - current.y;
+        // Reject corrupt/offscreen geometry before any write; validate all four atomically.
+        if (!WCLGFinite(dx) || !WCLGFinite(dy) || fabs(dx) > bounds.size.width / 2 || fabs(dy) > bounds.size.height) return;
+        targets[i] = CGPointMake(item.center.x + dx, item.center.y + dy);
+        if (!WCLGFinite(targets[i].x) || !WCLGFinite(targets[i].y)) return;
+    }
+    LYHWGlassPassState *pass = objc_getAssociatedObject(bar, &kWCLGPassStateKey);
+    if (!pass) return; // Geometry is only legal inside the scheduled pass.
+    CFTimeInterval now = CACurrentMediaTime();
+    BOOL changed = !CGRectEqualToRect(pass.alignmentPlatter, pf) || !CGRectEqualToRect(pass.alignmentBounds, bounds);
+    if (changed) {
+        pass.alignmentPlatter = pf; pass.alignmentBounds = bounds;
+        pass.alignmentSuspended = NO; pass.alignmentWindow = now; pass.alignmentWrites = 0;
+    }
+    if (pass.alignmentSuspended) return; // Resume only for a new real bar/platter geometry.
+    BOOL needsWrite = NO;
+    for (NSUInteger i = 0; i < items.count; i++) {
+        UIView *item = items[i];
+        if (fabs(item.center.x - targets[i].x) >= 0.5 || fabs(item.center.y - targets[i].y) >= 0.5) needsWrite = YES;
+    }
+    if (needsWrite) {
+        if (now - pass.alignmentWindow >= 1.0) { pass.alignmentWindow = now; pass.alignmentWrites = 0; }
+        if (pass.alignmentWrites >= 4) { pass.alignmentSuspended = YES; return; }
+        pass.alignmentWrites++;
+    }
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    LYHWGlassResetBarChrome(bar);
+    for (NSUInteger i = 0; i < items.count; i++) {
+        UIView *item = items[i];
+        // No layoutIfNeeded/setNeedsLayout or geometry writes below half a point.
+        if (fabs(item.center.x - targets[i].x) >= 0.5 || fabs(item.center.y - targets[i].y) >= 0.5)
+            item.center = targets[i];
+    }
+    [CATransaction commit];
+}
 // WeChat items include the 40pt safe-area tail (90pt bounds, content ends at
 // y=50 in the dump). Use actual icon/title content, never that full-height box.
 static CGRect LYHWGlassItemContentRect(UIView *item, UITabBar *bar) {
@@ -636,6 +711,7 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
         objc_setAssociatedObject(bar, &kGlassState, state, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     LYHWGlassApplyBackground(bar, state);
+    LYHWGlassAlignTabBarItems(bar);
     NSMutableArray<UIView *> *items = [NSMutableArray array];
     LYHWGlassCollectItems(bar, items, 0);
     // Items may be replaced or reparented by UIKit. Release our mutations on obsolete views.
@@ -704,7 +780,7 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
     BOOL moved = !CGRectEqualToRect(selected, state.selectedRect);
     CGPathRef oldPath = state.selection.presentationLayer ? ((CAShapeLayer *)state.selection.presentationLayer).path : state.selection.path;
     CABasicAnimation *slide = nil;
-    if (moved && sSlidingMask && sCustomMaskRequested && oldPath && path && !UIAccessibilityIsReduceMotionEnabled()) {
+    if (!nativeLensFound && moved && sSlidingMask && sCustomMaskRequested && oldPath && path && !UIAccessibilityIsReduceMotionEnabled()) {
         slide = [CABasicAnimation animationWithKeyPath:@"path"];
         slide.fromValue = (__bridge id)oldPath;
         slide.toValue = (__bridge id)path;
@@ -722,9 +798,11 @@ static void LYHWGlassApplyFeatures(UITabBar *bar) {
     UIColor *tint = bar.tintColor ?: UIColor.systemGreenColor;
     CGColorRef fill = [tint colorWithAlphaComponent:0.045].CGColor;
     if (!state.selection.fillColor || !CGColorEqualToColor(state.selection.fillColor, fill)) state.selection.fillColor = fill;
-    BOOL hideMask = !sCustomMaskRequested || !valid;
+    // Native lens owns selection/slide. Retain custom fill only as an opted-in
+    // fallback on providers without a live lens; never whiten refractive glass.
+    BOOL hideMask = nativeLensFound || !sCustomMaskRequested || !valid;
     if (state.selection.hidden != hideMask) state.selection.hidden = hideMask;
-    if (!sSlidingMask || !sCustomMaskRequested || !valid) [state.selection removeAnimationForKey:@"LYHW.slide"];
+    if (nativeLensFound || !sSlidingMask || !sCustomMaskRequested || !valid) [state.selection removeAnimationForKey:@"LYHW.slide"];
     // Clip only our own decorative layers (including glow), never UIKit's lens
     // or any view. Decorations cannot protrude below the actual platter.
     CGRect platterRect = LYHWGlassPlatterRect(bar);

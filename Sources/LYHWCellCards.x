@@ -1419,7 +1419,16 @@ static void LYHWClearSectionBars(UITableView *tv) {
 }
 
 %hook UITableView
+- (void)setShowsVerticalScrollIndicator:(BOOL)show {
+    // Only recognized WeChat list pages, not web views or arbitrary scroll views.
+    if (show && LYHWPageKind((UIView *)self) != 0) show = NO;
+    %orig(show);
+}
 - (void)layoutSubviews {
+    // Set once before UIKit lays out its indicators; no private view removal.
+    UITableView *list = (UITableView *)self;
+    if (list.showsVerticalScrollIndicator && LYHWPageKind((UIView *)self) != 0)
+        list.showsVerticalScrollIndicator = NO;
     %orig;
     if (LYHWCCfg().searchCornerEnabled) {
         NSInteger pk = LYHWPageKind(self);
