@@ -20,7 +20,7 @@
 static const LYHWRule kRules[] = {
     // ───────── 聊天：图片 / 视频 / 表情 ─────────
     { "chatImageCorner",     "ImageMessageCellView",   NULL, NULL, IVAR,   "m_imageView"      },
-    { "chatImageCorner",     "VideoMessageCellView",   NULL, NULL, IVAR,   "m_imageView"      },
+    { "chatImageCorner",     "VideoMessageCellView",   NULL, NULL, IVAR,   "m_thumbImageView" },
     { "chatImageCorner",     "ImageScrollView",        NULL, NULL, SUBS,   "WCTiledImageView,UIImageView" },
     { "chatImageCorner",     "UIImageView",   "SharePreConfirmHeadView", NULL, SELF, NULL     },
     { "chatImageCorner",     "UIImageView",   "WCFinderShareFeedCellView", NULL, SELF, NULL   },
@@ -41,7 +41,10 @@ static const LYHWRule kRules[] = {
     { "chatRedPacketCorner", "UIView",        "WCPayTransferMessageCellView", NULL, SELF, NULL },
     { "chatRedPacketCorner", "YYAsyncImageView", "WCPayTransferMessageCellView", NULL, SELF, NULL },
     { "chatFavoriteCorner",  "UIView",        "AppNoteMessageCellView",    NULL, SELF, NULL   },
-    { "chatArticleCorner",   "BizAppReaderMessageCellView", NULL, NULL, SUBS, "MMHeadImageView,MMUILongPressImageView,MMCPLabel,UILabel" },
+    { "chatArticleCorner",   "BizAppBaseMessageCellView",   NULL, NULL, SUBS, "MMHeadImageView,MMUILongPressImageView,MMCPLabel,UILabel" },
+    { "chatArticleCorner",   "BizAppBaseMessageCellView",   NULL, NULL, IVAR, "m_coverImageView" },
+    { "chatArticleCorner",   "BizAppImageContentMessageCellView", NULL, NULL, SUBS, "MMHeadImageView,MMUILongPressImageView,MMCPLabel,UILabel" },
+    { "chatArticleCorner",   "BizAppTextContentMessageCellView",  NULL, NULL, SUBS, "MMHeadImageView,MMUILongPressImageView,MMCPLabel,UILabel" },
     { "chatHistoryCorner",   "AppRecordMessageCellView",    NULL, NULL, SUBS, "MMHeadImageView,MMUILongPressImageView,MMCPLabel,UILabel" },
     { "chatMiniProgramCorner","WAAppPageCellView",          NULL, NULL, SUBS, "MMHeadImageView,MMUILongPressImageView,MMCPLabel,UILabel" },
     { "chatPinTipsCorner",   "UIView",        "MMMsgCommonTipsView",       NULL, SELF, NULL   },
@@ -49,16 +52,7 @@ static const LYHWRule kRules[] = {
     { "msgReferCorner",      "UIView",        "MMInputMsgReferView",       NULL, SELF, NULL   },
     { "msgReferCorner",      "UIImageView",   "MMInputMsgReferView",       NULL, SELF, NULL   },
     { "msgReferCorner",      "UIView",        "SystemMessageCellView",     NULL, SELF, NULL   },
-    // ───────── 朋友圈 ─────────
-    { "momentCorner",        "WCImageView",                  NULL, NULL, IVAR, "_imageView"      },
-    { "momentCorner",        "WCContentItemFinderView",      NULL, NULL, IVAR, "_contentImageView" },
-    { "momentCorner",        "WCSNSNodeVideoView",           NULL, NULL, IVAR, "_thumbImageView" },
-    { "momentCorner",        "WCSNSNodeVideoView",           NULL, NULL, IVAR, "_playerView"     },
-    { "momentCorner",        "WCPuzzleImageView",            NULL, NULL, SELF, NULL },
-    { "momentCorner",        "WCListFeedVideoThumbView",     NULL, NULL, SELF, NULL },
-    { "momentCorner",        "WCStoryAlbumCollectionViewCell", NULL, NULL, SELF, NULL },
-    { "momentCorner",        "SightFileMaskView",            NULL, NULL, SUBS, "MMWebImageView" },
-    { "momentCorner",        "WCFinderShareLiveView",        NULL, NULL, SUBS, "MMWebImageView" },
+    // ───────── 朋友圈：按用户要求保留自己的实现（见 LYHWCellCards.x），此处不再重复挂规则 ─────────
     // ───────── 视频号 ─────────
     { "finderCorner",        "WCFinderFeedStaticCoverView",  NULL, NULL, SUBS, "WCFinderFeedImageCDNView" },
     { "finderCorner",        "WCFinderWXContactEntranceView",NULL, NULL, SUBS, "WCFinderAuthInfoIconView" },
@@ -155,11 +149,26 @@ static void LYHWApplyTo(UIView *v, LYHWStyle s) {
     LYHWApplyRadiusAndBorder(v, (CGFloat)s.radius, (CGFloat)s.bw, s.bc);
 }
 
+/// 取实例变量对应的视图。
+/// 8.0.80 里很多是 @property 自动合成的 ivar（带下划线，如 _m_emoticonView），
+/// 也有手写 ivar（不带下划线，如 m_imageView），所以三种写法依次试：
+///   1) 原名 ivar  2) 下划线+原名 ivar  3) KVC 取同名属性
 static UIView *LYHWIvarView(id host, const char *ivarName) {
-    if (!ivarName) return nil;
-    Ivar iv = class_getInstanceVariable([host class], ivarName);
-    if (!iv) return nil;
-    id v = object_getIvar(host, iv);
+    if (!ivarName || !host) return nil;
+    Class cls = [host class];
+    Ivar iv = class_getInstanceVariable(cls, ivarName);
+    if (!iv) {
+        NSString *u = [@"_" stringByAppendingString:@(ivarName)];
+        iv = class_getInstanceVariable(cls, u.UTF8String);
+    }
+    id v = nil;
+    if (iv) {
+        v = object_getIvar(host, iv);
+    } else {
+        NSString *prop = @(ivarName);
+        if ([prop hasPrefix:@"_"]) prop = [prop substringFromIndex:1];
+        @try { v = [host valueForKey:prop]; } @catch (__unused NSException *e) { v = nil; }
+    }
     return [v isKindOfClass:[UIView class]] ? v : nil;
 }
 

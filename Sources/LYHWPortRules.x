@@ -89,3 +89,43 @@ static void LYHWRun(UIView *v) {
     LYHWApplyRulesForView((UIView *)self);
 }
 %end
+
+// ─────────────────────────────────────────────────────────────
+// 搜索框：原插件 WCSouSuoKuangChuli 的做法
+//   hook WCSearchBar layoutSubviews → 取 searchBox（UIStackView）上圆角/边框，
+//   didMoveToWindow / didMoveToSuperview 里强制重排一次，避免第一次出现时是直角。
+//   （你现有的 MMSearchBar 在 8.0.80 里已经不存在，所以这里是真正生效的那条。）
+// ─────────────────────────────────────────────────────────────
+#import "LYHWRadius.h"
+#import "LYHWCommon.h"
+
+static void LYHWRoundWCSearchBar(UIView *bar) {
+    LYHWConfig *c = [LYHWConfig shared];
+    if (!c.searchCornerEnabled) return;
+    UIView *box = nil;
+    @try { box = [bar valueForKey:@"searchBox"]; } @catch (__unused NSException *e) {}
+    if (![box isKindOfClass:[UIView class]]) {
+        @try { box = [bar valueForKey:@"searchBoxContainer"]; } @catch (__unused NSException *e) {}
+    }
+    if (![box isKindOfClass:[UIView class]]) return;
+    CGFloat bw = (CGFloat)c.searchCornerBorderSize;
+    UIColor *bc = bw > 0 ? LYHWColorForAppearance(c.searchCornerBorderColorLight, c.searchCornerBorderColorDark) : nil;
+    LYHWApplyRadiusAndBorder(box, (CGFloat)c.searchCornerRadius, bw, bc);
+}
+
+%hook WCSearchBar
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundWCSearchBar((UIView *)self);
+}
+- (void)didMoveToWindow {
+    %orig;
+    [(UIView *)self setNeedsLayout];
+    [(UIView *)self layoutIfNeeded];
+}
+- (void)didMoveToSuperview {
+    %orig;
+    [(UIView *)self setNeedsLayout];
+    [(UIView *)self layoutIfNeeded];
+}
+%end
