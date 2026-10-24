@@ -840,7 +840,8 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
 
     LYHWConfig *c = LYHWCCfg();
     NSInteger kind = LYHWPageKind(tv);
-    if (kind == 0) return;
+    if (kind == 0 || kind == 7) return; // Contact profile is owned by uploaded-source module.
+
     BOOL profileLike = (kind == 7 || kind == 9);
     if (kind == 9) { if (!c.groupInfoCornerEnabled) return; kind = 6; }
     if (kind == 7) { if (!c.profilePageCornerEnabled) return; kind = 6; }
@@ -1279,38 +1280,6 @@ static CGFloat LYHWHeaderCardHeight(UIView *h, UIView *card, CGFloat top, CGFloa
     return want;
 }
 
-static void LYHWStyleInfoHeader(UITableView *tv) {
-    UIView *h = tv.tableHeaderView;
-    if (!h || h.bounds.size.width < 100 || h.bounds.size.height < 60) return;
-    CGFloat W = h.bounds.size.width, H = h.bounds.size.height;
-    LYHWConfig *pc = LYHWCCfg();
-    CGFloat pm = MAX(0, MIN(pc.profilePageCornerMargin, W * 0.45));
-    CGFloat pr = pc.profilePageCornerRadius > 0 ? pc.profilePageCornerRadius : 24.0;
-    UIView *card = [h viewWithTag:0x574355];
-    if (!card) { card = [UIView new]; card.tag = 0x574355; card.userInteractionEnabled = NO; [h insertSubview:card atIndex:0]; }
-    CGFloat cardH = LYHWHeaderCardHeight(h, card, 4, H - 12);
-    card.frame = CGRectMake(pm, 4, W - pm * 2, cardH);
-    LYHWSetBackgroundIfChanged(card, LYHWCachedPalette4());
-    card.layer.cornerRadius = pr;
-    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
-    {
-        double hst = LYHWCCfg().cardShadowEnabled ? MAX(0.0, MIN(1.0, LYHWCCfg().cardShadowStrength)) : 0.0;
-        // 阴影画在头部视图图层上（卡片自己不裁剪也可以，但统一放到 h 上，与 cell 一致）
-        h.clipsToBounds = NO;
-        LYHWSetSinkShadow(h.layer, card.frame, pr, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
-    }
-    LYHWSetBackgroundIfChanged(h, [UIColor clearColor]);
-    stopW = W;
-    LYHWClearBg(h, card);
-    LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
-    LYHWPaintListSurface(tv, h);
-    // 卡片收口后，头部自身也要跟着收，否则卡片下方会多出一段空白
-    CGFloat wantH = CGRectGetMaxY(card.frame) + 8.0;
-    if (wantH > 40 && fabs(h.bounds.size.height - wantH) > 1.0 && wantH < H) {
-        CGRect hf = h.frame; hf.size.height = wantH; h.frame = hf;
-        tv.tableHeaderView = h;
-    }
-}
 
 static void LYHWStyleMyHeader(UITableView *tv) {
     UIView *h = tv.tableHeaderView;
@@ -1501,7 +1470,7 @@ static void LYHWClearSectionBars(UITableView *tv) {
     }
     // 好友资料页继续使用用户自己的头部实现；群聊资料页改走源码式逐行卡片，
     // 不再套 LYHWStyleInfoHeader，避免与 NewChatRoomMemberContainView 清理逻辑叠加。
-    else if (LYHWCCfg().profilePageCornerEnabled && LYHWPageKind(self) == 7) LYHWStyleInfoHeader((UITableView *)self);
+    // Friend profile uses LYHWProfileCard.x source implementation only.
     [objc_getAssociatedObject(self, @selector(LYHWGroupInfo)) removeAllObjects];
     for (UITableViewCell *cell in [(UITableView *)self visibleCells]) LYHWStyleCellCard(cell);
     if (LYHWPageKind(self) != 0) LYHWClearSectionBars((UITableView *)self);

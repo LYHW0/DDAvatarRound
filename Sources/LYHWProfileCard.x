@@ -18,11 +18,7 @@ static inline LYHWConfig *LYHWPCfg(void) { return [LYHWConfig shared]; }
 static const NSInteger kWCRProfileBackgroundTag = 0x57524350; // "WRCP"
 
 static CGFloat LYHWProfileCornerRadius(void) {
-    LYHWConfig *cfg = LYHWPCfg();
-    if (cfg.profileFollowGlobalCornerEnabled) {
-        return cfg.globalCornerRadius;
-    }
-    return cfg.profileCornerRadius;
+    return MAX(0, MIN(60, LYHWPCfg().profilePageCornerRadius));
 }
 
 /// 给资料卡铺背景（图片优先，其次纯色）
@@ -58,29 +54,33 @@ static void LYHWApplyProfileBackground(UIViewController *vc) {
 }
 
 /// 给资料卡里的"卡片"上圆角
+// Port of uploaded WCRProfileCard.x: round native cell.contentView and headers,
+// not a reconstructed large header card. Walk wrappers for current WeChat.
 static void LYHWApplyProfileCardCorner(UIViewController *vc) {
-    if (!vc || !vc.isViewLoaded) return;
-    LYHWConfig *cfg = LYHWPCfg();
-    if (!cfg.profileCornerEnabled || YES) return;
-
+    if (!vc || !vc.isViewLoaded || !LYHWPCfg().profilePageCornerEnabled) return;
     CGFloat radius = LYHWProfileCornerRadius();
-    UIView *root = vc.view;
-
-    // 资料页主体是一个 UITableView（或包了一层容器），逐个裁圆角
-    for (UIView *sub in root.subviews) {
-        if ([sub isKindOfClass:[UITableView class]]) {
+    NSMutableArray<UIView *> *pending = [NSMutableArray arrayWithObject:vc.view];
+    for (NSUInteger i = 0; i < pending.count && i < 512; i++) {
+        UIView *sub = pending[i];
+        if ([sub isKindOfClass:UITableView.class]) {
             UITableView *table = (UITableView *)sub;
-            table.backgroundColor = [UIColor clearColor];
-            table.separatorStyle = UITableViewCellSeparatorStyleNone;
-
-            for (UIView *cell in table.subviews) {
-                if ([NSStringFromClass([cell class]) containsString:@"Cell"]) {
-                    LYHWApplyCorner(((UITableViewCell *)cell).contentView, radius, 0, nil, YES);
-                }
+            if (table.backgroundColor != UIColor.clearColor && ![table.backgroundColor isEqual:UIColor.clearColor])
+                table.backgroundColor = UIColor.clearColor;
+            if (table.separatorStyle != UITableViewCellSeparatorStyleNone)
+                table.separatorStyle = UITableViewCellSeparatorStyleNone;
+            for (UITableViewCell *cell in table.visibleCells) {
+                // Do not leave the old generic card/mask mixed with source logic.
+                if (cell.backgroundView.tag == 0x574352) cell.backgroundView = nil;
+                if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWClipMask"])
+                    cell.contentView.layer.mask = nil;
+                LYHWApplyCorner(cell.contentView, radius, 0, nil, YES);
             }
-        } else if ([NSStringFromClass([sub class]) containsString:@"Header"]) {
-            LYHWApplyCorner(sub, radius, 0, nil, YES);
+            if (table.tableHeaderView) LYHWApplyCorner(table.tableHeaderView, radius, 0, nil, YES);
+            continue;
         }
+        if ([NSStringFromClass(sub.class) containsString:@"Header"])
+            LYHWApplyCorner(sub, radius, 0, nil, YES);
+        [pending addObjectsFromArray:sub.subviews];
     }
 }
 
