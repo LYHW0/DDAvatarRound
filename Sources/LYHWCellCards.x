@@ -558,14 +558,34 @@ static BOOL LYHWChatInfoStyleEnabled(UITableView *tv) {
     return LYHWCCfg().chatDetailCornerEnabled;
 }
 
-static void LYHWClearGroupInfoSurface(UITableView *tv) {
-    if (!tv || !LYHWIsGroupInfoTable(tv)) return;
+// 表格级重入保护：tv.backgroundColor = clearColor 在 iOS 26 上会触发
+// _resolvedBackgroundColorWithTraitCollection -> layoutSublayers -> layoutSubviews 回路。
+static const void *kLYHWTableStylingKey = &kLYHWTableStylingKey;
+static BOOL LYHWTableStyling(UITableView *tv) {
+    return [objc_getAssociatedObject(tv, kLYHWTableStylingKey) boolValue];
+}
+static void LYHWSetTableStyling(UITableView *tv, BOOL styling) {
+    objc_setAssociatedObject(tv, kLYHWTableStylingKey, @(styling), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+static void LYHWClearGroupInfoSurfaceOnce(UITableView *tv) {
+    if (!tv) return;
+    // 只做一次，避免每次 layout 都重复设置动态色触发 trait 解析回路
+    if (LYHWTableStyling(tv)) return;
+    LYHWSetTableStyling(tv, YES);
     tv.backgroundColor = [UIColor clearColor];
     tv.layer.backgroundColor = nil;
     tv.backgroundView = nil;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
+}
+
+static void LYHWClearGroupInfoSurface(UITableView *tv) {
+    if (!tv || !LYHWIsGroupInfoTable(tv)) return;
+    if (!tv.backgroundColor) LYHWClearGroupInfoSurfaceOnce(tv);
     UIView *host = tv.superview;
-    if (host && ![host isKindOfClass:[UITableViewCell class]]) host.backgroundColor = LYHWListGray();
+    if (host && ![host isKindOfClass:[UITableViewCell class]]) {
+        host.backgroundColor = LYHWListGray();
+    }
 
     // 对应原模块在 WCTableView 上清理整宽底板；不触碰文字、头像和按钮。
     for (UIView *v in [tv.subviews copy]) {
@@ -718,6 +738,7 @@ static BOOL gLYHWInStyle = NO;
 static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell || gLYHWInStyle) return;
+    if (gLYHWInStyle) return;
     if (LYHWStyling(cell)) return;
     LYHWSetStyling(cell, YES);
     gLYHWInStyle = YES;
