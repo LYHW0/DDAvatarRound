@@ -561,70 +561,107 @@ static void LYHWClearGroupInfoContent(UIView *root, int depth) {
     }
 }
 
-static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
-    if (!cell) return;
-    UITableView *tv = LYHWAncestorTable(cell);
-    if (!LYHWIsGroupInfoTable(tv)) return;
-    LYHWConfig *c = LYHWCCfg();
-
-    // 删除旧版本/旧路径的卡片和阴影，避免两套实现叠加。
-    for (UIView *v in [cell.subviews copy]) {
-        if (v.tag == 0x45e0 || v.tag == 0x574352 || v.tag == 0x574353) [v removeFromSuperview];
+// 以布局几何识别连续卡片：跨 section 但无实际空隙也算同一块，
+// 群成员的多行网格/“更多群成员”因此共用首尾圆角。
+static NSIndexPath *LYHWGroupAdjacent(UITableView *tv, NSIndexPath *ip, BOOL before) {
+    NSInteger s = ip.section, r = ip.row + (before ? -1 : 1);
+    for (NSInteger guard = 0; guard < 512; guard++) {
+        if (s < 0 || s >= tv.numberOfSections) return nil;
+        NSInteger count = [tv numberOfRowsInSection:s];
+        if (r < 0) { s--; if (s < 0) return nil; r = [tv numberOfRowsInSection:s] - 1; continue; }
+        if (r >= count) { s++; r = 0; continue; }
+        NSIndexPath *candidate = [NSIndexPath indexPathForRow:r inSection:s];
+        CGRect other = [tv rectForRowAtIndexPath:candidate];
+        if (other.size.height > 1.0) {
+            CGRect here = [tv rectForRowAtIndexPath:ip];
+            CGFloat gap = before ? CGRectGetMinY(here) - CGRectGetMaxY(other)
+                                 : CGRectGetMinY(other) - CGRectGetMaxY(here);
+            return gap >= -1.0 && gap <= 1.5 ? candidate : nil;
+        }
+        r += before ? -1 : 1;
     }
-    if (cell.backgroundView.tag == 0x45e0 || cell.backgroundView.tag == 0x574352) cell.backgroundView = nil;
-    if (cell.selectedBackgroundView.tag == 0x574353) cell.selectedBackgroundView = nil;
-    [CATransaction begin]; [CATransaction setDisableActions:YES];
-    cell.layer.shadowOpacity = 0; cell.layer.shadowPath = NULL;
-    [CATransaction commit];
+    return nil;
+}
 
+static CGRect LYHWGroupBlockRect(UITableView *tv, NSIndexPath *ip) {
+    CGRect block = [tv rectForRowAtIndexPath:ip];
+    for (NSNumber *direction in @[@YES, @NO]) {
+        NSIndexPath *cursor = ip;
+        for (NSInteger count = 0; count < 512; count++) {
+            NSIndexPath *next = LYHWGroupAdjacent(tv, cursor, direction.boolValue);
+            if (!next) break;
+            block = CGRectUnion(block, [tv rectForRowAtIndexPath:next]); cursor = next;
+        }
+    }
+    return block;
+}
+
+static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
+    UITableView *tv = LYHWAncestorTable(cell);
+    if (!cell || !LYHWIsGroupInfoTable(tv)) return;
+    LYHWConfig *c = LYHWCCfg();
+    UIView *existing = [cell viewWithTag:0x45e0];
     if (!c.groupInfoCornerEnabled) {
-        cell.backgroundColor = [UIColor clearColor];
-        cell.contentView.backgroundColor = [UIColor clearColor];
+        [existing removeFromSuperview];
+        if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"]) cell.contentView.layer.mask = nil;
+        if (cell.selectedBackgroundView.tag == 0x45e1) cell.selectedBackgroundView = nil;
         return;
     }
+    NSIndexPath *ip = [tv indexPathForCell:cell];
+    if (!ip || cell.bounds.size.width < 1 || cell.bounds.size.height < 1) return;
 
     LYHWClearGroupInfoSurface(tv);
-    cell.backgroundColor = [UIColor clearColor];
-    cell.layer.backgroundColor = nil;
+    // 只清旧路径，复用本版本卡片，避免每次 layout 移除重建。
+    for (UIView *v in [cell.subviews copy])
+        if (v.tag == 0x574352 || v.tag == 0x574353) [v removeFromSuperview];
     cell.backgroundView = nil;
-    cell.selectedBackgroundView = [UIView new];
-    cell.selectedBackgroundView.backgroundColor = [UIColor clearColor];
+    cell.backgroundColor = [UIColor clearColor]; cell.layer.backgroundColor = nil;
+    cell.layer.cornerRadius = 0; cell.layer.mask = nil;
+    cell.layer.shadowOpacity = 0; cell.layer.shadowPath = NULL;
+    cell.contentView.frame = cell.bounds;
     cell.contentView.backgroundColor = [UIColor clearColor];
     cell.contentView.layer.backgroundColor = nil;
-    cell.contentView.frame = cell.bounds;
-    cell.contentView.clipsToBounds = NO;
+    cell.contentView.layer.cornerRadius = 0;
     LYHWClearGroupInfoContent(cell.contentView, 0);
-    LYHWHideLines(cell);
-
-    NSIndexPath *ip = [tv indexPathForCell:cell];
-    if (!ip) return;
-    NSInteger rows = [tv numberOfRowsInSection:ip.section];
-    BOOL first = (ip.row == 0), last = (ip.row == rows - 1), single = first && last;
-    UIRectCorner corners = 0;
-    if (single) corners = UIRectCornerAllCorners;
-    else {
-        if (first) corners |= UIRectCornerTopLeft | UIRectCornerTopRight;
-        if (last) corners |= UIRectCornerBottomLeft | UIRectCornerBottomRight;
+    // 微信把部分内容直接加在 cell 上而不是 contentView 上，只清大容器底板。
+    for (UIView *v in cell.subviews) {
+        if (v == existing || v == cell.contentView || [v isKindOfClass:[UILabel class]] ||
+            [v isKindOfClass:[UIImageView class]] || [v isKindOfClass:[UIButton class]]) continue;
+        v.backgroundColor = [UIColor clearColor]; v.layer.backgroundColor = nil;
     }
-
-    LYHWCardView *card = nil;
-    for (UIView *v in cell.subviews) if (v.tag == 0x45e0 && [v isKindOfClass:[LYHWCardView class]]) card = (LYHWCardView *)v;
-    if (!card) { card = [LYHWCardView new]; card.tag = 0x45e0; card.userInteractionEnabled = NO; }
-    CGFloat margin = MAX(0.0, MIN(c.groupInfoCornerMargin, cell.bounds.size.width * 0.45));
-    CGRect frame = CGRectInset(cell.bounds, margin, 0);
-    LYHWSetCardFrame(card, frame);
+    LYHWHideLines(cell);
+    // 用整个连续分组的路径裁每一行：短小的“更多群成员”行也不会被圆成一条白色梭形。
+    CGRect block = LYHWGroupBlockRect(tv, ip);
+    LYHWCardView *card = [existing isKindOfClass:[LYHWCardView class]] ? (LYHWCardView *)existing : nil;
+    if (!card) { [existing removeFromSuperview]; card = [LYHWCardView new]; card.tag = 0x45e0; card.userInteractionEnabled = NO; }
+    CGFloat desired = MAX(0, c.groupInfoCornerMargin);
+    // 如系统已内缩，不再重复叠加同一份边距。
+    CGRect row = [tv convertRect:cell.bounds fromView:cell];
+    CGFloat margin = MAX(0, desired - MAX(0, CGRectGetMinX(row)));
+    margin = MIN(margin, cell.bounds.size.width * 0.45);
+    LYHWSetCardFrame(card, CGRectInset(cell.bounds, margin, 0));
     card.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
-        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : [UIColor whiteColor];
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.11 alpha:1] : UIColor.whiteColor;
     }];
-    CGFloat radius = MAX(0.0, c.groupInfoCornerRadius);
-    CAShapeLayer *mask = [CAShapeLayer layer];
-    mask.frame = card.bounds;
-    mask.path = [UIBezierPath bezierPathWithRoundedRect:card.bounds byRoundingCorners:corners
-                                            cornerRadii:CGSizeMake(radius, radius)].CGPath;
+    CGFloat radius = MIN(MAX(0, c.groupInfoCornerRadius), card.bounds.size.width / 2);
+    CGFloat blockY = CGRectGetMinY(block) - CGRectGetMinY([tv rectForRowAtIndexPath:ip]);
+    CGRect blockInCard = CGRectMake(0, blockY, card.bounds.size.width, block.size.height);
+    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:blockInCard cornerRadius:radius];
+    CAShapeLayer *mask = [card.layer.mask isKindOfClass:[CAShapeLayer class]] ? (CAShapeLayer *)card.layer.mask : [CAShapeLayer layer];
+    mask.frame = card.bounds; mask.path = path.CGPath;
     card.layer.mask = mask;
-    card.layer.cornerRadius = radius;
-    if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
+    // 只能由上面的路径决定首尾角，绝不能再设默认四角圆角。
+    card.layer.cornerRadius = 0;
     if (card.superview != cell) [cell insertSubview:card atIndex:0]; else [cell sendSubviewToBack:card];
+    // 内容层按同一路径裁掉四周原生白底，保护文字/按钮的原有布局。
+    CGRect blockInContent = CGRectMake(CGRectGetMinX(card.frame), blockY, card.bounds.size.width, block.size.height);
+    UIBezierPath *clip = [UIBezierPath bezierPathWithRoundedRect:blockInContent cornerRadius:radius];
+    CAShapeLayer *cm = [CAShapeLayer layer]; cm.name = @"LYHWGroupClipMask";
+    cm.frame = cell.contentView.bounds; cm.path = clip.CGPath; cell.contentView.layer.mask = cm;
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    if (!cell.selectedBackgroundView || cell.selectedBackgroundView.tag != 0x45e1) {
+        UIView *sel = [UIView new]; sel.tag = 0x45e1; sel.backgroundColor = UIColor.clearColor; cell.selectedBackgroundView = sel;
+    }
 }
 
 static BOOL gLYHWInStyle = NO;
@@ -928,7 +965,11 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
 }
 - (void)prepareForReuse {
     %orig;
-    LYHWHideShadowHost((UITableViewCell *)self);
+    UITableViewCell *cell = (UITableViewCell *)self;
+    LYHWHideShadowHost(cell);
+    [[cell viewWithTag:0x45e0] removeFromSuperview];
+    if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"]) cell.contentView.layer.mask = nil;
+    if (cell.selectedBackgroundView.tag == 0x45e1) cell.selectedBackgroundView = nil;
 }
 - (void)setHighlighted:(BOOL)h animated:(BOOL)a {
     %orig;
@@ -1148,15 +1189,16 @@ static void LYHWStyleMyHeader(UITableView *tv) {
     if (@available(iOS 13.0, *)) card.layer.cornerCurve = kCACornerCurveContinuous;
     {
         double hst = LYHWCCfg().cardShadowEnabled ? MAX(0.0, MIN(1.0, LYHWCCfg().cardShadowStrength)) : 0.0;
-        // 阴影画在头部视图图层上（卡片自己不裁剪也可以，但统一放到 h 上，与 cell 一致）
-        h.clipsToBounds = NO;
-        LYHWSetSinkShadow(h.layer, card.frame, 24, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
+        // 阴影跟随卡片自身，不再挂到整宽 header 底板上。
+        LYHWSetSinkShadow(h.layer, CGRectZero, 0, 0, 0);
+        card.clipsToBounds = NO;
+        LYHWSetSinkShadow(card.layer, card.bounds, 24, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
     }
     h.backgroundColor = [UIColor clearColor];
     stopW = W;
     LYHWClearBg(h, card);
     LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
-    LYHWPaintListSurface(tv, h);
+    LYHWPaintListSurface(tv, nil); // header 保持透明，消除底部整宽硬切线
     name.textAlignment = NSTextAlignmentCenter; wid.textAlignment = NSTextAlignmentCenter;
     LYHWPlace(avatar, h, W / 2, cardTop + 62);
     LYHWPlace(name, h, W / 2, cardTop + 128);
