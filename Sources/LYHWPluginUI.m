@@ -235,8 +235,10 @@ static id LYHWFloatTabValue(NSString *key) {
 - (void)commitValue:(id)value forKey:(NSString *)key {
     LYHWConfig *cfg = [LYHWConfig shared];
     if (LYHWFloatTabDefaults()[key]) {
-        [[NSUserDefaults standardUserDefaults] setObject:value forKey:key];
-        [[NSUserDefaults standardUserDefaults] synchronize];
+        [cfg setObject:value forKey:key];
+        if ([key isEqualToString:@"floatingTabBarEnabled"] && [value boolValue]) {
+            cfg.liquidTabBarEnabled = NO;
+        }
         [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification object:nil];
         return;
     }
