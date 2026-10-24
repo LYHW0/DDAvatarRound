@@ -10,6 +10,16 @@ static inline LYHWConfig *LYHWCCfg(void) { return [LYHWConfig shared]; }
 // 最后一行的阴影挂在 cell.layer 上。微信长按时会先后调用 highlighted/selected，
 // 两个状态存在短暂交错；用独立按压标记把整段手势锁住，避免阴影在中途恢复后跟着 cell 动。
 static const void *kLYHWPressActiveKey = &kLYHWPressActiveKey;
+// 样式函数内会改 backgroundView/selectedBackgroundView/backgroundColor，
+// 这些都是我们自己 hook 的方法，必须防止「样式 → setter → 样式」无限递归。
+static const void *kLYHWStylingKey = &kLYHWStylingKey;
+
+static BOOL LYHWStyling(UITableViewCell *cell) {
+    return [objc_getAssociatedObject(cell, kLYHWStylingKey) boolValue];
+}
+static void LYHWSetStyling(UITableViewCell *cell, BOOL styling) {
+    objc_setAssociatedObject(cell, kLYHWStylingKey, @(styling), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
 static BOOL LYHWPressActive(UITableViewCell *cell) {
     return [objc_getAssociatedObject(cell, kLYHWPressActiveKey) boolValue];
 }
@@ -628,6 +638,8 @@ static CGRect LYHWGroupBlockRect(UITableView *tv, NSIndexPath *ip) {
 static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     UITableView *tv = LYHWAncestorTable(cell);
     if (!cell || !LYHWIsGroupInfoTable(tv)) return;
+    if (LYHWStyling(cell)) return;
+    LYHWSetStyling(cell, YES);
     LYHWConfig *c = LYHWCCfg();
     BOOL isGroup = LYHWIsGroupRoomInfoTable(tv);
     CGFloat configuredRadius = isGroup ? c.groupInfoCornerRadius : c.chatDetailCornerRadius;
@@ -637,10 +649,14 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
         [existing removeFromSuperview];
         if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"]) cell.contentView.layer.mask = nil;
         if (cell.selectedBackgroundView.tag == 0x45e1) cell.selectedBackgroundView = nil;
+        LYHWSetStyling(cell, NO);
         return;
     }
     NSIndexPath *ip = [tv indexPathForCell:cell];
-    if (!ip || cell.bounds.size.width < 1 || cell.bounds.size.height < 1) return;
+    if (!ip || cell.bounds.size.width < 1 || cell.bounds.size.height < 1) {
+        LYHWSetStyling(cell, NO);
+        return;
+    }
 
     LYHWClearGroupInfoSurface(tv);
     // 只清旧路径，复用本版本卡片，避免每次 layout 移除重建。
@@ -694,6 +710,7 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     if (!cell.selectedBackgroundView || cell.selectedBackgroundView.tag != 0x45e1) {
         UIView *sel = [UIView new]; sel.tag = 0x45e1; sel.backgroundColor = UIColor.clearColor; cell.selectedBackgroundView = sel;
     }
+    LYHWSetStyling(cell, NO);
 }
 
 
@@ -701,9 +718,12 @@ static BOOL gLYHWInStyle = NO;
 static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell || gLYHWInStyle) return;
+    if (LYHWStyling(cell)) return;
+    LYHWSetStyling(cell, YES);
     gLYHWInStyle = YES;
     LYHWStyleCellCardInner(cell);
     gLYHWInStyle = NO;
+    LYHWSetStyling(cell, NO);
 }
 static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     if (!cell) return;
@@ -911,7 +931,8 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     }
     LYHWApplyCardShadow(cell, card, c, isLastRow);
     LYHWConstrainSwipeViews(cell, card);
-    LYHWScheduleSwipeRescan(cell, card);
+    LYHWStartSwipeLink(cell, card);
+    LYHWSetStyling(cell, NO);
 }
 
 
