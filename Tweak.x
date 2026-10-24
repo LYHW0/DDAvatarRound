@@ -11,6 +11,9 @@
 #import <UIKit/UIKit.h>
 #import "LYHWConfig.h"
 #import "LYHWSpeedSetup.h"
+#import "DYLAppearance.h"
+
+void ZKInstallLiquidTabBar(void);
 
 static void LYHWSettingsChangedCallback(CFNotificationCenterRef center,
                                        void *observer,
@@ -28,6 +31,8 @@ static void LYHWSettingsChangedCallback(CFNotificationCenterRef center,
         // 先把配置初始化好，避免首个界面加载时读不到
         [LYHWConfig shared];
         LYHWSetupUISpeedFeature();
+        DYLAppearanceStart();
+        if ([LYHWConfig shared].liquidTabBarEnabled) ZKInstallLiquidTabBar();
 
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
                                         NULL,

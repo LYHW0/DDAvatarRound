@@ -191,6 +191,7 @@ LYHW_STRING(topbarCornerBorderColorLight, topbarCornerBorderColorLight, @"#E5E5E
 LYHW_STRING(topbarCornerBorderColorDark, topbarCornerBorderColorDark, @"#3A3A3C")
 LYHW_BOOL(toolbarCornerEnabled, toolbarCornerEnabled, NO)
 LYHW_DOUBLE(toolbarCornerRadius, toolbarCornerRadius, 24.0)
+LYHW_BOOL(liquidTabBarEnabled, liquidTabBarEnabled, NO)
 LYHW_BOOL(toolbarCornerBottomFlatEnabled, toolbarCornerBottomFlatEnabled, YES)
 LYHW_DOUBLE(toolbarCornerBorderSize, toolbarCornerBorderSize, 0.0)
 LYHW_STRING(toolbarCornerBorderColorLight, toolbarCornerBorderColorLight, @"#E5E5EA")

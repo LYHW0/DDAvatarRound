@@ -9,6 +9,7 @@
 #import "LYHWSpeedCellFactory.h"
 #import "LYHWSpeedAlert.h"
 #import "LYHWSpeedConfig.h"
+#import "DYLAppearance.h"
 #import <objc/runtime.h>
 
 static NSString * const kCellID = @"LYHWPluginCell";
@@ -133,7 +134,9 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
         LYHWPageWithItems(@"内容页圆角", content),
         LYHWPageWithItems(@"服务页圆角", service),
         P(@"头像圆角", LYHWItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
-                     LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100))
+                     LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100)),
+        LYHWItem(@"iOS 26 原生液态底栏（重启生效）", @"liquidTabBarEnabled", @"bool", 0, 1),
+        @{ @"title": @"字体与主题 DIY", @"kind": @"appearance" }
     ];
     #undef P
     self.sections = @[ @{ @"header": @"兰因后悟", @"items": pages },
@@ -242,7 +245,7 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
         speedCell.textLabel.textColor = [UIColor labelColor];
         return speedCell;
     }
-    if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"]) {
+    if ([item[@"kind"] isEqualToString:@"page"] || [item[@"kind"] isEqualToString:@"action"] || [item[@"kind"] isEqualToString:@"appearance"]) {
         cell.detailTextLabel.text = nil;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -272,6 +275,10 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
         sub.pageTitle = item[@"title"];
         sub.sections = @[ @{ @"header": item[@"title"], @"items": item[@"items"] } ];
         [self.navigationController pushViewController:sub animated:YES];
+        return;
+    }
+    if ([item[@"kind"] isEqualToString:@"appearance"]) {
+        [DYLSettingsController presentFrom:self];
         return;
     }
     if ([item[@"kind"] isEqualToString:@"speed"]) {

@@ -150,6 +150,7 @@ extern NSString * const LYHWSettingsChangedNotification;
 
 @property (nonatomic, assign) BOOL toolbarCornerEnabled;
 @property (nonatomic, assign) double toolbarCornerRadius;
+@property (nonatomic, assign) BOOL liquidTabBarEnabled;
 @property (nonatomic, assign) BOOL toolbarCornerBottomFlatEnabled;
 @property (nonatomic, assign) double toolbarCornerBorderSize;
 @property (nonatomic, copy) NSString *toolbarCornerBorderColorLight;
