@@ -125,8 +125,8 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
                        LYHWItem(@"图片/视频半径", @"timelineMediaCornerRadius", @"num", 2, 40),
                        LYHWItem(@"朋友圈评论圆角", @"timelineCommentCornerEnabled", @"bool", 0, 1),
                        LYHWItem(@"评论半径", @"timelineCommentCornerRadius", @"num", 2, 30)),
-        P(@"内容页圆角", content),
-        P(@"服务页圆角", service),
+        LYHWPageWithItems(@"内容页圆角", content),
+        LYHWPageWithItems(@"服务页圆角", service),
         P(@"头像圆角", LYHWItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
                      LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100))
     ];
