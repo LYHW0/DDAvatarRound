@@ -151,6 +151,7 @@ extern NSString * const LYHWSettingsChangedNotification;
 @property (nonatomic, assign) BOOL toolbarCornerEnabled;
 @property (nonatomic, assign) double toolbarCornerRadius;
 @property (nonatomic, assign) BOOL liquidTabBarEnabled;
+@property (nonatomic, assign) BOOL floatingTabBarEnabled;
 @property (nonatomic, assign) BOOL toolbarCornerBottomFlatEnabled;
 @property (nonatomic, assign) double toolbarCornerBorderSize;
 @property (nonatomic, copy) NSString *toolbarCornerBorderColorLight;
@@ -304,7 +305,6 @@ extern NSString * const LYHWSettingsChangedNotification;
 @property (nonatomic, copy)   NSString *menuIconColorDark;
 @property (nonatomic, assign) BOOL menuTextCenterEnabled;
 
-@property (nonatomic, assign) BOOL floatingTabBarEnabled;
 @property (nonatomic, assign) BOOL cardShadowEnabled;
 @property (nonatomic, assign) BOOL cellTapEffectHidden;
 @property (nonatomic, assign) double myPageCornerRadius;

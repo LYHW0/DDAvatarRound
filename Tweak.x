@@ -12,6 +12,7 @@
 #import "LYHWConfig.h"
 #import "LYHWSpeedSetup.h"
 #import "DYLAppearance.h"
+#include "WXFT.h"
 
 void ZKInstallLiquidTabBar(void);
 
@@ -32,7 +33,13 @@ static void LYHWSettingsChangedCallback(CFNotificationCenterRef center,
         [LYHWConfig shared];
         LYHWSetupUISpeedFeature();
         DYLAppearanceStart();
-        if ([LYHWConfig shared].liquidTabBarEnabled) ZKInstallLiquidTabBar();
+        // 只安装一套底栏 hook，避免两个实现同时改写 MMTabBar。
+        if ([LYHWConfig shared].floatingTabBarEnabled) {
+            [LYHWConfig shared].liquidTabBarEnabled = NO;
+            WXFTInstall();
+        } else if ([LYHWConfig shared].liquidTabBarEnabled) {
+            ZKInstallLiquidTabBar();
+        }
 
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
                                         NULL,

@@ -539,7 +539,7 @@ void ZKInstallLiquidTabBar(void)
     if (version.majorVersion < 26) return;
 
     // 统一由兰因后悟设置页控制；默认关闭，避免与原底栏圆角逻辑冲突。
-    if (![LYHWConfig shared].liquidTabBarEnabled) return;
+    if (![LYHWConfig shared].liquidTabBarEnabled || [LYHWConfig shared].floatingTabBarEnabled) return;
 
     // 10.1 Info.plist：干掉「退回旧设计」的开关
     Class bundleClass = objc_getClass("NSBundle");
