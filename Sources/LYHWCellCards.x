@@ -738,7 +738,8 @@ static BOOL gLYHWInStyle = NO;
 static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell || gLYHWInStyle) return;
-    if (gLYHWInStyle) return;
+    // 液态底栏模式与卡片圆角互斥，避免底栏重排时反复触发 cell 样式
+    if (LYHWCCfg().liquidTabBarEnabled) return;
     if (LYHWStyling(cell)) return;
     LYHWSetStyling(cell, YES);
     gLYHWInStyle = YES;
@@ -1394,6 +1395,9 @@ static void LYHWClearSectionBars(UITableView *tv) {
         if ((pk == 1 || pk == 2) && th) LYHWRoundHeaderSearch(th, ((UIView *)self).bounds.size.width, LYHWCCfg().searchCornerRadius, 0);
     }
     if (!LYHWAnyCardOn()) return;
+    // 液态底栏会重排底栏子视图并触发 trait 刷新；
+    // 这时再对表格做卡片样式会互相触发，直接跳过全部卡片处理。
+    if (LYHWCCfg().liquidTabBarEnabled) return;
     {
         NSInteger fk = LYHWPageKind(self);
         if (fk == 1 || fk == 2 || fk == 4 || fk == 5 || fk == 6) LYHWPaintFooter((UITableView *)self);
@@ -1650,17 +1654,15 @@ static void LYHWRestyleVisibleCells(UIView *root) {
     NSMutableArray *tabs = [NSMutableArray array];
     LYHWFindTables(root, tabs, 0);
     for (UITableView *tv in tabs) {
-        [UIView performWithoutAnimation:^{
-            [CATransaction begin];
-            [CATransaction setDisableActions:YES];
-            [tv layoutIfNeeded];
-            for (UITableViewCell *cell in tv.visibleCells) {
-                [cell setNeedsLayout];
-                [cell layoutIfNeeded];
-                LYHWStyleCellCard(cell);   // 主动套一次，不依赖 layoutSubviews 是否被触发
-            }
-            [CATransaction commit];
-        }];
+        // 绝不能在表格自己的 layoutSubviews 链里再调 layoutIfNeeded：
+        // 会触发 UIScrollView _updatePockets → 视图重加 → trait 刷新 → 再次 layoutSubviews，
+        // 配合液态底栏重排直接变成无限递归（0x8BADF00D）。
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        for (UITableViewCell *cell in tv.visibleCells) {
+            LYHWStyleCellCard(cell);
+        }
+        [CATransaction commit];
     }
 }
 @interface LYHWRestyleLink : NSObject
