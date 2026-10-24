@@ -172,9 +172,37 @@ static void LYHWRoundSearchFields(UIView *v, CGFloat r, int depth) {
 
 %end
 
+
+// 输入框圆角（原插件 DuiHuaJieMianWenBenKuangChuli）。
+// 8.0.80：MMInputToolView.textView 就是输入框（MMGrowTextView）。
+// 之前 hook 的 InputToolView 在 8.0.80 里不存在，所以这条一直没生效。
+static void LYHWRoundInputTextBox(UIView *toolView) {
+    LYHWConfig *cfg = LYHWCfgEx();
+    if (!cfg.inputCornerEnabled) return;
+    UIView *tv = nil;
+    @try { tv = [(id)toolView valueForKey:@"textView"]; } @catch (__unused NSException *e) {}
+    NSMutableArray<UIView *> *targets = [NSMutableArray array];
+    if ([tv isKindOfClass:[UIView class]]) {
+        [targets addObject:tv];
+    } else {
+        for (UIView *sub in toolView.subviews) {
+            if ([sub isKindOfClass:NSClassFromString(@"MMGrowTextView")] ||
+                [[NSStringFromClass([sub class]) lowercaseString] containsString:@"textinput"]) {
+                [targets addObject:sub];
+            }
+        }
+    }
+    for (UIView *t in targets) {
+        LYHWApplyCorner(t, cfg.inputCornerRadius, cfg.inputCornerBorderSize,
+                        LYHWColorForAppearance(cfg.inputCornerBorderColorLight,
+                                               cfg.inputCornerBorderColorDark), YES);
+    }
+}
+
 %hook MMInputToolView
 - (void)layoutSubviews {
     %orig;
+    LYHWRoundInputTextBox((UIView *)self);
     LYHWConfig *cfg = LYHWCfgEx();
     UIView *me = (UIView *)self;
     UIView *tool = nil;
@@ -213,24 +241,7 @@ static void LYHWRoundSearchFields(UIView *v, CGFloat r, int depth) {
 }
 %end
 
-%hook InputToolView
 
-- (void)layoutSubviews {
-    %orig;
-    LYHWConfig *cfg = LYHWCfgEx();
-    if (!cfg.inputCornerEnabled) return;
-    
-    for (UIView *sub in ((UIView *)self).subviews) {
-        if ([sub isKindOfClass:NSClassFromString(@"MMGrowTextView")] ||
-            [[NSStringFromClass([sub class]) lowercaseString] containsString:@"textinput"]) {
-            LYHWApplyCorner(sub, cfg.inputCornerRadius, cfg.inputCornerBorderSize,
-                          LYHWColorForAppearance(cfg.inputCornerBorderColorLight,
-                                                cfg.inputCornerBorderColorDark), YES);
-        }
-    }
-}
-
-%end
 
 #pragma mark - 顶栏圆角（导航栏背景只圆下角）
 
@@ -449,6 +460,19 @@ static void LYHWRoundMsgNavBar(UIView *nav, LYHWConfig *cfg) {
 }
 
 %hook MMMsgContentNavBar
+- (void)layoutSubviews {
+    %orig;
+    LYHWRoundMsgNavBar((UIView *)self, LYHWCfgEx());
+}
+- (void)updateBackgroundCornerMask {
+    %orig;
+    // 微信自己在这里会重设背景圆角遮罩，原插件也 hook 了这个方法，重套一次避免被覆盖
+    LYHWRoundMsgNavBar((UIView *)self, LYHWCfgEx());
+}
+%end
+
+// 8.0.80 的新版聊天页顶栏（与 MMMsgContentNavBar 并列，原插件两个都处理）
+%hook MMNewMsgContentNavBar
 - (void)layoutSubviews {
     %orig;
     LYHWRoundMsgNavBar((UIView *)self, LYHWCfgEx());

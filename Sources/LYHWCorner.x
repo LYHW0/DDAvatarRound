@@ -36,7 +36,7 @@ static BOOL LYHWCornerEnabledForView(UIView *view) {
         [cls isEqualToString:@"MMMainTableView"]) {
         return cfg.homepageCornerEnabled;
     }
-    if ([cls isEqualToString:@"MMFavImageComponent"] || [cls isEqualToString:@"FavImagePreview"]) {
+    if ([cls isEqualToString:@"MMFavImageComponent"] || [cls isEqualToString:@"FavImagePreView"]) {
         return cfg.discoverPageCornerEnabled;
     }
     return cfg.homepageCornerEnabled || cfg.mainFrameCornerEnabled;
@@ -227,7 +227,7 @@ static void LYHWStyleCardView(UIView *view, CGFloat radius, CGFloat inset) {
 
 %end
 
-%hook FavImagePreview
+%hook FavImagePreView
 
 - (void)layoutSubviews {
     %orig;
