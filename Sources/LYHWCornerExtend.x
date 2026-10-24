@@ -204,7 +204,6 @@ static void LYHWRoundInputTextBox(UIView *toolView) {
     %orig;
     LYHWRoundInputTextBox((UIView *)self);
     LYHWConfig *cfg = LYHWCfgEx();
-    if (cfg.liquidTabBarEnabled) return;
     UIView *me = (UIView *)self;
     UIView *tool = nil;
     @try { id t = [me valueForKey:@"toolView"]; if ([t isKindOfClass:[UIView class]]) tool = t; } @catch (__unused id e) {}
@@ -354,7 +353,7 @@ static void LYHWRoundCustomNavBar(UIView *bar, LYHWConfig *cfg) {
 - (void)layoutSubviews {
     %orig;
     LYHWConfig *cfg = LYHWCfgEx();
-    if (cfg.liquidTabBarEnabled || !cfg.toolbarCornerEnabled) return;
+    if (!cfg.toolbarCornerEnabled) return;
     UIView *bg = LYHWBarBackground((UIView *)self);
     if (bg) LYHWTopRound(bg, cfg.toolbarCornerRadius);
 }
@@ -364,7 +363,7 @@ static void LYHWRoundCustomNavBar(UIView *bar, LYHWConfig *cfg) {
 - (void)layoutSubviews {
     %orig;
     LYHWConfig *cfg = LYHWCfgEx();
-    if (cfg.liquidTabBarEnabled || !cfg.toolbarCornerEnabled) return;
+    if (!cfg.toolbarCornerEnabled) return;
     UIView *me = (UIView *)self;
     UIView *bg = nil;
     if ([me respondsToSelector:@selector(backgroundView)]) bg = [me valueForKey:@"backgroundView"];

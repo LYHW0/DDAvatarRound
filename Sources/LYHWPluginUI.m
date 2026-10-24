@@ -135,24 +135,6 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
         LYHWPageWithItems(@"服务页圆角", service),
         P(@"头像圆角", LYHWItem(@"头像圆角", @"avatarCornerEnabled", @"bool", 0, 1),
                      LYHWItem(@"头像圆角比例(%)", @"avatarCornerRadius", @"num", 10, 100)),
-        P(@"悬浮底栏", LYHWItem(@"启用悬浮底栏（重启生效；与主页卡片圆角互斥）", @"floatingTabBarEnabled", @"bool", 0, 1),
-                      LYHWItem(@"悬浮底栏左右留白", @"wkkFloatTabWidth", @"num", -40, 80),
-                      LYHWItem(@"悬浮底栏高度增量", @"wkkFloatTabHeight", @"num", -14, 40),
-                      LYHWItem(@"悬浮底栏垂直位置", @"wkkFloatTabY", @"num", -40, 40),
-                      LYHWItem(@"悬浮底栏圆角（-1自动）", @"wkkFloatTabRadius", @"num", -1, 60),
-                      LYHWItem(@"悬浮底栏透明度(%)", @"wkkFloatTabAlpha", @"num", 0, 100),
-                      LYHWItem(@"毛玻璃透明度(%)", @"wkkFloatTabMaskAlpha", @"num", 0, 100),
-                      LYHWItem(@"按钮缩放(%)", @"wkkFloatTabButtonScale", @"num", 0, 100),
-                      LYHWItem(@"隐藏底栏文字", @"wkkFloatTabHideText", @"bool", 0, 1),
-                      LYHWItem(@"隐藏红点", @"wkkFloatTabHideDot", @"bool", 0, 1),
-                      LYHWItem(@"隐藏数字角标", @"wkkFloatTabHideBadge", @"bool", 0, 1),
-                      LYHWItem(@"关闭毛玻璃遮罩", @"wkkFloatTabNoMask", @"bool", 0, 1),
-                      LYHWItem(@"立体风格", @"wkkFloatTabStereo", @"bool", 0, 1),
-                      LYHWItem(@"遮罩发光", @"wkkFloatTabMaskGlow", @"bool", 0, 1),
-                      LYHWItem(@"遮罩随滚动位移", @"wkkFloatTabMaskSlide", @"bool", 0, 1),
-                      LYHWItem(@"选中图标动画", @"wkkFloatTabIconAnim", @"bool", 0, 1),
-                      LYHWItem(@"长按快速设置", @"wkkFloatTabLongPopup", @"bool", 0, 1)),
-        P(@"原生液态底栏", LYHWItem(@"iOS 26 原生液态底栏（重启生效）", @"liquidTabBarEnabled", @"bool", 0, 1)),
         @{ @"title": @"字体与主题 DIY", @"kind": @"appearance" }
     ];
     #undef P
@@ -189,30 +171,7 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
     return items[(NSUInteger)indexPath.row];
 }
 
-static NSDictionary<NSString *, NSArray *> *LYHWFloatTabDefaults(void) {
-    static NSDictionary *map; static dispatch_once_t once;
-    dispatch_once(&once, ^{ map = @{
-        @"wkkFloatTabWidth": @[@-1, @(-40), @(80)],
-        @"wkkFloatTabHeight": @[@12, @(-14), @(40)],
-        @"wkkFloatTabY": @[@-4, @(-40), @(40)],
-        @"wkkFloatTabRadius": @[@-1, @(-1), @(60)],
-        @"wkkFloatTabAlpha": @[@100, @(0), @(100)],
-        @"wkkFloatTabMaskAlpha": @[@100, @(0), @(100)],
-        @"wkkFloatTabButtonScale": @[@0, @(0), @(100)]
-    }; });
-    return map;
-}
-static id LYHWFloatTabValue(NSString *key) {
-    NSArray *spec = LYHWFloatTabDefaults()[key];
-    id v = [[LYHWConfig shared] objectForKey:key def:nil];   // 和微信内模块读同一个 suite
-    if (v) return v;
-    return spec ? spec[0] : nil;
-}
-
 - (BOOL)boolValueForKey:(NSString *)key {
-    id floatValue = nil;
-    if (LYHWFloatTabDefaults()[key]) floatValue = LYHWFloatTabValue(key);
-    if (floatValue) return [floatValue boolValue];
     id value = nil;
     @try { value = [[LYHWConfig shared] valueForKey:key]; } @catch (__unused id e) {}
     if (!value) value = [[LYHWConfig shared] objectForKey:key def:nil];
@@ -220,13 +179,7 @@ static id LYHWFloatTabValue(NSString *key) {
 }
 
 - (double)numberValueForKey:(NSString *)key item:(NSDictionary *)item {
-    id value = LYHWFloatTabDefaults()[key] ? LYHWFloatTabValue(key) : nil;
-    if (value) {
-        NSArray *spec = LYHWFloatTabDefaults()[key];
-        double v = [value doubleValue];
-        return MAX([spec[1] doubleValue], MIN([spec[2] doubleValue], v));
-    }
-    value = nil;
+    id value = nil;
     @try { value = [[LYHWConfig shared] valueForKey:key]; } @catch (__unused id e) {}
     if (!value) value = [[LYHWConfig shared] objectForKey:key def:nil];
     if (!value) return 0.0;
@@ -235,23 +188,9 @@ static id LYHWFloatTabValue(NSString *key) {
 }
 
 - (void)commitValue:(id)value forKey:(NSString *)key {
-    LYHWConfig *cfg = [LYHWConfig shared];
-    if (LYHWFloatTabDefaults()[key]) {
-        [cfg setObject:value forKey:key];
-        if ([key isEqualToString:@"floatingTabBarEnabled"] && [value boolValue]) {
-            cfg.liquidTabBarEnabled = NO;
-        }
-        [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification object:nil];
-        return;
-    }
-    [cfg setObject:value forKey:key];
-    // 两套底栏 hook 互斥：开一个就把另一个关掉（两个都写同一个 suite，避免读写不同源）
-    if ([key isEqualToString:@"liquidTabBarEnabled"] && [value boolValue]) {
-        cfg.floatingTabBarEnabled = NO;
-    } else if ([key isEqualToString:@"floatingTabBarEnabled"] && [value boolValue]) {
-        cfg.liquidTabBarEnabled = NO;
-    }
-    [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification object:nil];
+    [[LYHWConfig shared] setObject:value forKey:key];
+    [[NSNotificationCenter defaultCenter] postNotificationName:LYHWSettingsChangedNotification
+                                                        object:nil];
 }
 
 #pragma mark - Table
@@ -436,13 +375,6 @@ static id LYHWFloatTabValue(NSString *key) {
     if (!indexPath) return;
     NSDictionary *item = [self itemAtIndexPath:indexPath];
     [self commitValue:@(sender.on) forKey:item[@"key"]];
-    if ([item[@"key"] isEqualToString:@"floatingTabBarEnabled"]) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"悬浮底栏设置已保存"
-                                                                       message:sender.on ? @"为避免与原生液态底栏同时注入，请先确认“iOS 26 原生液态底栏”已关闭，然后完全退出并重新打开微信。悬浮底栏模式下主页卡片圆角会暂时停用。" : @"请完全退出并重新打开微信，恢复原底栏与主页卡片圆角。"
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:nil]];
-        [self presentViewController:alert animated:YES completion:nil];
-    }
 }
 
 @end

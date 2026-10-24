@@ -28,30 +28,14 @@ static NSSet<NSString *> *LYHWRuleNames(void) {
     return set;
 }
 
-/// 单个类是否在名单里：按 Class 指针缓存，避免每次 layout 都 NSStringFromClass（全 App 每个视图每次布局都要走这里）
-static BOOL LYHWClassMayMatch(Class cls) {
-    if (!cls) return NO;
-    static NSMapTable<Class, NSNumber *> *cache;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        cache = [NSMapTable strongToStrongObjectsMapTable];
-    });
-
-    NSNumber *cached = [cache objectForKey:cls];
-    if (cached) return [cached boolValue];
-
-    BOOL hit = [LYHWRuleNames() containsObject:NSStringFromClass(cls)];
-    [cache setObject:@(hit) forKey:cls];
-    return hit;
-}
-
 /// 视图是否“可能命中规则”：自身类名 / 父 / 祖父 类名在名单里
 static BOOL LYHWMayMatch(UIView *v) {
-    if (LYHWClassMayMatch([v class])) return YES;
+    NSSet *names = LYHWRuleNames();
+    if ([names containsObject:NSStringFromClass([v class])]) return YES;
     UIView *p = v.superview;
-    if (p && LYHWClassMayMatch([p class])) return YES;
+    if (p && [names containsObject:NSStringFromClass([p class])]) return YES;
     UIView *g = p.superview;
-    if (g && LYHWClassMayMatch([g class])) return YES;
+    if (g && [names containsObject:NSStringFromClass([g class])]) return YES;
     return NO;
 }
 

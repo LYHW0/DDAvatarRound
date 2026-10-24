@@ -10,16 +10,6 @@ static inline LYHWConfig *LYHWCCfg(void) { return [LYHWConfig shared]; }
 // 最后一行的阴影挂在 cell.layer 上。微信长按时会先后调用 highlighted/selected，
 // 两个状态存在短暂交错；用独立按压标记把整段手势锁住，避免阴影在中途恢复后跟着 cell 动。
 static const void *kLYHWPressActiveKey = &kLYHWPressActiveKey;
-// 样式函数内会改 backgroundView/selectedBackgroundView/backgroundColor，
-// 这些都是我们自己 hook 的方法，必须防止「样式 → setter → 样式」无限递归。
-static const void *kLYHWStylingKey = &kLYHWStylingKey;
-
-static BOOL LYHWStyling(UITableViewCell *cell) {
-    return [objc_getAssociatedObject(cell, kLYHWStylingKey) boolValue];
-}
-static void LYHWSetStyling(UITableViewCell *cell, BOOL styling) {
-    objc_setAssociatedObject(cell, kLYHWStylingKey, @(styling), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
 static BOOL LYHWPressActive(UITableViewCell *cell) {
     return [objc_getAssociatedObject(cell, kLYHWPressActiveKey) boolValue];
 }
@@ -37,9 +27,6 @@ static UIColor *LYHWListGray(void) {
 
 static BOOL LYHWAnyCardOn(void) {
     LYHWConfig *c = LYHWCCfg();
-    // 两套底栏实现都会在 table layout/trait 链里重排 MMTabBar 并触发 pockets 更新；
-    // 底栏模块开着的时候关掉主页卡片管线，避免启动期间 table→trait→layout 递归。
-    if (c.floatingTabBarEnabled || c.liquidTabBarEnabled) return NO;
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
            c.discoverPageCornerEnabled || c.myPageCornerEnabled || c.settingPageCornerEnabled ||
            c.timelineCornerEnabled || c.profilePageCornerEnabled || c.chatDetailCornerEnabled ||
@@ -561,34 +548,14 @@ static BOOL LYHWChatInfoStyleEnabled(UITableView *tv) {
     return LYHWCCfg().chatDetailCornerEnabled;
 }
 
-// 表格级重入保护：tv.backgroundColor = clearColor 在 iOS 26 上会触发
-// _resolvedBackgroundColorWithTraitCollection -> layoutSublayers -> layoutSubviews 回路。
-static const void *kLYHWTableStylingKey = &kLYHWTableStylingKey;
-static BOOL LYHWTableStyling(UITableView *tv) {
-    return [objc_getAssociatedObject(tv, kLYHWTableStylingKey) boolValue];
-}
-static void LYHWSetTableStyling(UITableView *tv, BOOL styling) {
-    objc_setAssociatedObject(tv, kLYHWTableStylingKey, @(styling), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-static void LYHWClearGroupInfoSurfaceOnce(UITableView *tv) {
-    if (!tv) return;
-    // 只做一次，避免每次 layout 都重复设置动态色触发 trait 解析回路
-    if (LYHWTableStyling(tv)) return;
-    LYHWSetTableStyling(tv, YES);
+static void LYHWClearGroupInfoSurface(UITableView *tv) {
+    if (!tv || !LYHWIsGroupInfoTable(tv)) return;
     tv.backgroundColor = [UIColor clearColor];
     tv.layer.backgroundColor = nil;
     tv.backgroundView = nil;
     tv.separatorStyle = UITableViewCellSeparatorStyleNone;
-}
-
-static void LYHWClearGroupInfoSurface(UITableView *tv) {
-    if (!tv || !LYHWIsGroupInfoTable(tv)) return;
-    if (!tv.backgroundColor) LYHWClearGroupInfoSurfaceOnce(tv);
     UIView *host = tv.superview;
-    if (host && ![host isKindOfClass:[UITableViewCell class]]) {
-        host.backgroundColor = LYHWListGray();
-    }
+    if (host && ![host isKindOfClass:[UITableViewCell class]]) host.backgroundColor = LYHWListGray();
 
     // 对应原模块在 WCTableView 上清理整宽底板；不触碰文字、头像和按钮。
     for (UIView *v in [tv.subviews copy]) {
@@ -661,8 +628,6 @@ static CGRect LYHWGroupBlockRect(UITableView *tv, NSIndexPath *ip) {
 static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     UITableView *tv = LYHWAncestorTable(cell);
     if (!cell || !LYHWIsGroupInfoTable(tv)) return;
-    if (LYHWStyling(cell)) return;
-    LYHWSetStyling(cell, YES);
     LYHWConfig *c = LYHWCCfg();
     BOOL isGroup = LYHWIsGroupRoomInfoTable(tv);
     CGFloat configuredRadius = isGroup ? c.groupInfoCornerRadius : c.chatDetailCornerRadius;
@@ -672,14 +637,10 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
         [existing removeFromSuperview];
         if ([cell.contentView.layer.mask.name isEqualToString:@"LYHWGroupClipMask"]) cell.contentView.layer.mask = nil;
         if (cell.selectedBackgroundView.tag == 0x45e1) cell.selectedBackgroundView = nil;
-        LYHWSetStyling(cell, NO);
         return;
     }
     NSIndexPath *ip = [tv indexPathForCell:cell];
-    if (!ip || cell.bounds.size.width < 1 || cell.bounds.size.height < 1) {
-        LYHWSetStyling(cell, NO);
-        return;
-    }
+    if (!ip || cell.bounds.size.width < 1 || cell.bounds.size.height < 1) return;
 
     LYHWClearGroupInfoSurface(tv);
     // 只清旧路径，复用本版本卡片，避免每次 layout 移除重建。
@@ -733,7 +694,6 @@ static void LYHWStyleGroupInfoCell(UITableViewCell *cell) {
     if (!cell.selectedBackgroundView || cell.selectedBackgroundView.tag != 0x45e1) {
         UIView *sel = [UIView new]; sel.tag = 0x45e1; sel.backgroundColor = UIColor.clearColor; cell.selectedBackgroundView = sel;
     }
-    LYHWSetStyling(cell, NO);
 }
 
 
@@ -741,13 +701,9 @@ static BOOL gLYHWInStyle = NO;
 static void LYHWStyleCellCardInner(UITableViewCell *cell);
 static void LYHWStyleCellCard(UITableViewCell *cell) {
     if (!cell || gLYHWInStyle) return;
-    // 液态底栏只与“底栏圆角”互斥，主页卡片圆角仍正常生效。
-    if (LYHWStyling(cell)) return;
-    LYHWSetStyling(cell, YES);
     gLYHWInStyle = YES;
     LYHWStyleCellCardInner(cell);
     gLYHWInStyle = NO;
-    LYHWSetStyling(cell, NO);
 }
 static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     if (!cell) return;
@@ -955,8 +911,7 @@ static void LYHWStyleCellCardInner(UITableViewCell *cell) {
     }
     LYHWApplyCardShadow(cell, card, c, isLastRow);
     LYHWConstrainSwipeViews(cell, card);
-    LYHWStartSwipeLink(cell, card);
-    LYHWSetStyling(cell, NO);
+    LYHWScheduleSwipeRescan(cell, card);
 }
 
 
@@ -1653,15 +1608,17 @@ static void LYHWRestyleVisibleCells(UIView *root) {
     NSMutableArray *tabs = [NSMutableArray array];
     LYHWFindTables(root, tabs, 0);
     for (UITableView *tv in tabs) {
-        // 绝不能在表格自己的 layoutSubviews 链里再调 layoutIfNeeded：
-        // 会触发 UIScrollView _updatePockets → 视图重加 → trait 刷新 → 再次 layoutSubviews，
-        // 配合液态底栏重排直接变成无限递归（0x8BADF00D）。
-        [CATransaction begin];
-        [CATransaction setDisableActions:YES];
-        for (UITableViewCell *cell in tv.visibleCells) {
-            LYHWStyleCellCard(cell);
-        }
-        [CATransaction commit];
+        [UIView performWithoutAnimation:^{
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            [tv layoutIfNeeded];
+            for (UITableViewCell *cell in tv.visibleCells) {
+                [cell setNeedsLayout];
+                [cell layoutIfNeeded];
+                LYHWStyleCellCard(cell);   // 主动套一次，不依赖 layoutSubviews 是否被触发
+            }
+            [CATransaction commit];
+        }];
     }
 }
 @interface LYHWRestyleLink : NSObject

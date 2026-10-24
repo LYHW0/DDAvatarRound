@@ -13,13 +13,8 @@ NSString * const LYHWSettingsChangedNotification = @"com.lyhw.settings_changed";
 
 static NSString * const kWRCSuiteName = @"com.lyhw.LYHW";
 
-@interface LYHWConfig () {
-    // 内存缓存：布局回调里一次要读几十个键，每次都走 cfprefsd 太慢（实测是滚动掉帧的主因之一）
-    NSMutableDictionary<NSString *, id> *_cache;
-    NSLock *_cacheLock;
-}
+@interface LYHWConfig ()
 @property (nonatomic, strong) NSUserDefaults *defaults;
-- (void)invalidateCache;
 @end
 
 @implementation LYHWConfig
@@ -36,8 +31,6 @@ static NSString * const kWRCSuiteName = @"com.lyhw.LYHW";
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _cache = [NSMutableDictionary dictionary];
-        _cacheLock = [[NSLock alloc] init];
         _defaults = [[NSUserDefaults alloc] initWithSuiteName:kWRCSuiteName];
         // 从旧版配置迁移一次
         if (![_defaults boolForKey:@"__LYHWMigrated"]) {
@@ -59,44 +52,20 @@ static NSString * const kWRCSuiteName = @"com.lyhw.LYHW";
 
 - (void)reload {
     [self.defaults synchronize];
-    [self invalidateCache];
-}
-
-- (void)invalidateCache {
-    if (!_cacheLock) return;
-    [_cacheLock lock];
-    [_cache removeAllObjects];
-    [_cacheLock unlock];
 }
 
 - (id _Nullable)objectForKey:(NSString *)key def:(id _Nullable)def {
-    if (key.length == 0) return def;
-
-    id cached = nil;
-    [_cacheLock lock];
-    cached = _cache[key];
-    [_cacheLock unlock];
-    if (cached) return (cached == [NSNull null]) ? def : cached;
-
     id v = [self.defaults objectForKey:key];
-    BOOL missing = (v == nil || v == [NSNull null]);
-    [_cacheLock lock];
-    _cache[key] = missing ? [NSNull null] : v;
-    [_cacheLock unlock];
-    return missing ? def : v;
+    if (v == nil || v == [NSNull null]) return def;
+    return v;
 }
 
 - (void)setObject:(id _Nullable)value forKey:(NSString *)key {
-    if (key.length == 0) return;
     if (value == nil) {
         [self.defaults removeObjectForKey:key];
     } else {
         [self.defaults setObject:value forKey:key];
     }
-    [_cacheLock lock];
-    if (value == nil) _cache[key] = [NSNull null];
-    else _cache[key] = value;
-    [_cacheLock unlock];
 }
 
 - (NSDictionary *)exportAll {
@@ -114,15 +83,13 @@ static NSString * const kWRCSuiteName = @"com.lyhw.LYHW";
         if ([v isKindOfClass:[NSNumber class]] || [v isKindOfClass:[NSString class]]) { [self.defaults setObject:v forKey:k]; n++; }
     }
     [self.defaults synchronize];
-    [self invalidateCache];
     return n;
 }
 
 #pragma mark - 取值便捷宏
 
-// 只查一次盘（原来是查两次），几百个 getter 加起来是实打实的开销
 #define LYHW_BOOL(prop, key, defv) \
-- (BOOL)prop { id o = [self objectForKey:@#key def:nil]; return o ? [o boolValue] : (defv); } \
+- (BOOL)prop { return [self objectForKey:@#key def:@(defv)] ? [[self objectForKey:@#key def:@(defv)] boolValue] : defv; } \
 - (void)set##prop:(BOOL)v { [self setObject:@(v) forKey:@#key]; }
 
 #define LYHW_DOUBLE(prop, key, defv) \
@@ -224,8 +191,6 @@ LYHW_STRING(topbarCornerBorderColorLight, topbarCornerBorderColorLight, @"#E5E5E
 LYHW_STRING(topbarCornerBorderColorDark, topbarCornerBorderColorDark, @"#3A3A3C")
 LYHW_BOOL(toolbarCornerEnabled, toolbarCornerEnabled, NO)
 LYHW_DOUBLE(toolbarCornerRadius, toolbarCornerRadius, 24.0)
-LYHW_BOOL(liquidTabBarEnabled, liquidTabBarEnabled, NO)
-LYHW_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, NO)
 LYHW_BOOL(toolbarCornerBottomFlatEnabled, toolbarCornerBottomFlatEnabled, YES)
 LYHW_DOUBLE(toolbarCornerBorderSize, toolbarCornerBorderSize, 0.0)
 LYHW_STRING(toolbarCornerBorderColorLight, toolbarCornerBorderColorLight, @"#E5E5EA")
@@ -365,6 +330,7 @@ LYHW_STRING(menuIconColorLight, menuIconColorLight, @"#111111")
 LYHW_STRING(menuIconColorDark, menuIconColorDark, @"#F2F2F7")
 LYHW_BOOL(menuTextCenterEnabled, menuTextCenterEnabled, NO)
 
+LYHW_BOOL(floatingTabBarEnabled, floatingTabBarEnabled, NO)
 LYHW_BOOL(cardShadowEnabled, cardShadowEnabled, YES)
 LYHW_BOOL(cellTapEffectHidden, cellTapEffectHidden, NO)
 LYHW_DOUBLE(myPageCornerRadius, myPageCornerRadius, 24.0)

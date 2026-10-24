@@ -5,6 +5,7 @@
 #import "DYLThemeManager.h"
 #import "DYLAppearance.h"
 #import <objc/runtime.h>
+#include <zlib.h>
 
 #if __has_include(<SSZipArchive/SSZipArchive.h>)
 #import <SSZipArchive/SSZipArchive.h>
@@ -12,6 +13,86 @@
 #else
 #define DYL_HAS_SSZIPARCHIVE 0
 #endif
+
+
+#pragma mark - 内置 ZIP 解压（Store + Deflate）
+
+static uint16_t DYLZip16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
+static uint32_t DYLZip32(const uint8_t *p) { return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }
+
+static BOOL DYLZipSafeRelativePath(NSString *name) {
+    if (name.length == 0 || [name hasPrefix:@"/"] || [name containsString:@":" ] || [name containsString:@".."])
+        return NO;
+    return YES;
+}
+
+static NSData *DYLZipInflate(NSData *compressed, NSUInteger outputSize) {
+    if (outputSize > 256 * 1024 * 1024) return nil;
+    NSMutableData *out = [NSMutableData dataWithLength:outputSize];
+    z_stream stream = {0};
+    stream.next_in = (Bytef *)compressed.bytes;
+    stream.avail_in = (uInt)MIN(compressed.length, UINT_MAX);
+    stream.next_out = out.mutableBytes;
+    stream.avail_out = (uInt)MIN(outputSize, UINT_MAX);
+    if (inflateInit2(&stream, -MAX_WBITS) != Z_OK) return nil;
+    int result = inflate(&stream, Z_FINISH);
+    inflateEnd(&stream);
+    if (result != Z_STREAM_END || stream.total_out != outputSize) return nil;
+    return out;
+}
+
+static BOOL DYLUnzipArchive(NSString *source, NSString *destination, NSString **message) {
+    NSData *data = [NSData dataWithContentsOfFile:source];
+    if (data.length < 22) { if (message) *message = @"ZIP 文件太小或已损坏"; return NO; }
+    const uint8_t *bytes = data.bytes; NSUInteger length = data.length;
+    NSUInteger searchStart = length > (65535 + 22) ? length - (65535 + 22) : 0;
+    NSUInteger eocd = NSNotFound;
+    for (NSUInteger i = length - 22; i >= searchStart; i--) {
+        if (DYLZip32(bytes + i) == 0x06054b50) { eocd = i; break; }
+        if (i == 0) break;
+    }
+    if (eocd == NSNotFound) { if (message) *message = @"找不到 ZIP 目录"; return NO; }
+    uint16_t count = DYLZip16(bytes + eocd + 10);
+    uint32_t centralSize = DYLZip32(bytes + eocd + 12);
+    uint32_t centralOffset = DYLZip32(bytes + eocd + 16);
+    if ((uint64_t)centralOffset + centralSize > length || count > 10000) { if (message) *message = @"ZIP 目录无效"; return NO; }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    [fm createDirectoryAtPath:destination withIntermediateDirectories:YES attributes:nil error:NULL];
+    NSUInteger pos = centralOffset;
+    for (uint16_t index = 0; index < count; index++) {
+        if (pos + 46 > length || DYLZip32(bytes + pos) != 0x02014b50) { if (message) *message = @"ZIP 条目损坏"; return NO; }
+        uint16_t method = DYLZip16(bytes + pos + 10);
+        uint32_t compressedSize = DYLZip32(bytes + pos + 20);
+        uint32_t uncompressedSize = DYLZip32(bytes + pos + 24);
+        uint16_t nameLen = DYLZip16(bytes + pos + 28);
+        uint16_t extraLen = DYLZip16(bytes + pos + 30);
+        uint16_t commentLen = DYLZip16(bytes + pos + 32);
+        uint32_t localOffset = DYLZip32(bytes + pos + 42);
+        if (pos + 46 + nameLen + extraLen + commentLen > length) return NO;
+        NSString *name = [[NSString alloc] initWithBytes:bytes + pos + 46 length:nameLen encoding:NSUTF8StringEncoding];
+        if (!name) name = [[NSString alloc] initWithBytes:bytes + pos + 46 length:nameLen encoding:NSASCIIStringEncoding];
+        if (!DYLZipSafeRelativePath(name)) { if (message) *message = @"ZIP 包含不安全路径"; return NO; }
+        NSString *target = [destination stringByAppendingPathComponent:name];
+        BOOL directory = [name hasSuffix:@"/"];
+        if (directory) {
+            [fm createDirectoryAtPath:target withIntermediateDirectories:YES attributes:nil error:NULL];
+        } else {
+            if (localOffset + 30 > length || DYLZip32(bytes + localOffset) != 0x04034b50) return NO;
+            uint16_t localNameLen = DYLZip16(bytes + localOffset + 26);
+            uint16_t localExtraLen = DYLZip16(bytes + localOffset + 28);
+            uint64_t payload = (uint64_t)localOffset + 30 + localNameLen + localExtraLen;
+            if (payload + compressedSize > length) return NO;
+            NSData *packed = [data subdataWithRange:NSMakeRange((NSUInteger)payload, compressedSize)];
+            NSData *fileData = method == 0 ? packed : (method == 8 ? DYLZipInflate(packed, uncompressedSize) : nil);
+            if (!fileData) { if (message) *message = @"主题 ZIP 使用了不支持的压缩方式"; return NO; }
+            NSString *parent = [target stringByDeletingLastPathComponent];
+            [fm createDirectoryAtPath:parent withIntermediateDirectories:YES attributes:nil error:NULL];
+            if (![fileData writeToFile:target options:NSDataWritingAtomic error:NULL]) return NO;
+        }
+        pos += 46 + nameLen + extraLen + commentLen;
+    }
+    return YES;
+}
 
 #pragma mark - DYLTheme
 
@@ -168,7 +249,7 @@
             ok = [SSZipArchive unzipFileAtPath:source toDestination:unzipRoot];
             if (!ok) lastError = @"解压失败";
 #else
-            lastError = @"工程里没有解压库（加 SSZipArchive 即可支持 zip，或直接把主题目录拷进来）";
+            ok = DYLUnzipArchive(source, unzipRoot, &lastError);
 #endif
         } else {
             lastError = @"只支持主题目录或 zip";
