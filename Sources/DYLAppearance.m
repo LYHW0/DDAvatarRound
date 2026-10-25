@@ -254,16 +254,27 @@ typedef UIImage *(*DYLImageNamedTraitImp)(id, SEL, NSString *, NSBundle *, UITra
 static DYLImageNamedImp      dyl_orig_imageNamed      = NULL;
 static DYLImageNamedTraitImp dyl_orig_imageNamedTrait = NULL;
 
+// Preserve the host asset's nine-slice metadata when replacing a named image.
+static UIImage *DYLThemeImageWithMetrics(UIImage *image, UIImage *original, NSString *name) {
+    if (!image || !original) return image;
+    UIEdgeInsets caps = original.capInsets;
+    if (!UIEdgeInsetsEqualToEdgeInsets(caps, UIEdgeInsetsZero) && original.size.width > 0 && original.size.height > 0) {
+        CGFloat x = image.size.width / original.size.width, y = image.size.height / original.size.height;
+        caps = UIEdgeInsetsMake(caps.top*y, caps.left*x, caps.bottom*y, caps.right*x);
+        if (caps.left + caps.right < image.size.width && caps.top + caps.bottom < image.size.height)
+            image = [image resizableImageWithCapInsets:caps resizingMode:original.resizingMode];
+    }
+    return [image imageWithRenderingMode:original.renderingMode];
+}
 static UIImage *dyl_imageNamed(id self, SEL _cmd, NSString *name) {
     UIImage *img = [[DYLThemeManager shared] imageForKey:name];
-    if (img) return img;
-    return dyl_orig_imageNamed ? dyl_orig_imageNamed(self, _cmd, name) : nil;
+    UIImage *original = dyl_orig_imageNamed ? dyl_orig_imageNamed(self, _cmd, name) : nil;
+    return img ? DYLThemeImageWithMetrics(img, original, name) : original;
 }
-
 static UIImage *dyl_imageNamedTrait(id self, SEL _cmd, NSString *name, NSBundle *bundle, UITraitCollection *tc) {
     UIImage *img = [[DYLThemeManager shared] imageForKey:name];
-    if (img) return img;
-    return dyl_orig_imageNamedTrait ? dyl_orig_imageNamedTrait(self, _cmd, name, bundle, tc) : nil;
+    UIImage *original = dyl_orig_imageNamedTrait ? dyl_orig_imageNamedTrait(self, _cmd, name, bundle, tc) : nil;
+    return img ? DYLThemeImageWithMetrics(img, original, name) : original;
 }
 
 typedef void (*DYLViewDidLoadImp)(id, SEL);

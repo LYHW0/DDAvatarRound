@@ -1297,13 +1297,14 @@ static void LYHWStyleInfoHeader(UITableView *tv) {
         double hst = LYHWCCfg().cardShadowEnabled ? MAX(0.0, MIN(1.0, LYHWCCfg().cardShadowStrength)) : 0.0;
         // 阴影画在头部视图图层上（卡片自己不裁剪也可以，但统一放到 h 上，与 cell 一致）
         h.clipsToBounds = NO;
-        LYHWSetSinkShadow(h.layer, card.frame, pr, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
+        h.layer.shadowOpacity = 0; h.layer.shadowPath = NULL;
+        LYHWSetSinkShadow(card.layer, card.bounds, pr, kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner, hst);
     }
     LYHWSetBackgroundIfChanged(h, [UIColor clearColor]);
     stopW = W;
     LYHWClearBg(h, card);
     LYHWClearWiderWhite(h, card.bounds.size.width, card, 0);
-    LYHWPaintListSurface(tv, h);
+    LYHWPaintListSurface(tv, nil); // header must remain transparent around its card
     // 卡片收口后，头部自身也要跟着收，否则卡片下方会多出一段空白
     CGFloat wantH = CGRectGetMaxY(card.frame) + 8.0;
     if (wantH > 40 && fabs(h.bounds.size.height - wantH) > 1.0 && wantH < H) {
