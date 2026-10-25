@@ -1458,7 +1458,41 @@ static void LYHWClearSectionBars(UITableView *tv) {
     }
 }
 
+// CALayer shadows do not own touches. The full native row still does, so
+// exclude the actual card's exterior at the table hit-test/row lookup boundary.
+static BOOL LYHWPointOutsideOwnedCard(UITableView *table, NSIndexPath *ip, CGPoint point) {
+    UITableViewCell *cell = ip ? [table cellForRowAtIndexPath:ip] : nil;
+    if (!cell || LYHWCellIsSwiped(cell)) return NO; // Preserve swipe actions.
+    UIView *card = cell.backgroundView;
+    if (![card isKindOfClass:LYHWCardView.class] || card.tag != 0x574352) return NO;
+    CGPoint local = [cell convertPoint:point fromView:table];
+    CGRect rect = ((LYHWCardView *)card).lockedFrame;
+    if (!CGRectContainsPoint(rect, local)) return YES;
+    CACornerMask cm = card.layer.maskedCorners;
+    UIRectCorner corners = 0;
+    if (cm & kCALayerMinXMinYCorner) corners |= UIRectCornerTopLeft;
+    if (cm & kCALayerMaxXMinYCorner) corners |= UIRectCornerTopRight;
+    if (cm & kCALayerMinXMaxYCorner) corners |= UIRectCornerBottomLeft;
+    if (cm & kCALayerMaxXMaxYCorner) corners |= UIRectCornerBottomRight;
+    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:rect byRoundingCorners:corners cornerRadii:CGSizeMake(card.layer.cornerRadius,card.layer.cornerRadius)];
+    return ![path containsPoint:local];
+}
 %hook UITableView
+- (NSIndexPath *)indexPathForRowAtPoint:(CGPoint)point {
+    NSIndexPath *ip = %orig;
+    return LYHWPointOutsideOwnedCard((UITableView *)self,ip,point) ? nil : ip;
+}
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hit = %orig;
+    UITableViewCell *cell = nil;
+    for (UIView *v = hit; v && v != (UIView *)self; v = v.superview) {
+        if ([v isKindOfClass:UITableViewCell.class]) { cell = (id)v; break; }
+    }
+    NSIndexPath *ip = cell ? [(UITableView *)self indexPathForCell:cell] : nil;
+    // Keep the table as the hit target so its scroll gesture still works.
+    if (LYHWPointOutsideOwnedCard((UITableView *)self,ip,point)) return (UIView *)self;
+    return hit;
+}
 - (void)setShowsVerticalScrollIndicator:(BOOL)show {
     // Only recognized WeChat list pages, not web views or arbitrary scroll views.
     if (show && LYHWPageKind((UIView *)self) != 0) show = NO;
