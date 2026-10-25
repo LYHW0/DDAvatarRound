@@ -68,6 +68,10 @@ static void LYHWDumpWalk(UIView *v, NSMutableString *out, int depth) {
         LYHWDumpColor(v.backgroundColor), v.hidden, v.alpha, v.clipsToBounds,
         v.layer.cornerRadius, (unsigned int)v.layer.maskedCorners];
     LYHWDumpMask(v, out, depth);
+    if ([v isKindOfClass:UIImageView.class]) {
+        UIImage *image = ((UIImageView *)v).image;
+        [out appendFormat:@"%*simage size=%@ scale=%.2f caps=%@ center=%@ rect=%@\n", depth*2+2, "", NSStringFromCGSize(image.size), image.scale, NSStringFromUIEdgeInsets(image.capInsets), NSStringFromCGRect(v.layer.contentsCenter), NSStringFromCGRect(v.layer.contentsRect)];
+    }
     if ([v isKindOfClass:UITableViewCell.class]) {
         UITableViewCell *cell = (UITableViewCell *)v;
         UIView *card = cell.backgroundView;

@@ -3,12 +3,17 @@
 static BOOL LYHWChatTitleNeedsContrast(UIView *view) {
     if (![LYHWConfig shared].topbarCornerEnabled) return NO;
     BOOL title = [NSStringFromClass(view.class) isEqualToString:@"MMTitleView"];
+    BOOL backNumber = NO;
+    if ([view isKindOfClass:UILabel.class]) {
+        NSString *text = ((UILabel *)view).text;
+        backNumber = text.length > 0 && [text rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet.invertedSet].location == NSNotFound;
+    }
     UINavigationBar *bar = nil;
     for (UIView *p = view.superview; p; p = p.superview) {
         if ([NSStringFromClass(p.class) isEqualToString:@"MMTitleView"]) title = YES;
         if ([p isKindOfClass:UINavigationBar.class]) { bar = (id)p; break; }
     }
-    if (!title || !bar) return NO;
+    if (!bar || (!title && !(backNumber && [NSStringFromClass(view.superview.class) isEqualToString:@"MMBarButton"]))) return NO;
     // Dump confirms MMTitleView/MMUILabel under MMUINavigationBar and a sibling
     // MMMsgContentNavBar in the chat root. Do not depend on responder VC names.
     NSMutableArray *pending = [NSMutableArray array];
@@ -59,6 +64,32 @@ static NSAttributedString *LYHWChatTitleAttributed(UIView *view, NSAttributedStr
             UILabel *label = (id)v;
             UIColor *next = LYHWChatTitleColor(v,label.textColor);
             if (![next isEqual:label.textColor]) label.textColor = next;
+            NSAttributedString *text = LYHWChatTitleAttributed(v,label.attributedText);
+            if (text != label.attributedText) label.attributedText = text;
+        }
+        [pending addObjectsFromArray:v.subviews];
+    }
+}
+%end
+
+%hook UIButtonLabel
+- (void)setTextColor:(UIColor *)color {
+    %orig(LYHWChatTitleColor((UIView *)self,color));
+}
+- (void)setAttributedText:(NSAttributedString *)text {
+    %orig(LYHWChatTitleAttributed((UIView *)self,text));
+}
+%end
+%hook UINavigationBar
+- (void)layoutSubviews {
+    %orig;
+    NSMutableArray *pending = [NSMutableArray arrayWithArray:((UIView *)self).subviews];
+    for (NSUInteger i=0; i<pending.count && i<256; i++) {
+        UIView *v = pending[i];
+        if ([v isKindOfClass:UILabel.class]) {
+            UILabel *label = (id)v;
+            UIColor *color = LYHWChatTitleColor(v,label.textColor);
+            if (![color isEqual:label.textColor]) label.textColor = color;
             NSAttributedString *text = LYHWChatTitleAttributed(v,label.attributedText);
             if (text != label.attributedText) label.attributedText = text;
         }
