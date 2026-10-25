@@ -13,6 +13,8 @@ class Visual57(unittest.TestCase):
  def test_title_chat_only(self):
   s=(R/'LYHWChatTitleContrast.x').read_text()
   self.assertIn('topbarCornerEnabled',s)
-  self.assertIn('MsgContentViewController',s)
-  self.assertIn('!dark',s)
+  self.assertIn('MMTitleView',s)
+  self.assertIn('MMMsgContentNavBar',s)
+  self.assertIn('NSForegroundColorAttributeName',s)
+  self.assertIn('UIUserInterfaceStyleDark',s)
 if __name__=='__main__': unittest.main()

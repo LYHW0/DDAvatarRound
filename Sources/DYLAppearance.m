@@ -257,6 +257,12 @@ static DYLImageNamedTraitImp dyl_orig_imageNamedTrait = NULL;
 // Preserve the host asset's nine-slice metadata when replacing a named image.
 static UIImage *DYLThemeImageWithMetrics(UIImage *image, UIImage *original, NSString *name) {
     if (!image || !original) return image;
+    NSValue *themeCaps = objc_getAssociatedObject(image, NSSelectorFromString(@"lyhwThemeTextBubbleCaps"));
+    if (themeCaps) {
+        UIImage *rendered = [image imageWithRenderingMode:original.renderingMode];
+        objc_setAssociatedObject(rendered, NSSelectorFromString(@"lyhwThemeTextBubbleCaps"), themeCaps, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return rendered;
+    }
     UIEdgeInsets caps = original.capInsets;
     if (!UIEdgeInsetsEqualToEdgeInsets(caps, UIEdgeInsetsZero) && original.size.width > 0 && original.size.height > 0) {
         CGFloat x = image.size.width / original.size.width, y = image.size.height / original.size.height;
@@ -296,7 +302,26 @@ static void dyl_viewDidLoad(id self, SEL _cmd) {
     }
 }
 
+typedef UIImage *(*DYLResizeImp)(id, SEL, UIEdgeInsets, UIImageResizingMode);
+typedef UIImage *(*DYLStretchImp)(id, SEL, NSInteger, NSInteger);
+static DYLResizeImp dyl_orig_resizeTheme;
+static DYLStretchImp dyl_orig_stretchTheme;
+static UIImage *dyl_resizeTheme(id self, SEL cmd, UIEdgeInsets caps, UIImageResizingMode mode) {
+    NSValue *fixed = objc_getAssociatedObject(self, NSSelectorFromString(@"lyhwThemeTextBubbleCaps"));
+    if (fixed) { caps = fixed.UIEdgeInsetsValue; mode = UIImageResizingModeStretch; }
+    UIImage *result = dyl_orig_resizeTheme ? dyl_orig_resizeTheme(self,cmd,caps,mode) : self;
+    if (fixed) objc_setAssociatedObject(result, NSSelectorFromString(@"lyhwThemeTextBubbleCaps"), fixed, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return result;
+}
+static UIImage *dyl_stretchTheme(id self, SEL cmd, NSInteger left, NSInteger top) {
+    NSValue *fixed = objc_getAssociatedObject(self, NSSelectorFromString(@"lyhwThemeTextBubbleCaps"));
+    if (fixed && dyl_orig_resizeTheme)
+        return dyl_resizeTheme(self,@selector(resizableImageWithCapInsets:resizingMode:),fixed.UIEdgeInsetsValue,UIImageResizingModeStretch);
+    return dyl_orig_stretchTheme ? dyl_orig_stretchTheme(self,cmd,left,top) : self;
+}
 static void DYLInstallThemeHooks(void) {
+    DYLHookInstanceMethod(UIImage.class, @selector(resizableImageWithCapInsets:resizingMode:), (IMP)dyl_resizeTheme, (IMP *)&dyl_orig_resizeTheme);
+    DYLHookInstanceMethod(UIImage.class, @selector(stretchableImageWithLeftCapWidth:topCapHeight:), (IMP)dyl_stretchTheme, (IMP *)&dyl_orig_stretchTheme);
     DYLHookClassMethod([UIImage class], @selector(imageNamed:), (IMP)dyl_imageNamed, (IMP *)&dyl_orig_imageNamed);
     DYLHookClassMethod([UIImage class], @selector(imageNamed:inBundle:compatibleWithTraitCollection:),
                        (IMP)dyl_imageNamedTrait, (IMP *)&dyl_orig_imageNamedTrait);

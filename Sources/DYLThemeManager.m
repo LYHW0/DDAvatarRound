@@ -427,6 +427,18 @@ static NSDictionary *DYLResourceImages(NSString *root) {
         // PDF / SVG 之类交给系统
         img = [UIImage imageNamed:path];
     }
+    if (img && [path.lastPathComponent hasPrefix:@"ChatRoom_Bubble_Text_"] && img.CGImage) {
+        // Image-only packs have no asset-catalog slicing metadata. Stretch only
+        // the center pixel; never stretch the edge/tail rows across the bubble.
+        CGFloat scale = img.scale;
+        size_t width = CGImageGetWidth(img.CGImage), height = CGImageGetHeight(img.CGImage);
+        if (width > 2 && height > 2) {
+            CGFloat left = floor((width-1)/2.0), top = floor((height-1)/2.0);
+            UIEdgeInsets caps = UIEdgeInsetsMake(top/scale,left/scale,(height-top-1)/scale,(width-left-1)/scale);
+            img = [img resizableImageWithCapInsets:caps resizingMode:UIImageResizingModeStretch];
+            objc_setAssociatedObject(img, NSSelectorFromString(@"lyhwThemeTextBubbleCaps"), [NSValue valueWithUIEdgeInsets:caps], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    }
     if (img) self.imageCache[key] = img;
     return img;
 }
