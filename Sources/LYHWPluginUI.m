@@ -100,7 +100,9 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
     NSArray *pages = @[
         P(L63Decode(68), LYHWItem(L63Decode(69), L63Decode(70), L63Decode(9), 0, 1),
                       LYHWItem(L63Decode(71), L63Decode(72), L63Decode(9), 0, 1),
-                      LYHWItem(L63Decode(73), L63Decode(74), L63Decode(9), 0, 1)),
+                      LYHWItem(L63Decode(73), L63Decode(74), L63Decode(9), 0, 1),
+                      // Restore the existing speed implementation's menu entry.
+                      LYHWItem(L63Decode(169), L63Decode(151), L63Decode(151), 0, 0)),
         P(L63Decode(75), LYHWItem(L63Decode(76), L63Decode(77), L63Decode(9), 0, 1),
                       LYHWItem(L63Decode(78), L63Decode(79), L63Decode(9), 0, 1),
                       LYHWItem(L63Decode(80), L63Decode(81), L63Decode(9), 0, 1),
