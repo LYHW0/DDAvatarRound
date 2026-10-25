@@ -8,7 +8,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = LYHW
 
 LYHW_FILES = Tweak.x $(wildcard Sources/*.x) $(wildcard Sources/*.m)
-LYHW_CFLAGS = -fobjc-arc -ISources -Wno-error -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-property-ivar
+LYHW_CFLAGS = -fvisibility=hidden -fvisibility-inlines-hidden -g0 -O2  -fobjc-arc -ISources -Wno-error -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-property-ivar
 LYHW_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics CoreFoundation
 
 SUBPROJECTS += prefs
