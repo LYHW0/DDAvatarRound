@@ -359,8 +359,6 @@ LYHW_DOUBLE(chatDetailCornerMargin, chatDetailCornerMargin, 10.0)
 LYHW_BOOL(groupInfoCornerEnabled, groupInfoCornerEnabled, YES)
 LYHW_DOUBLE(groupInfoCornerRadius, groupInfoCornerRadius, 24.0)
 LYHW_DOUBLE(groupInfoCornerMargin, groupInfoCornerMargin, 20.0)
-LYHW_BOOL(servicePageCornerEnabled, servicePageCornerEnabled, YES)
-LYHW_DOUBLE(servicePageCornerRadius, servicePageCornerRadius, 24.0)
 
 
 #pragma mark - 全局圆角移植（规则表，68 项）

@@ -8,7 +8,10 @@ class Slim53(unittest.TestCase):
   for key in ['glassHideRedDot','glassHideBadge']: self.assertIn(key,s)
  def test_service_single_entry(self):
   s=(R/'Sources/LYHWPluginUI.m').read_text()
-  self.assertEqual(s.count('@"servicePageCornerEnabled"'),1)
+  self.assertEqual(s.count('@"servicePageCornerEnabled"'),0)
+  cards=(R/'Sources/LYHWCellCards.x').read_text()
+  self.assertNotIn('servicePageCornerEnabled',cards)
+  self.assertNotIn('LYHWInService',cards)
   self.assertNotIn('@"glassDisableMask"',s)
  def test_details_lifecycle_and_member_exclusion(self):
   s=(R/'Sources/LYHWCellCards.x').read_text()

@@ -94,6 +94,28 @@ static BOOL DYLUnzipArchive(NSString *source, NSString *destination, NSString **
     return YES;
 }
 
+// Legacy WeChat resource packs may contain images only, without a manifest.
+static NSDictionary *DYLResourceImages(NSString *root) {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSMutableDictionary *images = [NSMutableDictionary dictionary];
+    NSDirectoryEnumerator *walk = [fm enumeratorAtPath:root];
+    for (NSString *relative in walk) {
+        BOOL ignored = NO;
+        for (NSString *component in relative.pathComponents)
+            if ([component hasPrefix:@"."] || [component isEqualToString:@"__MACOSX"]) { ignored = YES; break; }
+        if (ignored) { [walk skipDescendants]; continue; }
+        if (![@[@"png", @"jpg", @"jpeg", @"webp"] containsObject:relative.pathExtension.lowercaseString]) continue;
+        NSString *full = [root stringByAppendingPathComponent:relative];
+        NSDictionary *attrs = [fm attributesOfItemAtPath:full error:nil];
+        if (![attrs[NSFileType] isEqual:NSFileTypeRegular]) continue;
+        NSString *key = relative.lastPathComponent.stringByDeletingPathExtension;
+        // Ambiguous basenames must not silently select an arbitrary resource.
+        if (images[key] && ![images[key] isEqual:relative]) return nil;
+        images[key] = relative;
+    }
+    return images;
+}
+
 #pragma mark - DYLTheme
 
 @interface DYLTheme ()
@@ -138,6 +160,21 @@ static BOOL DYLUnzipArchive(NSString *source, NSString *destination, NSString **
 
 - (NSString *)imagePathForKey:(NSString *)key {
     NSString *file = self.images[key];
+    if (file.length == 0) {
+        NSString *stem = key.stringByDeletingPathExtension;
+        file = self.images[stem];
+        if (!file.length) {
+            // Honor explicitly requested scale; otherwise prefer device scale.
+            BOOL explicitScale = [stem hasSuffix:@"@2x"] || [stem hasSuffix:@"@3x"];
+            if (!explicitScale) {
+                NSArray *scales = UIScreen.mainScreen.scale >= 2.5 ? @[@"@3x", @"@2x", @""] : @[@"@2x", @"@3x", @""];
+                for (NSString *scale in scales) {
+                    file = self.images[[stem stringByAppendingString:scale]];
+                    if (file.length) break;
+                }
+            }
+        }
+    }
     if (file.length == 0) return nil;
     if ([file isAbsolutePath]) return file;
 
@@ -276,21 +313,35 @@ static BOOL DYLUnzipArchive(NSString *source, NSString *destination, NSString **
             NSString *p = [unzipRoot stringByAppendingPathComponent:sub];
             BOOL d = NO;
             if ([fm fileExistsAtPath:p isDirectory:&d] && d) {
-                if ([fm fileExistsAtPath:[p stringByAppendingPathComponent:@"theme.json"]]) { themeRoot = p; break; }
+                if ([fm fileExistsAtPath:[p stringByAppendingPathComponent:@"theme.json"]] || [fm fileExistsAtPath:[p stringByAppendingPathComponent:@"Theme.plist"]]) { themeRoot = p; break; }
             }
         }
     }
 
     if (!themeRoot) {
+        NSDictionary *images = DYLResourceImages(unzipRoot);
+        if (images.count) {
+            NSString *displayName = url.lastPathComponent.stringByDeletingPathExtension;
+            NSDictionary *manifest = @{ @"name": displayName.length ? displayName : @"图片资源主题", @"images": images };
+            NSData *data = [NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingPrettyPrinted error:nil];
+            if (data && [data writeToFile:[unzipRoot stringByAppendingPathComponent:@"theme.json"] options:NSDataWritingAtomic error:nil])
+                themeRoot = unzipRoot;
+        }
+    }
+    if (!themeRoot) {
         if (error) {
             *error = [NSError errorWithDomain:@"DYLThemeManager" code:-2
-                                     userInfo:@{NSLocalizedDescriptionKey : @"主题包里找不到 theme.json"}];
+                                     userInfo:@{NSLocalizedDescriptionKey : @"主题包需要 theme.json/Theme.plist，或包含可识别的图片资源（同名资源不可重复）"}];
         }
         return NO;
     }
 
     DYLTheme *theme = [DYLTheme themeAtPath:themeRoot];
-    NSString *ident = theme.identifier.length > 0 ? theme.identifier : [NSUUID UUID].UUIDString;
+    if (!theme) {
+        if (error) *error = [NSError errorWithDomain:@"DYLThemeManager" code:-4 userInfo:@{NSLocalizedDescriptionKey:@"主题配置文件无效"}];
+        return NO;
+    }
+    NSString *ident = [@"import-" stringByAppendingString:NSUUID.UUID.UUIDString];
     NSString *dst = [self.themesDirectory stringByAppendingPathComponent:ident];
     [fm removeItemAtPath:dst error:NULL];
     ok = [fm moveItemAtPath:themeRoot toPath:dst error:NULL];

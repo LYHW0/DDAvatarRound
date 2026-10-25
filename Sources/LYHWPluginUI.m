@@ -95,9 +95,7 @@ static NSDictionary *LYHWPageWithItems(NSString *title, NSArray *items) {
     LYHWAddCornerGroup(content, @"文件浏览", @"fileBrowseCorner", YES);
 
     NSMutableArray *service = [NSMutableArray array];
-    [service addObject:LYHWItem(@"服务页卡片圆角", @"servicePageCornerEnabled", @"bool", 0, 1)];
-    [service addObject:LYHWItem(@"卡片圆角半径", @"servicePageCornerRadius", @"num", 0, 60)];
-    LYHWAddCornerGroup(service, @"钱包控件", @"serviceCorner", YES);
+    LYHWAddCornerGroup(service, @"服务页/钱包", @"serviceCorner", YES);
 
     NSArray *pages = @[
         P(@"悬浮底栏", LYHWItem(@"启用悬浮底栏（重启生效）", @"glassTabBarEnabled", @"bool", 0, 1),

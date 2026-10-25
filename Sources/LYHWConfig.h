@@ -334,8 +334,6 @@ extern NSString * const LYHWSettingsChangedNotification;
 @property (nonatomic, assign) BOOL groupInfoCornerEnabled;
 @property (nonatomic, assign) double groupInfoCornerRadius;
 @property (nonatomic, assign) double groupInfoCornerMargin;
-@property (nonatomic, assign) BOOL servicePageCornerEnabled;
-@property (nonatomic, assign) double servicePageCornerRadius;
 
 
 #pragma mark - 全局圆角移植（规则表，68 项）

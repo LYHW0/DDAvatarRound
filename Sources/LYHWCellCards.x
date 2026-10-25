@@ -92,7 +92,7 @@ static BOOL LYHWAnyCardOn(void) {
     return c.homepageCornerEnabled || c.mainFrameCornerEnabled ||
            c.discoverPageCornerEnabled || c.myPageCornerEnabled || c.settingPageCornerEnabled ||
            c.timelineCornerEnabled || c.profilePageCornerEnabled || c.chatDetailCornerEnabled ||
-           c.servicePageCornerEnabled || c.groupInfoCornerEnabled;
+           c.groupInfoCornerEnabled;
 }
 
 static BOOL LYHWClassExcluded(NSString *cls) {
@@ -1869,48 +1869,6 @@ static BOOL LYHWIsWhiteish(UIColor *c) {
     ((UIView *)self).layer.backgroundColor = nil;
     LYHWClearGroupInfoSurface(tv);
     LYHWClearGroupInfoContent((UIView *)self, 0);
-}
-%end
-
-#pragma mark - 服务页（WCPayMainViewControllerV2）
-static BOOL LYHWInService(UIView *v) {
-    for (UIResponder *r = v; r; r = r.nextResponder)
-        if ([r isKindOfClass:[UIViewController class]]) return [NSStringFromClass([r class]) isEqualToString:@"WCPayMainViewControllerV2"];
-    return NO;
-}
-static void LYHWRoundCard(UIView *v, CGFloat r) {
-    v.layer.cornerRadius = r;
-    if (@available(iOS 13.0, *)) v.layer.cornerCurve = kCACornerCurveContinuous;
-    v.layer.masksToBounds = YES;
-}
-%hook UICollectionView
-- (void)layoutSubviews {
-    %orig;
-    LYHWConfig *c = LYHWCCfg();
-    if (!c.servicePageCornerEnabled) return;
-    UICollectionView *cv = (UICollectionView *)self;
-    if (!LYHWInService(cv)) return;
-    CGFloat W = cv.bounds.size.width, r = c.servicePageCornerRadius, m = 10;
-    LYHWSetBackgroundIfChanged(cv, LYHWCachedPalette6());
-    for (UIView *sv in cv.subviews) {
-        if ([sv isKindOfClass:[UICollectionViewCell class]] || [sv isKindOfClass:[UIImageView class]]) continue;
-        if (![sv isKindOfClass:[UICollectionReusableView class]]) continue;
-        CGRect f = sv.frame;
-        if (f.size.width >= W * 0.9 && f.size.height >= 60) {
-            f.origin.x = m; f.size.width = W - m * 2; sv.frame = f;
-            LYHWRoundCard(sv, r);
-        }
-    }
-    UIViewController *vc = nil;
-    for (UIResponder *x = cv; x; x = x.nextResponder) if ([x isKindOfClass:[UIViewController class]]) { vc = (UIViewController *)x; break; }
-    @try {
-        UIView *hv = [vc valueForKey:@"headerView"];
-        if ([hv isKindOfClass:[UIView class]]) {
-            UIView *target = hv;
-            for (UIView *sv in hv.subviews) if (sv.bounds.size.width >= hv.bounds.size.width * 0.85 && sv.bounds.size.height >= 80) { target = sv; break; }
-            LYHWRoundCard(target, r);
-        }
-    } @catch (__unused id e) {}
 }
 %end
 
