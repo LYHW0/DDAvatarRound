@@ -362,7 +362,7 @@ static void LYHWSetSinkShadow(CALayer *L, CGRect cardFrame, CGFloat rad, CACorne
 static void LYHWApplyCardShadow(UITableViewCell *cell, UIView *card, LYHWConfig *c, BOOL isBlockBottom) {
     if (!cell || !card) return;
     double st = c.cardShadowEnabled ? MAX(0.0, MIN(1.0, c.cardShadowStrength)) : 0.0;
-    BOOL on = (st > 0.001) && isBlockBottom && !LYHWPressActive(cell) && !LYHWCellIsSwiped(cell) && !cell.highlighted && !cell.selected;
+    BOOL on = (st > 0.001) && isBlockBottom && !LYHWCellIsSwiped(cell);
     LYHWSetSinkShadow(cell.layer, card.frame, card.layer.cornerRadius, card.layer.maskedCorners, on ? st : 0);
 }
 
@@ -1051,24 +1051,10 @@ static void LYHWFixPressedState(UITableViewCell *cell) {
             }
         }
     }
-    // 长按/选中期间锁定状态：不要让微信的中间态触发一次恢复阴影，
-    // 否则阴影挂在最后一行 cell.layer 上，会随那一行的高亮/菜单动画一起移动。
-    {
-        BOOL pressed = cell.highlighted || cell.selected;
-        LYHWSetPressActive(cell, pressed);
-        NSIndexPath *ip = nil;
-        UITableView *tv = nil;
-        for (UIView *v = cell.superview; v; v = v.superview) if ([v isKindOfClass:[UITableView class]]) { tv = (UITableView *)v; break; }
-        if (tv) ip = [tv indexPathForCell:cell];
-        if (pressed) {
-            [CATransaction begin]; [CATransaction setDisableActions:YES];
-            cell.layer.shadowOpacity = 0;
-            cell.layer.shadowPath = NULL;
-            [CATransaction commit];
-        } else if (ip) {
-            LYHWStyleCellCard(cell);
-        }
-    }
+    // Pressing must not clear the block-bottom shadow. Reapply the normal
+    // block geometry under the existing style reentrancy guard.
+    LYHWSetPressActive(cell, cell.highlighted || cell.selected);
+    LYHWStyleCellCard(cell);
     CGFloat cw = card.bounds.size.width;
     for (UIView *sv in cell.subviews) {
         if (sv == cell.contentView || sv == card || sv == sel) continue;
