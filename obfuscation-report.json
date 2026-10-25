@@ -1,0 +1,8 @@
+{
+  "base": "b5ea0e4",
+  "version": "1.0.63",
+  "algorithm": "AES-256-CBC",
+  "strings": 180,
+  "scope": "menu and speed UI strings; runtime class/selector metadata preserved",
+  "key_limitation": "keys are split inside binary; dynamic extraction remains possible"
+}

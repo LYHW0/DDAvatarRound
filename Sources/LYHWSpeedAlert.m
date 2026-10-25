@@ -1,3 +1,4 @@
+#import "L63Strings.h"
 //
 //  LYHWSpeedAlert.m
 //
@@ -40,7 +41,7 @@
 
 #if HB_USE_WECHAT_ALERT_STYLE
     // ── 与原始二进制完全一致的调用序列（宿主需存在 WCUIAlertView）──
-    Class ab = NSClassFromString(@"WCUIAlertView");
+    Class ab = NSClassFromString(L63Decode(168));
     if (ab && [ab instancesRespondToSelector:@selector(initWithTitle:message:)]) {
         id alert = [[ab alloc] initWithTitle:item.alertTitle message:item.alertMessage];
         if ([alert respondsToSelector:@selector(addBtnTitle:target:sel:)]) {
