@@ -14,7 +14,7 @@ class Profile54(unittest.TestCase):
  def test_plain_top_keeps_buttons(self):
   s=(R/'LYHWNavigationBackground.x').read_text()
   self.assertIn('hidesSharedBackground',s)
-  self.assertIn('hidesBackground',s)
+  self.assertNotIn('NSSelectorFromString(@"setHidesBackground:")',s)
   for bad in ['removeFromSuperview','hidden = YES','target =','setNeedsLayout','layoutIfNeeded']:
    self.assertNotIn(bad,s)
 if __name__=='__main__':unittest.main()

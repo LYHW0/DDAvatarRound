@@ -3,13 +3,13 @@
 #import <objc/message.h>
 static void LYHWPlainNavigationButton(UIBarButtonItem *item) {
     if (!item) return;
-    for (NSString *key in @[@"hidesSharedBackground", @"hidesBackground"]) {
-        SEL getter = NSSelectorFromString(key);
-        SEL setter = NSSelectorFromString([NSString stringWithFormat:@"set%@%@:", [[key substringToIndex:1] uppercaseString], [key substringFromIndex:1]]);
-        if ([item respondsToSelector:getter] && [item respondsToSelector:setter] &&
-            !((BOOL (*)(id,SEL))objc_msgSend)(item,getter))
-            ((void (*)(id,SEL,BOOL))objc_msgSend)(item,setter,YES);
-    }
+    // Only suppress the shared visual background. The private hidesBackground
+    // flag can change the hosting path on iOS 26; leave it entirely to UIKit.
+    SEL getter = NSSelectorFromString(@"hidesSharedBackground");
+    SEL setter = NSSelectorFromString(@"setHidesSharedBackground:");
+    if ([item respondsToSelector:getter] && [item respondsToSelector:setter] &&
+        !((BOOL (*)(id,SEL))objc_msgSend)(item,getter))
+        ((void (*)(id,SEL,BOOL))objc_msgSend)(item,setter,YES);
 }
 static void LYHWPlainNavigationItem(UINavigationItem *item) {
     for (UIBarButtonItem *b in item.leftBarButtonItems) LYHWPlainNavigationButton(b);
