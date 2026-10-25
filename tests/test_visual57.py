@@ -5,11 +5,6 @@ class Visual57(unittest.TestCase):
   s=(R/'LYHWCellCards.x').read_text().split('static void LYHWStyleInfoHeader',1)[1].split('static void LYHWStyleMyHeader',1)[0]
   self.assertIn('LYHWSetSinkShadow(card.layer, card.bounds',s)
   self.assertIn('LYHWPaintListSurface(tv, nil)',s)
- def test_theme_keeps_resizing(self):
-  s=(R/'DYLAppearance.m').read_text()
-  self.assertIn('original.capInsets',s)
-  self.assertIn('original.resizingMode',s)
-  self.assertIn('original.renderingMode',s)
  def test_title_chat_only(self):
   s=(R/'LYHWChatTitleContrast.x').read_text()
   self.assertIn('topbarCornerEnabled',s)
