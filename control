@@ -1,6 +1,6 @@
 Package: com.lyhw.lanyinhouwu
 Name: 兰因后悟
-Version: 1.0.65
+Version: 1.0.66
 Architecture: iphoneos-arm64
 Description: 兰因后悟 —— 微信界面美化（圆角 / 阴影 / 悬浮底栏 / 会话分组）
 Maintainer: 懒小王
